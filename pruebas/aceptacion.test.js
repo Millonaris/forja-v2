@@ -15,6 +15,10 @@ import * as fuerza from "../src/logica/motorFuerza.js";
 import * as carrera from "../src/logica/motorCarrera.js";
 import { faseDe, objetivosDe } from "../src/datos/planNutricion.js";
 import { seriesDeHoy, rirDeHoy } from "../src/datos/rampa.js";
+import * as progresion from "../src/logica/progresion.js";
+import * as volumen from "../src/logica/volumen.js";
+import * as agenda from "../src/logica/agenda.js";
+import * as peso from "../src/logica/peso.js";
 import { sumarDias, hoyISO } from "../src/logica/fechas.js";
 
 const estadoInicial = { id: 1, indiceSiguiente: 0, ultimaCompletada: null };
@@ -168,4 +172,184 @@ test("§10 · la rampa recorta series sin crear una rutina aparte", () => {
 
 test("la rampa nunca deja un ejercicio en cero series", () => {
   assert.equal(seriesDeHoy({ series: 1 }, "2026-08-28"), 1);
+});
+
+/* ------------------------------------------------------------------ */
+/* §12 · Progresión y volumen                                          */
+/* ------------------------------------------------------------------ */
+
+test("§12 · rango lleno con el RIR correcto pide subir peso", () => {
+  const ejercicio = { repMin: 8, repMax: 12 };
+  const historial = [
+    { fecha: "2026-08-20", series: [
+      { numeroSerie: 1, kg: 70, reps: 12, rir: 2 },
+      { numeroSerie: 2, kg: 70, reps: 12, rir: 1 },
+      { numeroSerie: 3, kg: 70, reps: 12, rir: 1 },
+    ] },
+  ];
+  assert.equal(progresion.veredicto(ejercicio, historial).id, "sube");
+});
+
+test("§12 · con margen de repeticiones toca llenar el rango, no subir", () => {
+  const ejercicio = { repMin: 8, repMax: 12 };
+  const historial = [
+    { fecha: "2026-08-20", series: [
+      { numeroSerie: 1, kg: 70, reps: 9, rir: 2 },
+      { numeroSerie: 2, kg: 70, reps: 9, rir: 2 },
+    ] },
+  ];
+  assert.equal(progresion.veredicto(ejercicio, historial).id, "llena");
+});
+
+test("§12 · tres sesiones clavado al mismo peso pide revisar", () => {
+  const ejercicio = { repMin: 8, repMax: 12 };
+  const serie = (reps) => [
+    { numeroSerie: 1, kg: 70, reps, rir: 2 },
+    { numeroSerie: 2, kg: 70, reps, rir: 2 },
+  ];
+  const historial = [
+    { fecha: "2026-08-20", series: serie(9) },
+    { fecha: "2026-08-14", series: serie(9) },
+    { fecha: "2026-08-08", series: serie(9) },
+    { fecha: "2026-08-02", series: serie(9) },
+  ];
+  assert.equal(progresion.veredicto(ejercicio, historial).id, "revisar");
+});
+
+test("§9 · la línea de referencia sale como '70 kg · 10/10/9 · RIR 2'", () => {
+  const series = [
+    { numeroSerie: 1, kg: 70, reps: 10, rir: 2 },
+    { numeroSerie: 2, kg: 70, reps: 10, rir: 2 },
+    { numeroSerie: 3, kg: 70, reps: 9, rir: 2 },
+  ];
+  assert.equal(progresion.resumirSesion(series), "70 kg · 10/10/9 · RIR 2");
+});
+
+test("§42 · el volumen no se corta por semanas naturales", () => {
+  // Dos sesiones en domingo y lunes: por semanas naturales caerían en semanas
+  // distintas y saldría "una floja y otra cargada". En ventana móvil son dos
+  // sesiones seguidas, que es lo que de verdad pasó.
+  const domingo = sumarDias(hoyISO(), -2);
+  const lunes = sumarDias(hoyISO(), -1);
+
+  const sesiones = [
+    { id: 1, fecha: domingo, plantillaId: "torso-a" },
+    { id: 2, fecha: lunes, plantillaId: "pierna-a" },
+  ];
+  const ejercicios = [
+    { id: "e1", musculos: ["deltoide lateral"] },
+    { id: "e2", musculos: ["cuádriceps"] },
+  ];
+  const series = [
+    { sesionId: 1, ejercicioId: "e1" },
+    { sesionId: 1, ejercicioId: "e1" },
+    { sesionId: 1, ejercicioId: "e1" },
+    { sesionId: 2, ejercicioId: "e2" },
+    { sesionId: 2, ejercicioId: "e2" },
+  ];
+
+  const v7 = volumen.volumenPorMusculo(sesiones, series, ejercicios, 7);
+  assert.deepEqual(v7, [
+    { musculo: "deltoide lateral", series: 3 },
+    { musculo: "cuádriceps", series: 2 },
+  ]);
+
+  // Y por últimos N entrenamientos, sin mirar el calendario para nada.
+  const v4 = volumen.volumenUltimasSesiones(sesiones, series, ejercicios, 4);
+  assert.equal(v4.reduce((t, m) => t + m.series, 0), 5);
+});
+
+test("§42 · una sesión sugerida el miércoles y hecha el jueves cuenta como hecha", () => {
+  // La adherencia solo mira lo que se hizo dentro de la ventana. La fecha
+  // sugerida no aparece por ningún lado, que es justo el objetivo.
+  const jueves = sumarDias(hoyISO(), -1);
+  const { hechas, objetivo } = volumen.adherenciaFuerza([
+    { id: 1, fecha: jueves, plantillaId: "pierna-a" },
+  ]);
+  assert.equal(hechas, 1);
+  assert.equal(objetivo, 3);
+});
+
+test("§19 · un día sin nada no es un fallo, es un día en blanco", () => {
+  const dias = [sumarDias(hoyISO(), -1), hoyISO()];
+  const mapa = volumen.consistencia(dias, [{ fecha: hoyISO() }], [], []);
+  assert.equal(mapa[0].acciones, 0, "ayer, sin acciones");
+  assert.equal(mapa[1].acciones, 1);
+  // No hay ningún campo de "fallado" ni "incumplido": no existe a propósito.
+  assert.deepEqual(Object.keys(mapa[0]).sort(), ["acciones", "carrera", "fecha", "fuerza", "postura"]);
+});
+
+/* ------------------------------------------------------------------ */
+/* §27 y §38 · Agenda                                                  */
+/* ------------------------------------------------------------------ */
+
+test("§27 · la agenda propone 7 días y todo lo futuro va como SUGERIDO", () => {
+  const dias = agenda.proximos7Dias({
+    ajustes: { diasFuerza: [1, 3, 5], diasCarrera: [2, 4, 0] },
+    estadoFuerza: { indiceSiguiente: 0 },
+    estadoCarrera: { bloque: 3, sesion: 1 },
+  });
+
+  assert.equal(dias.length, 7);
+  for (const dia of dias) {
+    for (const e of dia.entradas) {
+      assert.equal(e.estado, "sugerido");
+      assert.equal(agenda.etiqueta(e), "SUGERIDO");
+    }
+  }
+});
+
+test("§38 · la agenda no propone correr dos días seguidos", () => {
+  const dias = agenda.proximos7Dias({
+    // Todos los días marcados como preferentes para correr: aun así la regla
+    // de días consecutivos tiene que dejar huecos.
+    ajustes: { diasFuerza: [], diasCarrera: [0, 1, 2, 3, 4, 5, 6] },
+    estadoFuerza: { indiceSiguiente: 0 },
+    estadoCarrera: { bloque: 3, sesion: 1 },
+  });
+
+  const conCarrera = dias.map((d) => d.entradas.some((e) => e.tipo === "carrera"));
+  for (let i = 1; i < conCarrera.length; i++) {
+    assert.ok(!(conCarrera[i] && conCarrera[i - 1]), `días ${i - 1} y ${i} seguidos`);
+  }
+});
+
+test("§16 · si fuerza y carrera caen el mismo día, se propone mover la carrera", () => {
+  const choque = agenda.conflicto("2026-08-27", [
+    { tipo: "fuerza", titulo: "Pierna A" },
+    { tipo: "carrera", titulo: "6 × (2′ + 2′)" },
+  ]);
+  assert.match(choque.mensaje, /mantener la fuerza/i);
+  assert.deepEqual(choque.opciones.map((o) => o.id), [
+    "mover-carrera", "omitir-carrera", "ambos", "cancelar",
+  ]);
+});
+
+test("§56 · omitido no se pinta con el color de error", () => {
+  assert.ok(agenda.ESTILO_ESTADO.omitido.opacidad < agenda.ESTILO_ESTADO.realizado.opacidad);
+  const estilos = JSON.stringify(agenda.ESTILO_ESTADO);
+  assert.ok(!/error|rojo|red/i.test(estilos), "ningún estado usa el rojo de error");
+});
+
+/* ------------------------------------------------------------------ */
+/* §6 y §22 · Peso                                                     */
+/* ------------------------------------------------------------------ */
+
+test("§6 · la media de 7 días aguanta días sin apuntar", () => {
+  const pesos = [
+    { fecha: hoyISO(), kg: 95.4 },
+    { fecha: sumarDias(hoyISO(), -2), kg: 95.8 },
+    { fecha: sumarDias(hoyISO(), -4), kg: 96.2 },
+  ];
+  assert.equal(peso.media(pesos, 7).toFixed(1), "95.8");
+  assert.equal(peso.faltaHoy(pesos), false);
+  assert.equal(peso.faltaHoy(pesos.slice(1)), true);
+});
+
+test("el peso se escribe con coma, como se dice", () => {
+  assert.equal(peso.formatear(95.4), "95,4");
+  assert.equal(peso.formatear(95), "95,0");
+  // La media sale de una división y trae muchos decimales: se recorta a uno.
+  assert.equal(peso.formatear(95.4666), "95,5");
+  assert.equal(peso.formatear(null), "—");
 });
