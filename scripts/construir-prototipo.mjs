@@ -174,7 +174,7 @@ writeFileSync(join(SALIDA, "sw.js"), sw);
 
 /* ---------- iconos ---------- */
 
-const ORIGEN_ICONOS = join(RAIZ, "iconos");
+const ORIGEN_ICONOS = join(RAIZ, "public", "iconos");
 let copiados = 0;
 try {
   for (const f of readdirSync(ORIGEN_ICONOS)) {
@@ -182,7 +182,7 @@ try {
     copiados++;
   }
 } catch {
-  console.warn("No hay iconos en ./iconos: ejecuta `node scripts/generar-iconos.mjs` primero.");
+  console.warn("No hay iconos en public/iconos: ejecuta `npm run iconos` primero.");
 }
 
 // GitHub Pages pasa la carpeta por Jekyll y se come lo que empieza por "_".

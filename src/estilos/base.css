@@ -1,0 +1,192 @@
+/*
+ * FORJA 2.0 · Base y piezas compartidas.
+ *
+ * Las clases de aquí son las que se repiten en varias pantallas: tarjeta,
+ * botones, chips, etiquetas de sección. Lo que solo aparece en un sitio se
+ * queda en su componente.
+ */
+
+@import "./tokens.css";
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  background: var(--fondo);
+}
+
+body {
+  margin: 0;
+  font-family: var(--tipo);
+  color: var(--texto);
+  -webkit-font-smoothing: antialiased;
+  /* Instalada como app, el rebote del scroll deja ver el fondo del navegador. */
+  overscroll-behavior-y: none;
+}
+
+input,
+textarea,
+button,
+select {
+  font-family: inherit;
+}
+
+/* La barra de scroll dentro de la app sobra: es un móvil. */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* El lienzo: 430 px centrados, como el diseño. */
+#raiz {
+  display: flex;
+  justify-content: center;
+  min-height: 100svh;
+}
+
+.lienzo {
+  width: var(--ancho);
+  min-height: 100svh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Texto ---------- */
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* Título de pantalla. */
+.titulo {
+  font-size: 27px;
+}
+
+/* Etiqueta de sección: mayúsculas pequeñas y muy espaciadas. */
+.rotulo {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--texto-tenue);
+  text-transform: uppercase;
+}
+
+.dato {
+  font-size: 15px;
+  color: var(--texto-medio);
+}
+
+/* ---------- Tarjetas ---------- */
+
+.tarjeta {
+  background: var(--superficie);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  padding: 16px 18px;
+}
+
+.tarjeta-plana {
+  background: var(--superficie);
+  border-radius: var(--radio-chico);
+  padding: 12px 14px;
+}
+
+/* ---------- Botones ---------- */
+
+.boton {
+  border: none;
+  border-radius: var(--radio-pildora);
+  padding: 15px 18px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  color: var(--texto);
+  background: var(--borde-fuerte);
+}
+
+/* Una sola acción primaria por bloque (§35). */
+.boton-primario {
+  background: var(--fuerza);
+  color: var(--fondo);
+}
+
+.boton-fantasma {
+  background: transparent;
+  border: 1px solid var(--borde);
+  color: var(--texto-medio);
+}
+
+.boton-texto {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--texto-tenue);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.boton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Fila de acciones: la primaria manda y las demás se reparten el resto. */
+.acciones {
+  display: flex;
+  gap: 8px;
+}
+
+.acciones > .boton-primario {
+  flex: 1.4;
+}
+
+.acciones > .boton {
+  flex: 1;
+}
+
+/* ---------- Chips ---------- */
+
+.chip {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 6px 11px;
+  border-radius: var(--radio-pildora);
+  background: var(--superficie-3);
+  border: 1px solid var(--borde);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* ---------- Utilidades ---------- */
+
+.columna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hueco);
+}
+
+.fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.entre {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Deja sitio para la barra de pestañas fija. */
+.con-nav {
+  padding-bottom: calc(var(--alto-nav) + 24px);
+}

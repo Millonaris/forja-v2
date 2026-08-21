@@ -1,9 +1,9 @@
-# Resultado de la compilación: se reconstruye con `npm run construir` y se
-# publica en la rama gh-pages, no se versiona aquí.
+# Resultados de compilación: se reconstruyen y se publican en gh-pages.
+dist/
 prototipo/
 
 # Iconos generados: salen de `npm run iconos`.
-iconos/
+public/iconos/
 
 node_modules/
 .DS_Store

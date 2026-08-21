@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-const SALIDA = join(AQUI, "..", "iconos");
+const SALIDA = join(AQUI, "..", "public", "iconos");
 
 const NEGRO = [14, 14, 14]; // #0E0E0E, el fondo del rediseño
 const LIMA = [243, 255, 71]; // #F3FF47, el acento de FORJA 2.0 (la v1 usa cian)

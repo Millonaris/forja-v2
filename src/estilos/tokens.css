@@ -1,0 +1,55 @@
+/*
+ * FORJA 2.0 · Tokens.
+ *
+ * Sacados del diseño (`diseno/FORJA 2.0.dc.html`). Si algo cambia allí, cambia
+ * aquí y no en cada componente.
+ *
+ * El color de cada pilar es fijo y significa siempre lo mismo (§35 de la spec):
+ * fuerza = lima, carrera = cian, postura = lila, nutrición = neutro. El rojo
+ * queda reservado a dolor o error real: mover una sesión NUNCA pinta de rojo.
+ */
+
+:root {
+  /* Fondos, del más hondo al más elevado. */
+  --fondo: #0e0e0e;
+  --fondo-hundido: #0a0a0a;
+  --superficie: #141414;
+  --superficie-2: #181818;
+  --superficie-3: #1e1e1e;
+  --borde: rgba(255, 255, 255, 0.09);
+  --borde-fuerte: #242424;
+
+  /* Texto. */
+  --texto: #f4f4ef;
+  --texto-medio: rgba(244, 244, 239, 0.62);
+  --texto-tenue: rgba(244, 244, 239, 0.4);
+
+  /* Pilares. */
+  --fuerza: #f3ff47;
+  --fuerza-tinte: #1b1d0d;
+  --carrera: #7bdfff;
+  --carrera-tinte: #0e1a1e;
+  --postura: #cdb9ff;
+  --postura-tinte: #17102a;
+
+  /* Estados. */
+  --exito: #71d98b;
+  --aviso: #ffc24b;
+  --error: #ff6b6b;
+
+  /* Tipografía: la del diseño, sin descargar nada. */
+  --tipo: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+
+  /* Ritmo vertical y radios. */
+  --hueco: 16px;
+  --margen: 20px;
+  --radio: 18px;
+  --radio-chico: 12px;
+  --radio-pildora: 999px;
+
+  /* Alto de la barra de pestañas, para que las pantallas reserven sitio. */
+  --alto-nav: calc(64px + env(safe-area-inset-bottom));
+
+  /* Ancho del lienzo: el diseño está pensado para 430 px y centrado. */
+  --ancho: min(430px, 100%);
+}

@@ -1,13 +1,30 @@
 {
   "name": "forja-v2",
   "private": true,
-  "version": "0.1.0",
+  "version": "2.0.0",
   "type": "module",
-  "description": "FORJA 2.0 — rediseño. Fase 1: prototipo navegable instalable.",
+  "description": "FORJA 2.0 — entrenamiento, carrera, postura y nutrición. Local, sin cuentas.",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test pruebas/*.test.js",
+    "movil": "vite preview --host",
+    "lint": "oxlint",
     "iconos": "node scripts/generar-iconos.mjs",
-    "construir": "node scripts/generar-iconos.mjs && node scripts/construir-prototipo.mjs",
-    "servir": "npm run construir && cd prototipo && python3 -m http.server 4321",
+    "prototipo": "node scripts/generar-iconos.mjs && node scripts/construir-prototipo.mjs",
     "publicar": "bash scripts/publicar.sh"
+  },
+  "dependencies": {
+    "dexie": "^4.4.4",
+    "dexie-react-hooks": "^4.4.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.4",
+    "oxlint": "^1.75.0",
+    "vite": "^8.2.0",
+    "vite-plugin-pwa": "^1.3.0"
   }
 }
