@@ -1,0 +1,13 @@
+{
+  "name": "forja-v2",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "FORJA 2.0 — rediseño. Fase 1: prototipo navegable instalable.",
+  "scripts": {
+    "iconos": "node scripts/generar-iconos.mjs",
+    "construir": "node scripts/generar-iconos.mjs && node scripts/construir-prototipo.mjs",
+    "servir": "npm run construir && cd prototipo && python3 -m http.server 4321",
+    "publicar": "bash scripts/publicar.sh"
+  }
+}

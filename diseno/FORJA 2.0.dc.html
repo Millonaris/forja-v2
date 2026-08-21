@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#050505;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#F4F4EF;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#F3FF47;text-decoration:none}a:hover{color:#fbffa8}
+input,textarea,button,select{font-family:inherit}
+button{-webkit-tap-highlight-color:transparent}
+::-webkit-scrollbar{display:none}
+@keyframes fpulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#050505;display:flex;justify-content:center">
+<div data-screen-label="FORJA" style="width:min(430px,100%);min-height:100vh;background:#0E0E0E;position:relative;display:flex;flex-direction:column;padding-bottom:96px">
+
+<!-- ============ HOY ============ -->
+<sc-if value="{{ isHoy }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="HOY" style="padding:20px 20px 0;display:flex;flex-direction:column;gap:16px">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-top:10px">
+    <div>
+      <div style="font-size:12px;font-weight:700;letter-spacing:.22em;color:#F3FF47">FORJA</div>
+      <h1 style="margin:6px 0 0;font-size:27px;font-weight:800;letter-spacing:-.01em">{{ fecha }}</h1>
+    </div>
+    <button onClick="{{ openAj }}" aria-label="Ajustes" style="width:42px;height:42px;border-radius:999px;background:#1E1E1E;border:1px solid rgba(255,255,255,.09);color:rgba(255,255,255,.7);font-size:16px;cursor:pointer">⚙</button>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <sc-for list="{{ chips }}" as="c" hint-placeholder-count="3">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.1em;padding:6px 11px;border-radius:999px;background:#1E1E1E;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.75)">{{ c }}</span>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ diaVisualOn }}" hint-placeholder-val="{{ false }}">
+    <div style="background:#181818;border:1px solid rgba(243,255,71,.35);border-radius:20px;padding:16px 18px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#F3FF47">DÍA VISUAL</div>
+      <div style="margin-top:8px;font-size:13px;line-height:1.55;color:rgba(255,255,255,.75)">Mantén kcal, agua y sal normales. Reserva 20–30 g HC para antes del pump si interesa. Evita CaCo antes del momento importante.</div>
+      <button onClick="{{ tg.pump }}" style="margin-top:10px;background:none;border:none;color:#F3FF47;font-size:12px;font-weight:700;padding:0;cursor:pointer">Ver pump opcional ›</button>
+      <sc-if value="{{ open.pump }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:8px;font-size:12.5px;line-height:1.7;color:rgba(255,255,255,.6)">Laterales 2–3×15–20 · Jalón/pullover 2×12–15 · Press/flexiones 2×12–15 · Bíceps 1–2×12–15 · Tríceps 1–2×12–15 · RIR 2–3 · sin fallo.</div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <!-- Peso -->
+  <sc-if value="{{ pesoPendiente }}" hint-placeholder-val="{{ true }}">
+    <button onClick="{{ openW }}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:16px 18px;cursor:pointer;text-align:left;width:100%">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#F4F4EF">Peso pendiente</div>
+        <div style="margin-top:3px;font-size:12.5px;color:rgba(255,255,255,.5)">Ayer: {{ pesoAyer }} kg</div>
+      </div>
+      <span style="background:#F3FF47;color:#0E0E0E;font-size:12px;font-weight:800;letter-spacing:.08em;padding:10px 16px;border-radius:999px">APUNTAR</span>
+    </button>
+  </sc-if>
+  <sc-if value="{{ pesoHecho }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:16px 18px">
+      <div style="font-size:16px;font-weight:800">{{ pesoLinea }} <span style="font-size:12.5px;font-weight:400;color:rgba(255,255,255,.5)">· media 7 d: {{ media7 }} kg</span></div>
+      <span style="color:#71D98B;font-size:15px">✓</span>
+    </div>
+  </sc-if>
+
+  <!-- Qué quieres hacer hoy -->
+  <div>
+    <h2 style="margin:6px 0 12px;font-size:19px;font-weight:800">¿Qué quieres hacer hoy?</h2>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button onClick="{{ goEntF }}" style="display:flex;align-items:center;gap:14px;background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:15px 16px;cursor:pointer;text-align:left;width:100%">
+        <span style="width:42px;height:42px;border-radius:14px;background:rgba(243,255,71,.12);display:flex;align-items:center;justify-content:center;color:#F3FF47;font-size:15px;font-weight:800">F</span>
+        <span style="flex:1"><span style="display:block;font-size:14px;font-weight:800;letter-spacing:.06em;color:#F4F4EF">FUERZA</span><span style="display:block;margin-top:2px;font-size:12.5px;color:rgba(255,255,255,.5)">Próximo: {{ nextWkName }}</span></span>
+        <span style="color:rgba(255,255,255,.35)">›</span>
+      </button>
+      <button onClick="{{ goEntC }}" style="display:flex;align-items:center;gap:14px;background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:15px 16px;cursor:pointer;text-align:left;width:100%">
+        <span style="width:42px;height:42px;border-radius:14px;background:rgba(123,223,255,.12);display:flex;align-items:center;justify-content:center;color:#7BDFFF;font-size:15px;font-weight:800">C</span>
+        <span style="flex:1"><span style="display:block;font-size:14px;font-weight:800;letter-spacing:.06em;color:#F4F4EF">CORRER</span><span style="display:block;margin-top:2px;font-size:12.5px;color:rgba(255,255,255,.5)">Próxima: {{ runShort }}</span></span>
+        <span style="color:rgba(255,255,255,.35)">›</span>
+      </button>
+      <button onClick="{{ goEntP }}" style="display:flex;align-items:center;gap:14px;background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:15px 16px;cursor:pointer;text-align:left;width:100%">
+        <span style="width:42px;height:42px;border-radius:14px;background:rgba(205,185,255,.12);display:flex;align-items:center;justify-content:center;color:#CDB9FF;font-size:15px;font-weight:800">P</span>
+        <span style="flex:1"><span style="display:block;font-size:14px;font-weight:800;letter-spacing:.06em;color:#F4F4EF">POSTURA</span><span style="display:block;margin-top:2px;font-size:12.5px;color:rgba(255,255,255,.5)">{{ posLinea }}</span></span>
+        <span style="color:rgba(255,255,255,.35)">›</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Próxima fuerza -->
+  <div style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">PRÓXIMA FUERZA</div>
+    <div style="margin-top:6px;font-size:24px;font-weight:800">{{ nextWkName }}</div>
+    <div style="margin-top:5px;font-size:12.5px;color:rgba(255,255,255,.5)">Último gym: {{ lastGym }}</div>
+    <div style="margin-top:2px;font-size:12.5px;color:#71D98B">Recomendación: hoy</div>
+    <sc-if value="{{ fzProgramada }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.08em;color:#F4F4EF;background:#242424;border:1px solid rgba(255,255,255,.12);padding:5px 10px;border-radius:999px">▦ PROGRAMADA · {{ fzProgDia }}</div>
+    </sc-if>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onClick="{{ startNext }}" style="flex:1.3;background:#F3FF47;color:#0E0E0E;border:none;border-radius:999px;padding:14px 10px;font-size:13px;font-weight:800;letter-spacing:.05em;cursor:pointer">EMPEZAR</button>
+      <button onClick="{{ progF }}" style="flex:1;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:14px 8px;font-size:12.5px;font-weight:700;cursor:pointer">PROGRAMAR</button>
+      <button onClick="{{ verRutina }}" style="flex:.7;background:none;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:14px 8px;font-size:12.5px;font-weight:700;cursor:pointer">VER</button>
+    </div>
+  </div>
+
+  <!-- Próxima carrera -->
+  <div style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">PRÓXIMA CARRERA</div>
+    <div style="margin-top:6px;font-size:19px;font-weight:800;color:#F4F4EF">{{ runTitle }}</div>
+    <div style="margin-top:5px;font-size:12.5px;color:rgba(255,255,255,.5)">Última carrera: {{ runLast }}</div>
+    <div style="margin-top:2px;font-size:12.5px;color:#FFC24B">Recomendación: {{ runRec }}</div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onClick="{{ openRunDone }}" style="flex:1.3;background:#7BDFFF;color:#0E1A1E;border:none;border-radius:999px;padding:14px 10px;font-size:13px;font-weight:800;letter-spacing:.03em;cursor:pointer">CORRER HOY</button>
+      <button onClick="{{ progC }}" style="flex:1;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:14px 8px;font-size:12.5px;font-weight:700;cursor:pointer">PROGRAMAR</button>
+      <button onClick="{{ verPlanRun }}" style="flex:.7;background:none;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:14px 8px;font-size:12.5px;font-weight:700;cursor:pointer">VER</button>
+    </div>
+  </div>
+
+  <!-- Postura compacta -->
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:16px 18px">
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">POSTURA</div>
+      <div style="margin-top:4px;font-size:16px;font-weight:800">{{ posFrac }} <span style="font-size:12.5px;font-weight:400;color:rgba(255,255,255,.5)">· 8–10 min</span></div>
+    </div>
+    <sc-if value="{{ posPendiente }}" hint-placeholder-val="{{ true }}">
+      <button onClick="{{ startPos }}" style="background:#CDB9FF;color:#17102A;border:none;border-radius:999px;padding:12px 20px;font-size:12.5px;font-weight:800;letter-spacing:.05em;cursor:pointer">EMPEZAR</button>
+    </sc-if>
+    <sc-if value="{{ posCompleta }}" hint-placeholder-val="{{ false }}">
+      <span style="color:#71D98B;font-size:14px;font-weight:700">Hecha ✓</span>
+    </sc-if>
+  </div>
+
+  <!-- Nutrición -->
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:#141414;border:1px solid rgba(255,255,255,.05);border-radius:20px;padding:15px 18px;margin-bottom:4px">
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.4)">{{ faseChip }}</div>
+      <div style="margin-top:4px;font-size:15px;font-weight:800">{{ nutriLinea }}</div>
+    </div>
+    <button onClick="{{ openPlanHoy }}" style="background:none;border:1px solid rgba(255,255,255,.14);color:#F4F4EF;border-radius:999px;padding:11px 14px;font-size:11.5px;font-weight:700;letter-spacing:.03em;cursor:pointer;white-space:nowrap">VER PLAN DE HOY</button>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ ENTRENAR ============ -->
+<sc-if value="{{ isEnt }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="ENTRENAR" style="padding:20px 20px 0;display:flex;flex-direction:column;gap:16px">
+  <h1 style="margin:10px 0 0;font-size:27px;font-weight:800">Entrenar</h1>
+  <div style="display:flex;gap:8px">
+    <sc-for list="{{ entTabs }}" as="t" hint-placeholder-count="3">
+      <button onClick="{{ t.on }}" style="{{ t.st }}">{{ t.label }}</button>
+    </sc-for>
+  </div>
+
+  <!-- FUERZA -->
+  <sc-if value="{{ entF }}" hint-placeholder-val="{{ true }}">
+    <div style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">SIGUIENTE</div>
+      <div style="margin-top:6px;font-size:26px;font-weight:800;color:#F3FF47">{{ nextWkNameUp }}</div>
+      <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;font-size:12.5px;color:rgba(255,255,255,.55)">
+        <div>Último: <span style="color:#F4F4EF;font-weight:600">{{ lastWkName }}</span></div>
+        <div>Hace <span style="color:#F4F4EF;font-weight:600">2 días</span></div>
+        <div>Rampa: <span style="color:#F4F4EF;font-weight:600">{{ rampaEstado }}</span></div>
+        <div>RIR objetivo: <span style="color:#F4F4EF;font-weight:600">{{ rirObjetivo }}</span></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button onClick="{{ startNext }}" style="flex:1.4;background:#F3FF47;color:#0E0E0E;border:none;border-radius:999px;padding:14px 10px;font-size:13px;font-weight:800;letter-spacing:.04em;cursor:pointer">EMPEZAR AHORA</button>
+        <button onClick="{{ progF }}" style="flex:1;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:14px 8px;font-size:12.5px;font-weight:700;cursor:pointer">PROGRAMAR</button>
+        <button onClick="{{ verRutina }}" style="flex:.8;background:none;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:14px 8px;font-size:12.5px;font-weight:700;cursor:pointer">RUTINA</button>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45);margin-bottom:10px">ROTACIÓN</div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <sc-for list="{{ rotacion }}" as="r" hint-placeholder-count="4">
+          <span style="{{ r.st }}">{{ r.name }}</span>
+          <sc-if value="{{ r.arrow }}" hint-placeholder-val="{{ true }}"><span style="color:rgba(255,255,255,.3);font-size:12px">→</span></sc-if>
+        </sc-for>
+        <span style="color:rgba(255,255,255,.3);font-size:14px">↻</span>
+      </div>
+      <div style="margin-top:8px;font-size:11.5px;color:rgba(255,255,255,.4)">El orden solo avanza al completar una sesión, no al pasar los días.</div>
+    </div>
+
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45);margin-bottom:10px">ELEGIR OTRA RUTINA</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ otras }}" as="w" hint-placeholder-count="3">
+          <button onClick="{{ w.on }}" style="display:flex;align-items:center;justify-content:space-between;background:#161616;border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:13px 16px;cursor:pointer;width:100%;text-align:left">
+            <span style="font-size:14px;font-weight:700;color:#F4F4EF">{{ w.name }}</span>
+            <span style="font-size:12px;color:rgba(255,255,255,.4)">{{ w.meta }}</span>
+          </button>
+        </sc-for>
+      </div>
+      <button onClick="{{ omitOpen }}" style="margin-top:12px;background:none;border:none;color:rgba(255,255,255,.45);font-size:12.5px;font-weight:600;cursor:pointer;padding:4px 0">Omitir {{ nextWkName }} sin hacerla ›</button>
+    </div>
+  </sc-if>
+
+  <!-- CARRERA -->
+  <sc-if value="{{ entC }}" hint-placeholder-val="{{ false }}">
+    <div style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">PRÓXIMA SESIÓN</div>
+        <span style="font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#7BDFFF;background:rgba(123,223,255,.1);padding:4px 9px;border-radius:999px">BLOQUE EN CURSO</span>
+      </div>
+      <div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,.55)">{{ runBloqueLinea }}</div>
+      <div style="margin-top:4px;font-size:22px;font-weight:800;color:#7BDFFF">{{ runTitle }}</div>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:rgba(255,255,255,.6)">
+        <div>· 5–10 min caminando antes</div>
+        <div>· 5 min caminando después</div>
+        <div>· RPE 3–4/10 — test del habla: conversación posible</div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:6px;align-items:center">
+        <sc-for list="{{ runDots }}" as="d" hint-placeholder-count="3">
+          <span style="{{ d.st }}"></span>
+        </sc-for>
+        <span style="margin-left:6px;font-size:12px;color:rgba(255,255,255,.45)">{{ runProgTxt }}</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button onClick="{{ openRunDone }}" style="flex:1.4;background:#7BDFFF;color:#0E1A1E;border:none;border-radius:999px;padding:14px 10px;font-size:13px;font-weight:800;cursor:pointer">MARCAR HECHA</button>
+        <button onClick="{{ progC }}" style="flex:1;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:14px 8px;font-size:12.5px;font-weight:700;cursor:pointer">PROGRAMAR</button>
+        <button onClick="{{ verPlanRun }}" style="flex:.8;background:none;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:14px 8px;font-size:12.5px;font-weight:700;cursor:pointer">PLAN</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-start;background:rgba(255,194,75,.08);border:1px solid rgba(255,194,75,.25);border-radius:16px;padding:13px 15px">
+      <span style="color:#FFC24B;font-size:14px">◆</span>
+      <div style="font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.7)">Corriste ayer. Para esta fase es preferible recuperar y correr mañana. Puedes correr igualmente.</div>
+    </div>
+  </sc-if>
+
+  <!-- POSTURA -->
+  <sc-if value="{{ entP }}" hint-placeholder-val="{{ false }}">
+    <div style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">RUTINA DE HOY · 8–10 MIN</div>
+        <span style="font-size:13px;font-weight:800;color:#CDB9FF">{{ posFrac }}</span>
+      </div>
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:2px">
+        <sc-for list="{{ posLista }}" as="p" hint-placeholder-count="6">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="{{ p.dotSt }}"></span>
+              <span style="font-size:14px;font-weight:600;color:#F4F4EF">{{ p.n }}</span>
+            </div>
+            <span style="font-size:12px;color:rgba(255,255,255,.45)">{{ p.d }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ posPendiente }}" hint-placeholder-val="{{ true }}">
+        <button onClick="{{ startPos }}" style="margin-top:16px;width:100%;background:#CDB9FF;color:#17102A;border:none;border-radius:999px;padding:15px;font-size:13.5px;font-weight:800;letter-spacing:.05em;cursor:pointer">EMPEZAR</button>
+      </sc-if>
+      <sc-if value="{{ posCompleta }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:16px;text-align:center;color:#71D98B;font-size:13.5px;font-weight:700">Completada hoy ✓</div>
+      </sc-if>
+    </div>
+    <div style="background:#141414;border:1px solid rgba(255,255,255,.05);border-radius:16px;padding:14px 16px">
+      <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.55)">Rodillas suaves → costillas sobre pelvis → cuello largo.</div>
+      <div style="margin-top:6px;font-size:11.5px;color:rgba(255,255,255,.4)">Mini-reset 3–5 veces/día · pectoral 30 s/lado 3×/sem · test de pared cada 6 semanas (próximo ~1 sep).</div>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+<!-- ============ PROGRESO ============ -->
+<sc-if value="{{ isPro }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="PROGRESO" style="padding:20px 20px 0;display:flex;flex-direction:column;gap:16px">
+  <h1 style="margin:10px 0 0;font-size:27px;font-weight:800">Progreso</h1>
+  <div style="display:flex;gap:7px;flex-wrap:wrap">
+    <sc-for list="{{ proTabs }}" as="t" hint-placeholder-count="5">
+      <button onClick="{{ t.on }}" style="{{ t.st }}">{{ t.label }}</button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ prCu }}" hint-placeholder-val="{{ true }}">
+    <div style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+      <div style="display:flex;align-items:baseline;gap:14px">
+        <div style="font-size:38px;font-weight:800;letter-spacing:-.02em">{{ pesoBig }}<span style="font-size:16px;font-weight:600;color:rgba(255,255,255,.4)"> kg</span></div>
+        <div style="font-size:12.5px;color:rgba(255,255,255,.5)">media 7 d {{ media7 }}</div>
+        <div style="font-size:12.5px;font-weight:700;color:#71D98B">{{ cambio30 }} / 30 d</div>
+      </div>
+      <svg viewBox="0 0 320 96" style="width:100%;height:96px;margin-top:10px;display:block">
+        <path d="{{ pesoArea }}" fill="rgba(243,255,71,.08)"></path>
+        <path d="{{ pesoPath }}" fill="none" stroke="#F3FF47" stroke-width="2" stroke-linecap="round"></path>
+      </svg>
+      <div style="display:flex;justify-content:space-between;font-size:10.5px;color:rgba(255,255,255,.35)"><span>hace 30 d · {{ pesoMax }} kg</span><span>hoy</span></div>
+    </div>
+    <div style="display:flex;gap:12px">
+      <div style="flex:1;background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.45)">CINTURA</div>
+        <div style="margin-top:6px;font-size:22px;font-weight:800">88,5 <span style="font-size:13px;font-weight:400;color:rgba(255,255,255,.4)">cm</span></div>
+        <div style="margin-top:2px;font-size:11.5px;color:#71D98B">−1,5 cm este mes</div>
+      </div>
+      <div style="flex:1;background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.45)">FOTOS</div>
+        <div style="margin-top:6px;font-size:13px;font-weight:600;color:rgba(255,255,255,.7)">Última: 8 ago</div>
+        <div style="margin-top:2px;font-size:11.5px;color:rgba(255,255,255,.4)">Próxima sugerida: 26 ago</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ prFu }}" hint-placeholder-val="{{ false }}">
+    <div style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:16px 18px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.45)">VOLUMEN RODANTE</div>
+      <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
+        <div><div style="font-size:20px;font-weight:800">42</div><div style="font-size:11px;color:rgba(255,255,255,.45)">series · 7 d</div></div>
+        <div><div style="font-size:20px;font-weight:800">88</div><div style="font-size:11px;color:rgba(255,255,255,.45)">series · 14 d</div></div>
+        <div><div style="font-size:20px;font-weight:800">4</div><div style="font-size:11px;color:rgba(255,255,255,.45)">últ. entrenos</div></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <sc-for list="{{ fTrend }}" as="e" hint-placeholder-count="6">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:#161616;border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:13px 15px">
+          <div>
+            <div style="font-size:14px;font-weight:700">{{ e.n }}</div>
+            <div style="margin-top:2px;font-size:11.5px;color:rgba(255,255,255,.45)">{{ e.line }}</div>
+          </div>
+          <span style="{{ e.st }}">{{ e.estado }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ prCa }}" hint-placeholder-val="{{ false }}">
+    <div style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.45)">BLOQUE ACTUAL</div>
+        <span style="font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#7BDFFF;background:rgba(123,223,255,.1);padding:4px 9px;border-radius:999px">EN CURSO</span>
+      </div>
+      <div style="margin-top:6px;font-size:24px;font-weight:800;color:#7BDFFF">Bloque S{{ runBlock }}</div>
+      <div style="margin-top:3px;font-size:12.5px;color:rgba(255,255,255,.5)">{{ runProgTxt }} · {{ runTitle }}</div>
+    </div>
+    <div style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.45)">MINUTOS CORRIENDO POR BLOQUE</div>
+      <div style="display:flex;align-items:flex-end;gap:14px;height:90px;margin-top:14px">
+        <sc-for list="{{ runBars }}" as="b" hint-placeholder-count="3">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+            <div style="font-size:11px;color:rgba(255,255,255,.55)">{{ b.v }}′</div>
+            <div style="width:100%;border-radius:8px 8px 3px 3px;background:{{ b.bg }};height:{{ b.h }}px"></div>
+            <div style="font-size:10.5px;color:rgba(255,255,255,.4)">{{ b.l }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="background:#161616;border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:15px 16px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.45)">VEREDICTOS</div>
+      <div style="font-size:12.5px;color:rgba(255,255,255,.7)">· Consistencia: 3 bloques seguidos al día — <span style="color:#71D98B;font-weight:700">bien</span></div>
+      <div style="font-size:12.5px;color:rgba(255,255,255,.7)">· Base aeróbica: en construcción, volumen subiendo</div>
+      <div style="font-size:12.5px;color:rgba(255,255,255,.7)">· Tirada más larga: 24 min totales (CaCo)</div>
+      <div style="font-size:12.5px;color:rgba(255,255,255,.45)">· Ritmo: — aún sin carrera continua comparable</div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ prPo }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;gap:12px">
+      <div style="flex:1;background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.45)">CUMPLIMIENTO</div>
+        <div style="margin-top:6px;font-size:24px;font-weight:800;color:#CDB9FF">{{ posCumpl }}<span style="font-size:13px;font-weight:400;color:rgba(255,255,255,.4)"> días · 7 d</span></div>
+      </div>
+      <div style="flex:1;background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.45)">TEST DE PARED</div>
+        <div style="margin-top:6px;font-size:16px;font-weight:800">2,5 cm <span style="color:#71D98B;font-size:12px">mejora</span></div>
+        <div style="margin-top:2px;font-size:11px;color:rgba(255,255,255,.4)">21 jul · próximo ~1 sep</div>
+      </div>
+    </div>
+    <div style="background:#161616;border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:14px 16px;font-size:12.5px;color:rgba(255,255,255,.6)">Las fotos comparativas viven junto a las de cuerpo. Los recordatorios de test son sugerencias, no obligaciones.</div>
+  </sc-if>
+
+  <sc-if value="{{ prHi }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <sc-for list="{{ histFiltros }}" as="f" hint-placeholder-count="5">
+          <button onClick="{{ f.on }}" style="{{ f.st }}">{{ f.label }}</button>
+        </sc-for>
+      </div>
+      <button onClick="{{ openInf }}" style="background:none;border:1px solid rgba(255,255,255,.14);color:#F4F4EF;border-radius:999px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">INFORME ↗</button>
+    </div>
+    <div style="display:flex;flex-direction:column">
+      <sc-for list="{{ histView }}" as="h" hint-placeholder-count="8">
+        <div style="display:flex;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+          <div style="width:52px;flex:none;font-size:11.5px;font-weight:700;color:rgba(255,255,255,.45);padding-top:2px">{{ h.d }}</div>
+          <span style="{{ h.dotSt }}"></span>
+          <div>
+            <div style="font-size:13.5px;font-weight:700">{{ h.t }}</div>
+            <div style="margin-top:1px;font-size:12px;color:rgba(255,255,255,.5)">{{ h.x }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+<!-- ============ PLAN ============ -->
+<sc-if value="{{ isPlan }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="PLAN" style="padding:20px 20px 0;display:flex;flex-direction:column;gap:16px">
+  <h1 style="margin:10px 0 0;font-size:27px;font-weight:800">Plan</h1>
+
+  <!-- Nutrición -->
+  <div style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">NUTRICIÓN · FASE ACTUAL</div>
+    <div style="margin-top:6px;font-size:21px;font-weight:800">{{ faseNombre }}</div>
+    <div style="margin-top:3px;font-size:14px;color:rgba(255,255,255,.6)">{{ nutriLinea }}</div>
+    <div style="margin-top:14px;display:flex;flex-direction:column;gap:1px">
+      <div style="display:grid;grid-template-columns:1.5fr .6fr .6fr .6fr;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.35);padding:0 0 6px">
+        <span>COMIDA</span><span style="text-align:right">P</span><span style="text-align:right">HC</span><span style="text-align:right">G</span>
+      </div>
+      <sc-for list="{{ comidas }}" as="m" hint-placeholder-count="4">
+        <div style="display:grid;grid-template-columns:1.5fr .6fr .6fr .6fr;gap:6px;font-size:13px;padding:8px 0;border-top:1px solid rgba(255,255,255,.05)">
+          <span style="font-weight:600">{{ m.h }}</span>
+          <span style="text-align:right;color:rgba(255,255,255,.75)">{{ m.p }}</span>
+          <span style="text-align:right;color:rgba(255,255,255,.75)">{{ m.c }}</span>
+          <span style="text-align:right;color:rgba(255,255,255,.75)">{{ m.g }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <button onClick="{{ tg.fases }}" style="margin-top:12px;background:none;border:none;color:#F3FF47;font-size:12.5px;font-weight:700;padding:0;cursor:pointer">Ver fases y reglas ›</button>
+    <sc-if value="{{ open.fases }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ fases }}" as="f" hint-placeholder-count="4">
+          <div style="display:flex;justify-content:space-between;gap:10px;background:#141414;border-radius:12px;padding:11px 13px;font-size:12.5px">
+            <div><span style="font-weight:700">{{ f.n }}</span><span style="color:rgba(255,255,255,.45)"> · {{ f.d }}</span></div>
+            <div style="color:rgba(255,255,255,.6);white-space:nowrap">{{ f.m }}</div>
+          </div>
+        </sc-for>
+        <div style="font-size:12px;line-height:1.7;color:rgba(255,255,255,.5)">Creatina 5 g/día · agua y sal normales · sin deshidratación · media de 7 días · cintura/fotos · ajustes de volumen ±100 kcal. Las fases sí dependen de la fecha: mover un entrenamiento no desplaza la nutrición.</div>
+        <div style="font-size:12px;line-height:1.6;color:rgba(255,255,255,.4)">Preentreno: no existe una quinta comida obligatoria. Si hay hambre o falta de energía, redistribuye parte de los macros sin subir las kcal totales.</div>
+      </div>
+    </sc-if>
+  </div>
+
+  <!-- Fuerza -->
+  <div id="plan-fuerza" style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">FUERZA · RUTINAS</div>
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+      <sc-for list="{{ wkList }}" as="w" hint-placeholder-count="4">
+        <div style="background:#141414;border:1px solid rgba(255,255,255,.05);border-radius:14px;overflow:hidden">
+          <button onClick="{{ w.on }}" style="display:flex;justify-content:space-between;align-items:center;width:100%;background:none;border:none;padding:13px 15px;cursor:pointer;text-align:left">
+            <span style="font-size:14px;font-weight:700;color:#F4F4EF">{{ w.name }}</span>
+            <span style="font-size:12px;color:rgba(255,255,255,.4)">{{ w.count }} ejercicios {{ w.chev }}</span>
+          </button>
+          <sc-if value="{{ w.open }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:0 15px 13px;display:flex;flex-direction:column">
+              <sc-for list="{{ w.ex }}" as="e" hint-placeholder-count="8">
+                <div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid rgba(255,255,255,.04);font-size:12.5px">
+                  <span style="color:rgba(255,255,255,.8)">{{ e.star }}{{ e.n }}</span>
+                  <span style="color:rgba(255,255,255,.45);white-space:nowrap">{{ e.dose }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+    <div style="margin-top:12px;font-size:11.5px;line-height:1.7;color:rgba(255,255,255,.4)">Grandes: RIR 1–2 · 2–3 min. Aislados: RIR 1–2 (última ocasional 0–1) · 90–120 s. Doble progresión: mantener peso → subir reps → llenar rango → incremento mínimo. Sin fallo sistemático.</div>
+  </div>
+
+  <!-- Carrera -->
+  <div id="plan-carrera" style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">CARRERA · 0→20 KM</div>
+    <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:baseline">
+      <div style="font-size:21px;font-weight:800;color:#7BDFFF">Fase 1 · Bloque S{{ runBlock }}</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.5)">{{ runProgTxt }}</div>
+    </div>
+    <div style="margin-top:4px;font-size:13px;color:rgba(255,255,255,.6)">Próximo hito: correr 5′ seguidos (bloque S5)</div>
+    <button onClick="{{ tg.run }}" style="margin-top:12px;background:none;border:none;color:#7BDFFF;font-size:12.5px;font-weight:700;padding:0;cursor:pointer">Ver 30 bloques ›</button>
+    <sc-if value="{{ open.run }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:12px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;color:rgba(255,255,255,.4);margin-bottom:6px">FASE 1 · CACO</div>
+        <sc-for list="{{ runF1 }}" as="r" hint-placeholder-count="10">
+          <div style="{{ r.st }}"><span style="width:34px;flex:none;font-weight:700">S{{ r.b }}</span><span style="flex:1">{{ r.s }}</span><span style="color:rgba(255,255,255,.4)">{{ r.f }}×/sem</span></div>
+        </sc-for>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;color:rgba(255,255,255,.4);margin:12px 0 6px">FASE 2 · MINUTOS CONTINUOS</div>
+        <sc-for list="{{ runF2 }}" as="r" hint-placeholder-count="8">
+          <div style="display:flex;gap:8px;font-size:12.5px;padding:6px 0;border-top:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.7)"><span style="width:34px;flex:none;font-weight:700">S{{ r.b }}</span><span style="flex:1">{{ r.s }}</span></div>
+        </sc-for>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;color:rgba(255,255,255,.4);margin:12px 0 6px">FASE 3 · KILÓMETROS</div>
+        <sc-for list="{{ runF3 }}" as="r" hint-placeholder-count="12">
+          <div style="display:flex;gap:8px;font-size:12.5px;padding:6px 0;border-top:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.7)"><span style="width:34px;flex:none;font-weight:700">S{{ r.b }}</span><span style="flex:1">{{ r.s }}</span></div>
+        </sc-for>
+        <div style="margin-top:10px;font-size:11.5px;line-height:1.7;color:rgba(255,255,255,.4)">Todo fácil, test del habla. Sin HIIT, sin series rápidas, sin tempo duro. Evitar días consecutivos. Repetir bloque si pesa. Dolor localizado persistente = no progresar.</div>
+      </div>
+    </sc-if>
+  </div>
+
+  <!-- Postura plan -->
+  <div style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">POSTURA · RUTINA DIARIA</div>
+    <div style="margin-top:10px;display:flex;flex-direction:column">
+      <sc-for list="{{ posLista }}" as="p" hint-placeholder-count="6">
+        <div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid rgba(255,255,255,.04);font-size:12.5px">
+          <span style="color:rgba(255,255,255,.8)">{{ p.n }}</span>
+          <span style="color:rgba(255,255,255,.45)">{{ p.d }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="margin-top:10px;font-size:11.5px;line-height:1.7;color:rgba(255,255,255,.4)">Basculación pélvica solo las primeras 4 semanas. Extras: pectoral 30 s/lado 3×/sem · flexor de cadera solo si hay tirantez · mini-reset 3–5×/día. Test de pared cada 6 semanas y fotos comparables — recordatorios, no obligaciones.</div>
+  </div>
+
+  <!-- Agenda -->
+  <div style="background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px;margin-bottom:4px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">AGENDA RECOMENDADA · 7 DÍAS</div>
+    </div>
+    <div style="margin-top:12px;display:flex;flex-direction:column">
+      <sc-for list="{{ agenda }}" as="a" hint-placeholder-count="7">
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid rgba(255,255,255,.05)">
+          <div style="width:56px;flex:none;font-size:12px;font-weight:700;color:rgba(255,255,255,.5)">{{ a.d }}</div>
+          <span style="{{ a.st }}">{{ a.name }}</span>
+          <span style="{{ a.tagSt }}">{{ a.tag }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="margin-top:10px;font-size:11.5px;color:rgba(255,255,255,.4)">Todo lo futuro es sugerido: muévelo desde Programar. La identidad de cada sesión no cambia al moverla.</div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ NAV ============ -->
+<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(430px,100%);z-index:40;background:rgba(14,14,14,.92);backdrop-filter:blur(14px);border-top:1px solid rgba(255,255,255,.07);display:flex;padding:10px 8px calc(12px + env(safe-area-inset-bottom))">
+  <sc-for list="{{ navTabs }}" as="n" hint-placeholder-count="4">
+    <button onClick="{{ n.on }}" style="{{ n.st }}">
+      <span style="font-size:16px;line-height:1">{{ n.icon }}</span>
+      <span style="font-size:10px;font-weight:700;letter-spacing:.08em">{{ n.label }}</span>
+    </button>
+  </sc-for>
+</div>
+
+<!-- ============ ONBOARDING ============ -->
+<sc-if value="{{ showOnb }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;inset:0;z-index:100;background:#0E0E0E;display:flex;justify-content:center">
+  <div style="width:min(430px,100%);display:flex;flex-direction:column;justify-content:center;padding:36px 30px;gap:8px">
+    <div style="font-size:13px;font-weight:800;letter-spacing:.26em;color:#F3FF47">FORJA 2.0</div>
+    <h1 style="margin:10px 0 18px;font-size:34px;font-weight:800;line-height:1.1;letter-spacing:-.02em">Hemos reorganizado FORJA.</h1>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;gap:14px;align-items:flex-start"><span style="color:#F3FF47;font-weight:800">1</span><div style="font-size:15px;line-height:1.5;color:rgba(255,255,255,.8)">Tus datos siguen aquí: sesiones, series, pesos, carreras y fotos.</div></div>
+      <div style="display:flex;gap:14px;align-items:flex-start"><span style="color:#F3FF47;font-weight:800">2</span><div style="font-size:15px;line-height:1.5;color:rgba(255,255,255,.8)">Ahora eliges cuándo entrenar. La rotación avanza cuando completas, no cuando pasa el día.</div></div>
+      <div style="display:flex;gap:14px;align-items:flex-start"><span style="color:#F3FF47;font-weight:800">3</span><div style="font-size:15px;line-height:1.5;color:rgba(255,255,255,.8)">El calendario solo recomienda. Mover una sesión nunca es un fallo.</div></div>
+    </div>
+    <button onClick="{{ onb }}" style="margin-top:34px;background:#F3FF47;color:#0E0E0E;border:none;border-radius:999px;padding:17px;font-size:14px;font-weight:800;letter-spacing:.08em;cursor:pointer">CONTINUAR</button>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ ENTRENO EN VIVO ============ -->
+<sc-if value="{{ liveOn }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Entreno en vivo" style="position:fixed;inset:0;z-index:80;background:#0E0E0E;display:flex;justify-content:center">
+  <div style="width:min(430px,100%);display:flex;flex-direction:column;height:100vh;overflow:auto;padding:18px 20px 140px">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:6px">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.45)">{{ lvWkName }} · EJERCICIO {{ lvPos }}</div>
+        <div style="margin-top:4px;font-size:24px;font-weight:800">{{ lvStar }}{{ lvName }}</div>
+      </div>
+      <button onClick="{{ finish }}" style="background:#242424;border:1px solid rgba(255,255,255,.1);color:#F4F4EF;border-radius:999px;padding:10px 14px;font-size:11.5px;font-weight:800;cursor:pointer">TERMINAR</button>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <span style="font-size:11.5px;font-weight:700;background:#1E1E1E;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:6px 11px;color:rgba(255,255,255,.75)">{{ lvDose }}</span>
+      <span style="font-size:11.5px;font-weight:700;background:#1E1E1E;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:6px 11px;color:rgba(255,255,255,.75)">RIR obj. {{ rirObjetivo }}</span>
+      <span style="font-size:11.5px;font-weight:700;background:#1E1E1E;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:6px 11px;color:rgba(255,255,255,.75)">Descanso {{ lvRestTxt }}</span>
+    </div>
+    <sc-if value="{{ rampaOn }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:12px;background:rgba(243,255,71,.08);border:1px solid rgba(243,255,71,.3);border-radius:14px;padding:11px 14px;font-size:12.5px;font-weight:700;color:#F3FF47">Rampa de vuelta · hoy {{ lvRampSets }}</div>
+    </sc-if>
+    <sc-if value="{{ lvHasRef }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#161616;border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:13px 15px">
+        <div style="font-size:13px;color:rgba(255,255,255,.65)">Última vez: <span style="color:#F4F4EF;font-weight:700">{{ lvRef }}</span></div>
+        <button onClick="{{ useLast }}" style="background:none;border:1px solid rgba(243,255,71,.4);color:#F3FF47;border-radius:999px;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap">USAR PESO</button>
+      </div>
+    </sc-if>
+    <sc-if value="{{ lvSetsAny }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ lvSets }}" as="s" hint-placeholder-count="2">
+          <div style="display:flex;justify-content:space-between;font-size:13px;background:#141414;border-radius:12px;padding:10px 14px">
+            <span style="color:rgba(255,255,255,.5)">Serie {{ s.i }}</span>
+            <span style="font-weight:700">{{ s.txt }}</span>
+            <span style="color:#71D98B">✓</span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <div style="margin-top:16px;background:#181818;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:18px">
+      <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.5)">{{ lvSerieTxt }}</div>
+      <div style="margin-top:14px;display:flex;gap:12px">
+        <div style="flex:1">
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.1em;color:rgba(255,255,255,.4);text-align:center">KG</div>
+          <div style="margin-top:6px;display:flex;align-items:center;gap:6px">
+            <button onClick="{{ kgDown }}" style="width:44px;height:52px;border-radius:14px;background:#242424;border:1px solid rgba(255,255,255,.09);color:#F4F4EF;font-size:19px;cursor:pointer">−</button>
+            <div style="flex:1;text-align:center;font-size:27px;font-weight:800">{{ kgVal }}</div>
+            <button onClick="{{ kgUp }}" style="width:44px;height:52px;border-radius:14px;background:#242424;border:1px solid rgba(255,255,255,.09);color:#F4F4EF;font-size:19px;cursor:pointer">+</button>
+          </div>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.1em;color:rgba(255,255,255,.4);text-align:center">REPS</div>
+          <div style="margin-top:6px;display:flex;align-items:center;gap:6px">
+            <button onClick="{{ repsDown }}" style="width:44px;height:52px;border-radius:14px;background:#242424;border:1px solid rgba(255,255,255,.09);color:#F4F4EF;font-size:19px;cursor:pointer">−</button>
+            <div style="flex:1;text-align:center;font-size:27px;font-weight:800">{{ repsVal }}</div>
+            <button onClick="{{ repsUp }}" style="width:44px;height:52px;border-radius:14px;background:#242424;border:1px solid rgba(255,255,255,.09);color:#F4F4EF;font-size:19px;cursor:pointer">+</button>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <div style="font-size:10.5px;font-weight:700;letter-spacing:.1em;color:rgba(255,255,255,.4)">RIR</div>
+        <div style="margin-top:6px;display:flex;gap:8px">
+          <button onClick="{{ rirA }}" style="{{ rirStA }}">0–1</button>
+          <button onClick="{{ rirB }}" style="{{ rirStB }}">2</button>
+          <button onClick="{{ rirC }}" style="{{ rirStC }}">3+</button>
+        </div>
+      </div>
+      <button onClick="{{ saveSet }}" style="margin-top:16px;width:100%;background:#F3FF47;color:#0E0E0E;border:none;border-radius:999px;padding:16px;font-size:14px;font-weight:800;letter-spacing:.06em;cursor:pointer">GUARDAR SERIE</button>
+    </div>
+    <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center">
+      <button onClick="{{ prevEx }}" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:13px;font-weight:700;cursor:pointer;padding:8px">‹ Anterior</button>
+      <button onClick="{{ skipEx }}" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:12px;cursor:pointer;padding:8px">Saltar</button>
+      <button onClick="{{ nextEx }}" style="background:none;border:none;color:#F3FF47;font-size:13px;font-weight:800;cursor:pointer;padding:8px">Siguiente ›</button>
+    </div>
+  </div>
+  <sc-if value="{{ restOn }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(430px,100%);z-index:90;background:#F3FF47;color:#0E0E0E;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px calc(18px + env(safe-area-inset-bottom));border-radius:24px 24px 0 0">
+      <div>
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:.14em;opacity:.65">DESCANSO</div>
+        <div style="font-size:32px;font-weight:800;letter-spacing:-.01em;font-variant-numeric:tabular-nums">{{ restTxt }}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onClick="{{ add30 }}" style="background:rgba(14,14,14,.12);border:none;color:#0E0E0E;border-radius:999px;padding:12px 16px;font-size:13px;font-weight:800;cursor:pointer">+30 s</button>
+        <button onClick="{{ skipRest }}" style="background:#0E0E0E;border:none;color:#F3FF47;border-radius:999px;padding:12px 16px;font-size:13px;font-weight:800;cursor:pointer">SALTAR</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+<!-- ============ POSTURA EN VIVO ============ -->
+<sc-if value="{{ posOn }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Postura en vivo" style="position:fixed;inset:0;z-index:80;background:#0E0E0E;display:flex;justify-content:center">
+  <div style="width:min(430px,100%);display:flex;flex-direction:column;height:100vh;padding:18px 24px calc(24px + env(safe-area-inset-bottom))">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:6px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#CDB9FF">POSTURA · {{ pvPos }}</div>
+      <button onClick="{{ posClose }}" style="background:#242424;border:1px solid rgba(255,255,255,.1);color:#F4F4EF;border-radius:999px;padding:9px 14px;font-size:11.5px;font-weight:800;cursor:pointer">SALIR</button>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px">
+      <div style="font-size:32px;font-weight:800;letter-spacing:-.01em">{{ pvName }}</div>
+      <div style="font-size:16px;font-weight:700;color:#CDB9FF">{{ pvDose }}</div>
+      <div style="margin-top:6px;font-size:15px;line-height:1.55;color:rgba(255,255,255,.8)">{{ pvInstr }}</div>
+      <div style="font-size:13px;line-height:1.5;color:#FFC24B">Error típico: {{ pvErr }}</div>
+      <div style="margin-top:22px;text-align:center">
+        <div style="font-size:60px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em">{{ pvTime }}</div>
+        <button onClick="{{ posToggle }}" style="margin-top:6px;background:none;border:1px solid rgba(255,255,255,.16);color:rgba(255,255,255,.7);border-radius:999px;padding:10px 18px;font-size:12px;font-weight:700;cursor:pointer">{{ pvToggleTxt }}</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;justify-content:center;margin-bottom:16px">
+      <sc-for list="{{ pvDots }}" as="d" hint-placeholder-count="6"><span style="{{ d.st }}"></span></sc-for>
+    </div>
+    <button onClick="{{ posNext }}" style="width:100%;background:#CDB9FF;color:#17102A;border:none;border-radius:999px;padding:17px;font-size:14px;font-weight:800;letter-spacing:.05em;cursor:pointer">{{ pvNextTxt }}</button>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ SHEETS ============ -->
+<sc-if value="{{ anySheet }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;inset:0;z-index:95;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.65);backdrop-filter:blur(3px)">
+<div style="width:min(430px,100%);background:#191919;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:26px 26px 0 0;padding:10px 22px calc(24px + env(safe-area-inset-bottom));max-height:84vh;overflow:auto">
+<div style="width:38px;height:4px;border-radius:99px;background:rgba(255,255,255,.15);margin:6px auto 16px"></div>
+
+<sc-if value="{{ shW }}" hint-placeholder-val="{{ false }}">
+  <div style="font-size:18px;font-weight:800">Apuntar peso</div>
+  <div style="margin-top:16px;display:flex;align-items:center;gap:10px;justify-content:center">
+    <button onClick="{{ wDown }}" style="width:56px;height:64px;border-radius:18px;background:#242424;border:1px solid rgba(255,255,255,.09);color:#F4F4EF;font-size:22px;cursor:pointer">−</button>
+    <div style="width:150px;text-align:center;font-size:46px;font-weight:800;font-variant-numeric:tabular-nums">{{ wVal }}</div>
+    <button onClick="{{ wUp }}" style="width:56px;height:64px;border-radius:18px;background:#242424;border:1px solid rgba(255,255,255,.09);color:#F4F4EF;font-size:22px;cursor:pointer">+</button>
+  </div>
+  <div style="text-align:center;margin-top:4px;font-size:12px;color:rgba(255,255,255,.4)">kg · en ayunas</div>
+  <button onClick="{{ saveW }}" style="margin-top:18px;width:100%;background:#F3FF47;color:#0E0E0E;border:none;border-radius:999px;padding:16px;font-size:14px;font-weight:800;letter-spacing:.06em;cursor:pointer">GUARDAR</button>
+  <button onClick="{{ closeSheet }}" style="margin-top:8px;width:100%;background:none;border:none;color:rgba(255,255,255,.45);padding:10px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>
+</sc-if>
+
+<sc-if value="{{ shProg }}" hint-placeholder-val="{{ false }}">
+  <div style="font-size:18px;font-weight:800">Programar {{ progKindTxt }}</div>
+  <div style="margin-top:4px;font-size:12.5px;color:rgba(255,255,255,.5)">Solo es una recomendación editable. La identidad de la sesión no cambia.</div>
+  <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+    <sc-for list="{{ progDias }}" as="d" hint-placeholder-count="7">
+      <button onClick="{{ d.on }}" style="display:flex;justify-content:space-between;align-items:center;background:#222222;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:13px 16px;cursor:pointer;width:100%;text-align:left">
+        <span style="font-size:14px;font-weight:700;color:#F4F4EF">{{ d.label }}</span>
+        <span style="font-size:11.5px;color:rgba(255,255,255,.4)">{{ d.meta }}</span>
+      </button>
+    </sc-for>
+  </div>
+  <button onClick="{{ closeSheet }}" style="margin-top:10px;width:100%;background:none;border:none;color:rgba(255,255,255,.45);padding:10px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>
+</sc-if>
+
+<sc-if value="{{ shConf }}" hint-placeholder-val="{{ false }}">
+  <div style="font-size:18px;font-weight:800">Ese día tiene carrera sugerida</div>
+  <div style="margin-top:6px;font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.6)">Recomendamos mantener la fuerza y mover la carrera. Tú decides.</div>
+  <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+    <button onClick="{{ cfMover }}" style="width:100%;background:#F3FF47;color:#0E0E0E;border:none;border-radius:999px;padding:15px;font-size:13px;font-weight:800;cursor:pointer">MOVER LA CARRERA</button>
+    <button onClick="{{ cfOmitir }}" style="width:100%;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:15px;font-size:13px;font-weight:700;cursor:pointer">OMITIR LA CARRERA</button>
+    <button onClick="{{ cfAmbos }}" style="width:100%;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:15px;font-size:13px;font-weight:700;cursor:pointer">HACER AMBOS</button>
+    <button onClick="{{ closeSheet }}" style="width:100%;background:none;border:none;color:rgba(255,255,255,.45);padding:10px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>
+  </div>
+</sc-if>
+
+<sc-if value="{{ shOther }}" hint-placeholder-val="{{ false }}">
+  <div style="font-size:18px;font-weight:800">Según la rotación toca {{ nextWkName }}</div>
+  <div style="margin-top:6px;font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.6)">¿Quieres hacer {{ otherName }}?</div>
+  <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+    <button onClick="{{ otherKeep }}" style="width:100%;background:#F3FF47;color:#0E0E0E;border:none;border-radius:999px;padding:15px;font-size:13px;font-weight:800;cursor:pointer">HACER SIN ALTERAR LA SECUENCIA</button>
+    <button onClick="{{ otherAdv }}" style="width:100%;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:15px;font-size:13px;font-weight:700;cursor:pointer">HACER Y AVANZAR SECUENCIA</button>
+    <button onClick="{{ closeSheet }}" style="width:100%;background:none;border:none;color:rgba(255,255,255,.45);padding:10px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>
+  </div>
+</sc-if>
+
+<sc-if value="{{ shOmit }}" hint-placeholder-val="{{ false }}">
+  <div style="font-size:18px;font-weight:800">Omitir {{ nextWkName }}</div>
+  <div style="margin-top:6px;font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.6)">Nada se rompe por omitir. ¿Avanzamos la rotación o la dejamos pendiente?</div>
+  <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+    <button onClick="{{ omitAdv }}" style="width:100%;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:15px;font-size:13px;font-weight:700;cursor:pointer">OMITIR Y AVANZAR</button>
+    <button onClick="{{ omitKeep }}" style="width:100%;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:15px;font-size:13px;font-weight:700;cursor:pointer">MANTENER PENDIENTE</button>
+    <button onClick="{{ closeSheet }}" style="width:100%;background:none;border:none;color:rgba(255,255,255,.45);padding:10px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>
+  </div>
+</sc-if>
+
+<sc-if value="{{ shPrio }}" hint-placeholder-val="{{ false }}">
+  <div style="font-size:18px;font-weight:800">⭐ Este ejercicio es prioritario</div>
+  <div style="margin-top:6px;font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.6)">{{ lvName }} está marcado como prioridad en tu plan.</div>
+  <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+    <button onClick="{{ prioStay }}" style="width:100%;background:#F3FF47;color:#0E0E0E;border:none;border-radius:999px;padding:15px;font-size:13px;font-weight:800;cursor:pointer">HACERLO</button>
+    <button onClick="{{ prioSkip }}" style="width:100%;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:15px;font-size:13px;font-weight:700;cursor:pointer">SALTARLO IGUALMENTE</button>
+  </div>
+</sc-if>
+
+<sc-if value="{{ shSum }}" hint-placeholder-val="{{ false }}">
+  <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">SESIÓN COMPLETADA</div>
+  <div style="margin-top:6px;font-size:24px;font-weight:800">{{ sumName }}</div>
+  <div style="margin-top:12px;display:flex;gap:22px">
+    <div><div style="font-size:24px;font-weight:800">{{ sumDur }}</div><div style="font-size:11px;color:rgba(255,255,255,.45)">duración</div></div>
+    <div><div style="font-size:24px;font-weight:800">{{ sumSets }}</div><div style="font-size:11px;color:rgba(255,255,255,.45)">series</div></div>
+  </div>
+  <div style="margin-top:14px;display:flex;flex-direction:column;gap:7px">
+    <sc-for list="{{ sumLines }}" as="l" hint-placeholder-count="3">
+      <div style="display:flex;gap:8px;font-size:13.5px"><span style="{{ l.c }}">●</span><span style="color:rgba(255,255,255,.8)">{{ l.txt }}</span></div>
+    </sc-for>
+  </div>
+  <div style="margin-top:12px;font-size:12.5px;color:rgba(255,255,255,.5)">{{ sumRec }}</div>
+  <button onClick="{{ closeSum }}" style="margin-top:18px;width:100%;background:#F3FF47;color:#0E0E0E;border:none;border-radius:999px;padding:16px;font-size:14px;font-weight:800;letter-spacing:.05em;cursor:pointer">{{ sumBtnTxt }}</button>
+</sc-if>
+
+<sc-if value="{{ shRun }}" hint-placeholder-val="{{ false }}">
+  <div style="font-size:18px;font-weight:800">Marcar carrera hecha</div>
+  <div style="margin-top:4px;font-size:13px;color:rgba(255,255,255,.55)">{{ runBloqueLinea }} · {{ runTitle }}</div>
+  <div style="margin-top:10px;display:flex;gap:10px;align-items:flex-start;background:rgba(255,194,75,.08);border:1px solid rgba(255,194,75,.25);border-radius:14px;padding:11px 13px">
+    <span style="color:#FFC24B">◆</span>
+    <div style="font-size:12px;line-height:1.5;color:rgba(255,255,255,.65)">Corriste ayer. Para esta fase es preferible recuperar — puedes registrarla igualmente.</div>
+  </div>
+  <div style="margin-top:14px;font-size:11px;font-weight:700;letter-spacing:.1em;color:rgba(255,255,255,.4)">¿CÓMO HA IDO?</div>
+  <div style="margin-top:8px;display:flex;gap:8px">
+    <button onClick="{{ feelF }}" style="{{ feelStF }}">Fácil / bien</button>
+    <button onClick="{{ feelJ }}" style="{{ feelStJ }}">Justo</button>
+    <button onClick="{{ feelM }}" style="{{ feelStM }}">Molestias</button>
+  </div>
+  <textarea onChange="{{ onRunNote }}" placeholder="Nota opcional (sin km ni ritmo en CaCo)" rows="2" style="margin-top:12px;width:100%;background:#141414;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:12px 14px;color:#F4F4EF;font-size:13px;resize:none"></textarea>
+  <button onClick="{{ saveRun }}" style="margin-top:14px;width:100%;background:#7BDFFF;color:#0E1A1E;border:none;border-radius:999px;padding:16px;font-size:14px;font-weight:800;letter-spacing:.04em;cursor:pointer">GUARDAR</button>
+  <button onClick="{{ closeSheet }}" style="margin-top:8px;width:100%;background:none;border:none;color:rgba(255,255,255,.45);padding:10px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>
+</sc-if>
+
+<sc-if value="{{ shBlock }}" hint-placeholder-val="{{ false }}">
+  <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:#7BDFFF">BLOQUE S{{ runBlockDone }} COMPLETADO</div>
+  <div style="margin-top:6px;font-size:22px;font-weight:800">¿Cómo ha ido el bloque?</div>
+  <div style="margin-top:6px;font-size:13px;line-height:1.5;color:rgba(255,255,255,.55)">Avanzar o repetir no depende del calendario, solo de ti.</div>
+  <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+    <button onClick="{{ blockAdv }}" style="width:100%;background:#7BDFFF;color:#0E1A1E;border:none;border-radius:999px;padding:15px;font-size:13px;font-weight:800;cursor:pointer">FÁCIL / BIEN — AVANZAR A S{{ runBlockNext }}</button>
+    <button onClick="{{ blockRep }}" style="width:100%;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:15px;font-size:13px;font-weight:700;cursor:pointer">JUSTO / MOLESTIAS — REPETIR S{{ runBlockDone }}</button>
+  </div>
+</sc-if>
+
+<sc-if value="{{ shPlanHoy }}" hint-placeholder-val="{{ false }}">
+  <div style="font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.45)">PLAN DE HOY · {{ faseNombre }}</div>
+  <div style="margin-top:6px;font-size:30px;font-weight:800">{{ kcalBig }} <span style="font-size:15px;font-weight:600;color:rgba(255,255,255,.45)">kcal</span></div>
+  <div style="margin-top:4px;font-size:14px;font-weight:700;color:rgba(255,255,255,.7)">{{ macrosLinea }}</div>
+  <div style="margin-top:14px;display:flex;flex-direction:column">
+    <sc-for list="{{ comidasHoy }}" as="m" hint-placeholder-count="4">
+      <div style="{{ m.st }}">
+        <div>
+          <div style="font-size:14px;font-weight:700">{{ m.h }}</div>
+          <sc-if value="{{ m.destacada }}" hint-placeholder-val="{{ false }}"><div style="font-size:10.5px;font-weight:800;letter-spacing:.08em;color:#F3FF47">CLAVE EN DÍA DE GYM</div></sc-if>
+        </div>
+        <div style="font-size:13px;color:rgba(255,255,255,.65);white-space:nowrap">{{ m.mac }}</div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="margin-top:12px;font-size:12px;color:rgba(255,255,255,.45)">Registro de alimentos: Fitia. Esto es solo tu chuleta.</div>
+  <button onClick="{{ closeSheet }}" style="margin-top:14px;width:100%;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:14px;font-size:13px;font-weight:700;cursor:pointer">CERRAR</button>
+</sc-if>
+
+<sc-if value="{{ shInf }}" hint-placeholder-val="{{ false }}">
+  <div style="font-size:18px;font-weight:800">Generar informe</div>
+  <div style="margin-top:4px;font-size:12.5px;color:rgba(255,255,255,.5)">Para tu entrenador o IA. Markdown listo para copiar.</div>
+  <div style="margin-top:12px;display:flex;gap:8px">
+    <button onClick="{{ inf7 }}" style="{{ infSt7 }}">7 días</button>
+    <button onClick="{{ inf14 }}" style="{{ infSt14 }}">14 días</button>
+    <button onClick="{{ inf30 }}" style="{{ infSt30 }}">30 días</button>
+  </div>
+  <textarea readOnly value="{{ infText }}" rows="9" style="margin-top:12px;width:100%;background:#101010;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:13px 14px;color:rgba(255,255,255,.8);font-size:11.5px;font-family:ui-monospace,Menlo,monospace;line-height:1.55;resize:none"></textarea>
+  <div style="margin-top:12px;display:flex;gap:8px">
+    <button onClick="{{ copyInf }}" style="flex:1;background:#F3FF47;color:#0E0E0E;border:none;border-radius:999px;padding:14px;font-size:13px;font-weight:800;cursor:pointer">COPIAR</button>
+    <button onClick="{{ dlInf }}" style="flex:1;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:14px;font-size:13px;font-weight:700;cursor:pointer">DESCARGAR MD</button>
+  </div>
+  <button onClick="{{ closeSheet }}" style="margin-top:8px;width:100%;background:none;border:none;color:rgba(255,255,255,.45);padding:10px;font-size:13px;font-weight:600;cursor:pointer">Cerrar</button>
+</sc-if>
+
+<sc-if value="{{ shAj }}" hint-placeholder-val="{{ false }}">
+  <div style="font-size:18px;font-weight:800">Ajustes</div>
+  <div style="margin-top:14px;display:flex;flex-direction:column">
+    <sc-for list="{{ ajList }}" as="a" hint-placeholder-count="6">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+        <span style="font-size:14px;font-weight:600">{{ a.n }}</span>
+        <span style="font-size:12px;color:rgba(255,255,255,.4)">{{ a.v }} ›</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;background:#141414;border-radius:14px;padding:13px 15px">
+    <div>
+      <div style="font-size:13px;font-weight:700">Backup</div>
+      <div style="font-size:11.5px;color:rgba(255,255,255,.45)">Última copia: hace 12 días</div>
+    </div>
+    <button style="background:none;border:1px solid rgba(255,255,255,.14);color:#F4F4EF;border-radius:999px;padding:9px 13px;font-size:11px;font-weight:700;cursor:pointer">EXPORTAR</button>
+  </div>
+  <button onClick="{{ closeSheet }}" style="margin-top:14px;width:100%;background:#242424;color:#F4F4EF;border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:14px;font-size:13px;font-weight:700;cursor:pointer">CERRAR</button>
+</sc-if>
+
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;bottom:104px;left:50%;transform:translateX(-50%);z-index:99;background:#F4F4EF;color:#0E0E0E;font-size:13px;font-weight:700;padding:11px 18px;border-radius:999px;box-shadow:0 8px 30px rgba(0,0,0,.5);white-space:nowrap">{{ toast }}</div>
+</sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 430, &quot;height&quot;: 932}, &quot;fase&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;Mini-cut fuerte&quot;, &quot;options&quot;: [&quot;Mini-cut fuerte&quot;, &quot;Mini-cut moderado&quot;, &quot;Mantenimiento&quot;, &quot;Volumen limpio&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Estado del plan&quot;}, &quot;rampaActiva&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Estado del plan&quot;}, &quot;diaVisual&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Estado del plan&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.WK = [
+      { id: 'TA', name: 'Torso A', ex: [
+        { id: 'ta1', n: 'Jalón al pecho', s: 3, r: '8–12', rest: 150 },
+        { id: 'ta2', n: 'Elevaciones laterales', s: 4, r: '12–20', rest: 105, p: 1 },
+        { id: 'ta3', n: 'Press inclinado', s: 3, r: '8–12', rest: 150 },
+        { id: 'ta4', n: 'Remo pecho apoyado', s: 3, r: '8–12', rest: 150 },
+        { id: 'ta5', n: 'Press hombro', s: 2, r: '8–12', rest: 150 },
+        { id: 'ta6', n: 'Reverse pec deck', s: 2, r: '12–20', rest: 105, p: 1 },
+        { id: 'ta7', n: 'Curl', s: 2, r: '10–15', rest: 105 },
+        { id: 'ta8', n: 'Tríceps polea', s: 2, r: '10–15', rest: 105 } ] },
+      { id: 'PA', name: 'Pierna A', ex: [
+        { id: 'pa1', n: 'Hack squat', s: 3, r: '8–12', rest: 180 },
+        { id: 'pa2', n: 'Prensa', s: 2, r: '10–15', rest: 150 },
+        { id: 'pa3', n: 'Curl femoral', s: 3, r: '10–15', rest: 105 },
+        { id: 'pa4', n: 'Extensión cuádriceps', s: 2, r: '10–15', rest: 105 },
+        { id: 'pa5', n: 'Hip thrust', s: 2, r: '8–12', rest: 150 },
+        { id: 'pa6', n: 'Gemelos', s: 3, r: '10–20', rest: 90 },
+        { id: 'pa7', n: 'Sóleo', s: 3, r: '12–15', rest: 90, p: 1 },
+        { id: 'pa8', n: 'Tibial', s: 2, r: '15–20', rest: 90, p: 1 },
+        { id: 'pa9', n: 'Elevación lateral', s: 3, r: '12–20', rest: 105, p: 1 },
+        { id: 'pa10', n: 'Pullover', s: 2, r: '10–15', rest: 105, p: 1 },
+        { id: 'pa11', n: 'Dead bug', s: 2, r: '8/lado', rest: 60 },
+        { id: 'pa12', n: 'Plancha lateral', s: 2, r: '20–30 s/lado', rest: 60 } ] },
+      { id: 'TB', name: 'Torso B', ex: [
+        { id: 'tb1', n: 'Press plano', s: 3, r: '8–12', rest: 150 },
+        { id: 'tb2', n: 'Laterales', s: 4, r: '12–20', rest: 105, p: 1 },
+        { id: 'tb3', n: 'Jalón neutro', s: 3, r: '8–12', rest: 150 },
+        { id: 'tb4', n: 'High row', s: 3, r: '8–12', rest: 150 },
+        { id: 'tb5', n: 'Pec deck', s: 2, r: '10–15', rest: 105 },
+        { id: 'tb6', n: 'Reverse pec deck', s: 2, r: '12–20', rest: 105, p: 1 },
+        { id: 'tb7', n: 'Curl', s: 2, r: '10–15', rest: 105 },
+        { id: 'tb8', n: 'Tríceps sobre cabeza', s: 2, r: '10–15', rest: 105 } ] },
+      { id: 'PB', name: 'Pierna B', ex: [
+        { id: 'pb1', n: 'Hip thrust', s: 3, r: '8–12', rest: 150 },
+        { id: 'pb2', n: 'Prensa', s: 3, r: '8–12', rest: 150 },
+        { id: 'pb3', n: 'Curl femoral', s: 3, r: '10–15', rest: 105 },
+        { id: 'pb4', n: 'Extensión cuádriceps', s: 2, r: '10–15', rest: 105 },
+        { id: 'pb5', n: 'Extensión 45°', s: 2, r: '10–15', rest: 105 },
+        { id: 'pb6', n: 'Gemelos', s: 3, r: '10–20', rest: 90 },
+        { id: 'pb7', n: 'Sóleo', s: 3, r: '12–15', rest: 90, p: 1 },
+        { id: 'pb8', n: 'Tibial', s: 2, r: '15–20', rest: 90, p: 1 },
+        { id: 'pb9', n: 'Laterales', s: 3, r: '12–20', rest: 105, p: 1 },
+        { id: 'pb10', n: 'Pullover', s: 2, r: '10–15', rest: 105, p: 1 },
+        { id: 'pb11', n: 'Pallof', s: 2, r: '10/lado', rest: 60 },
+        { id: 'pb12', n: 'Plancha lateral', s: 2, r: '20–30 s/lado', rest: 60 } ] } ];
+    this.REF = {
+      pa1: { kg: 80, reps: [10, 9, 8], rir: 2 }, pa2: { kg: 140, reps: [12, 11], rir: 2 },
+      pa3: { kg: 45, reps: [12, 11, 10], rir: 2 }, pa4: { kg: 50, reps: [13, 12], rir: 2 },
+      pa5: { kg: 100, reps: [10, 9], rir: 2 }, pa6: { kg: 70, reps: [14, 12, 11], rir: 2 },
+      pa7: { kg: 55, reps: [14, 13, 12], rir: 2 }, pa8: { kg: 20, reps: [18, 16], rir: 2 },
+      pa9: { kg: 10, reps: [16, 14, 13], rir: 2 }, pa10: { kg: 32.5, reps: [12, 11], rir: 2 },
+      ta1: { kg: 68, reps: [11, 10, 9], rir: 2 }, ta2: { kg: 10, reps: [18, 16, 15, 14], rir: 2 },
+      ta3: { kg: 60, reps: [10, 9, 8], rir: 2 }, ta4: { kg: 65, reps: [10, 10, 9], rir: 2 },
+      ta5: { kg: 40, reps: [10, 9], rir: 2 }, ta6: { kg: 45, reps: [15, 14], rir: 2 },
+      ta7: { kg: 14, reps: [13, 12], rir: 2 }, ta8: { kg: 25, reps: [14, 12], rir: 2 },
+      tb1: { kg: 70, reps: [10, 9, 8], rir: 2 }, tb2: { kg: 10, reps: [17, 16, 14, 13], rir: 2 },
+      tb3: { kg: 64, reps: [11, 10, 9], rir: 2 }, tb4: { kg: 55, reps: [10, 9, 9], rir: 2 },
+      pb1: { kg: 110, reps: [10, 9, 8], rir: 2 }, pb2: { kg: 150, reps: [10, 9, 9], rir: 2 } };
+    this.POS = [
+      { n: 'Basculación pélvica', d: '1×8', i: 'Bascula la pelvis con control, sin empujar con las lumbares.', e: 'Arquear la zona lumbar.', t: 45 },
+      { n: 'Extensión torácica', d: '1×8', i: 'Extiende la parte alta de la espalda; la lumbar no participa.', e: 'Extender desde la lumbar.', t: 45 },
+      { n: 'Chin tuck', d: '2×8 · 5 s', i: 'Cabeza hacia atrás, no barbilla hacia abajo.', e: 'Mirar al suelo al retraer.', t: 80 },
+      { n: 'Wall slide', d: '2×8–10', i: 'Desliza antebrazos por la pared sin despegarlos.', e: 'Encoger los hombros.', t: 80 },
+      { n: 'Cobra baja', d: '2×20–30 s', i: 'Eleva el pecho suave, glúteos activos, cuello largo.', e: 'Empujar con las manos.', t: 60 },
+      { n: 'Stacking', d: '3×20 s', i: 'Rodillas suaves → costillas sobre pelvis → cuello largo.', e: 'Contener la respiración.', t: 60 } ];
+    this.NUTRI = {
+      'Mini-cut fuerte': { chip: 'MINI-CUT', kcal: 1700, m: '195P · 105HC · 55G', meals: [
+        { h: '09:00 Desayuno', p: 45, c: 40, g: 15, dk: 1 }, { h: '13:00 Comida post', p: 55, c: 45, g: 10, dk: 1 },
+        { h: '17:30 Merienda', p: 40, c: 10, g: 10 }, { h: '21:00 Cena', p: 55, c: 10, g: 20 }] },
+      'Mini-cut moderado': { chip: 'MINI-CUT MOD', kcal: 1850, m: '195P · 130HC · 60G', meals: [
+        { h: '09:00 Desayuno', p: 45, c: 45, g: 15, dk: 1 }, { h: '13:00 Comida post', p: 55, c: 60, g: 10, dk: 1 },
+        { h: '17:30 Merienda', p: 40, c: 10, g: 10 }, { h: '21:00 Cena', p: 55, c: 15, g: 25 }] },
+      'Mantenimiento': { chip: 'MANTENIMIENTO', kcal: 2400, m: '185P · 258HC · 70G', meals: [
+        { h: '09:00 Desayuno', p: 45, c: 70, g: 15, dk: 1 }, { h: '13:00 Comida post', p: 55, c: 100, g: 15, dk: 1 },
+        { h: '17:30 Merienda', p: 40, c: 35, g: 10 }, { h: '21:00 Cena', p: 45, c: 53, g: 30 }] },
+      'Volumen limpio': { chip: 'VOLUMEN', kcal: 2500, m: '185P · 283HC · 70G', meals: [
+        { h: '09:00 Desayuno', p: 45, c: 75, g: 15, dk: 1 }, { h: '13:00 Comida post', p: 55, c: 110, g: 15, dk: 1 },
+        { h: '17:30 Merienda', p: 40, c: 40, g: 10 }, { h: '21:00 Cena', p: 45, c: 58, g: 30 }] } };
+    this.FASES = [
+      { n: 'Mini-cut fuerte', d: '26 ago – 1 sep', m: '~1700 · 195/105/55' },
+      { n: 'Mini-cut moderado', d: '2 – 8 sep', m: '~1850 · 195/130/60' },
+      { n: 'Mantenimiento', d: '9 – 15 sep', m: '~2400 · 185/258/70' },
+      { n: 'Volumen limpio', d: 'desde 16 sep', m: '~2500–2550' }];
+    this.RUNF1 = [
+      { b: 1, f: 2, s: '6×(1′ correr + 2′ caminar)' }, { b: 2, f: 2, s: '6×(1:30′ + 2′)' },
+      { b: 3, f: 3, s: '6×(2′ + 2′)' }, { b: 4, f: 3, s: '5×(3′ + 2′)' }, { b: 5, f: 3, s: '4×(5′ + 2′)' },
+      { b: 6, f: 3, s: '3×(7′ + 2′)' }, { b: 7, f: 3, s: '3×(8′ + 2′)' }, { b: 8, f: 3, s: '2×(12′ + 2′)' },
+      { b: 9, f: 3, s: '2×(15′ + 2′)' }, { b: 10, f: 3, s: '25′ / 25′ / 30′ continuos' }];
+    this.RUNF2 = [
+      { b: 11, s: '30′ · 30′ · larga 35′' }, { b: 12, s: '30′ · 35′ · larga 40′' }, { b: 13, s: '35′ · 35′ · larga 45′' },
+      { b: 14, s: '30′ · 30′ · larga 35′ ↓ descarga' }, { b: 15, s: '35′ · 40′ · larga 50′' }, { b: 16, s: '35′ · 40′ · larga 55′' },
+      { b: 17, s: '40′ · 40′ · larga 60′' }, { b: 18, s: '35′ · 35′ · larga 45′ ↓ descarga' }];
+    this.RUNF3 = [
+      { b: 19, s: '5 · 5 · larga 8 km' }, { b: 20, s: '5 · 5 · larga 9 km' }, { b: 21, s: '5 · 6 · larga 10 km' },
+      { b: 22, s: '5 · 5 · larga 8 km ↓' }, { b: 23, s: '6 · 6 · larga 11 km' }, { b: 24, s: '6 · 6 · larga 12,5 km' },
+      { b: 25, s: '6 · 7 · larga 14 km' }, { b: 26, s: '5 · 5 · larga 10 km ↓' }, { b: 27, s: '7 · 7 · larga 16 km' },
+      { b: 28, s: '7 · 8 · larga 18 km' }, { b: 29, s: '5 · 6 · larga 12 km ↓' }, { b: 30, s: '6 · 7 · larga 20 km' }];
+    this.WHIST = [97.1, 97.2, 96.9, 97.0, 96.7, 96.8, 96.5, 96.6, 96.3, 96.5, 96.2, 96.4, 96.0, 96.1, 96.3, 95.9, 96.1, 95.8, 96.0, 95.7, 95.9, 95.6, 95.8, 96.0, 95.9, 96.0, 95.8, 95.7, 95.9];
+    this.FTREND = [
+      { n: 'Elevaciones laterales', line: '10 kg · 18/16/15/14 · +2 reps vs anterior', estado: 'SUBE PESO', c: '#71D98B' },
+      { n: 'Hack squat', line: '80 kg · 10/9/8 · RIR 2', estado: 'LLENA RANGO', c: '#F3FF47' },
+      { n: 'Jalón al pecho', line: '68 kg · 11/10/9 · estable 3 sesiones', estado: 'MANTÉN', c: '#7BDFFF' },
+      { n: 'Press inclinado', line: '60 kg · 10/9/8 · RIR 2', estado: 'MANTÉN', c: '#7BDFFF' },
+      { n: 'Hip thrust', line: '100 kg · 10/9 · buen margen', estado: 'SUBE PESO', c: '#71D98B' },
+      { n: 'Curl femoral', line: '45 kg · reps bajando 2 sesiones', estado: 'REVISAR', c: '#FFC24B' }];
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('forja2_proto') || '{}'); } catch (e) {}
+    this.state = Object.assign({
+      onboarded: false, tab: 'hoy', ent: 'fuerza', pr: 'cuerpo',
+      weightToday: null, wVal: 95.4,
+      nextIdx: 1, lastGymTxt: 'Torso A · hace 2 días',
+      fzSched: null, runSched: null, runOmitDay: null,
+      run: { block: 3, session: 1, done: 0, total: 3 },
+      runLast: 'hace 1 día', posDone: 0,
+      live: null, rest: null, sum: null, pos: null,
+      sheet: null, other: null, conflictDay: null, feel: null, runNote: '',
+      infRange: 7, histFilter: 'Todos', toast: null,
+      open: {}, wkOpen: {},
+      hist: [
+        { d: '20 ago', t: 'Carrera', x: 'S2 · 6×(1:30′+2′) · hecha', k: 'carrera' },
+        { d: '19 ago', t: 'Torso A', x: '8 ejercicios · 21 series · 52 min', k: 'fuerza' },
+        { d: '19 ago', t: 'Postura', x: '6/6 ejercicios', k: 'postura' },
+        { d: '19 ago', t: 'Peso', x: '95,7 kg', k: 'peso' },
+        { d: '18 ago', t: 'Carrera', x: 'S2 · 6×(1:30′+2′) · hecha', k: 'carrera' },
+        { d: '18 ago', t: 'Postura', x: '6/6 ejercicios', k: 'postura' },
+        { d: '17 ago', t: 'Pierna B', x: '12 ejercicios · 26 series · 61 min', k: 'fuerza' },
+        { d: '16 ago', t: 'Peso', x: '96,0 kg', k: 'peso' },
+        { d: '15 ago', t: 'Carrera', x: 'S2 · 6×(1:30′+2′) · hecha', k: 'carrera' },
+        { d: '14 ago', t: 'Torso B', x: '8 ejercicios · 20 series · 49 min', k: 'fuerza' }]
+    }, saved);
+  }
+  persist() {
+    const s = this.state;
+    const keep = { onboarded: s.onboarded, weightToday: s.weightToday, nextIdx: s.nextIdx, fzSched: s.fzSched, runSched: s.runSched, run: s.run, runLast: s.runLast, posDone: s.posDone, hist: s.hist, lastGymTxt: s.lastGymTxt };
+    try { localStorage.setItem('forja2_proto', JSON.stringify(keep)); } catch (e) {}
+  }
+  setP(patch) { this.setState(patch, () => this.persist()); }
+  componentDidMount() { this.iv = setInterval(() => this.tick(), 1000); }
+  componentWillUnmount() { clearInterval(this.iv); }
+  tick() {
+    const { rest, pos } = this.state;
+    if (rest && rest.left > 0) {
+      const left = rest.left - 1;
+      if (left <= 0) { try { navigator.vibrate && navigator.vibrate(200); } catch (e) {} this.setState({ rest: null, toast: 'Descanso terminado' }); this.clearToast(); }
+      else this.setState({ rest: Object.assign({}, rest, { left }) });
+    }
+    if (pos && pos.run && pos.left > 0) this.setState({ pos: Object.assign({}, pos, { left: pos.left - 1 }) });
+  }
+  clearToast() { clearTimeout(this.tt); this.tt = setTimeout(() => this.setState({ toast: null }), 2400); }
+  showToast(m) { this.setState({ toast: m }); this.clearToast(); }
+  fmt1(x) { return x.toFixed(1).replace('.', ','); }
+  mmss(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  startLive(idx, advance) {
+    const wk = this.WK[idx]; const ref = this.REF[wk.ex[0].id];
+    this.setState({ live: { wi: idx, ei: 0, sets: {}, t0: Date.now(), advance }, kgIn: ref ? ref.kg : 20, repsIn: 10, rirIn: '2', sheet: null, other: null });
+  }
+  finishLive() {
+    const { live } = this.state; if (!live) return;
+    const wk = this.WK[live.wi];
+    const dur = Math.max(1, Math.round((Date.now() - live.t0) / 60000));
+    let total = 0; const lines = [];
+    wk.ex.forEach(ex => {
+      const sets = live.sets[ex.id]; if (!sets || !sets.length) return;
+      total += sets.length;
+      const ref = this.REF[ex.id]; if (!ref) return;
+      const tot = sets.reduce((a, s) => a + s.reps, 0); const rtot = ref.reps.reduce((a, b) => a + b, 0);
+      if (sets[0].kg > ref.kg) lines.push({ txt: ex.n + ': subiste a ' + sets[0].kg + ' kg', c: { color: '#71D98B' } });
+      else if (tot > rtot) lines.push({ txt: ex.n + ': +' + (tot - rtot) + ' reps totales', c: { color: '#71D98B' } });
+      else if (tot === rtot) lines.push({ txt: ex.n + ': día estable', c: { color: '#7BDFFF' } });
+      else lines.push({ txt: ex.n + ': mantén peso', c: { color: '#FFC24B' } });
+    });
+    const sum = { name: wk.name, dur: dur + ' min', sets: total, lines: lines.slice(0, 4), advance: live.advance, wi: live.wi,
+      rec: lines.some(l => l.c.color === '#71D98B') ? 'Buen día: consolida y sube el incremento mínimo donde llenaste rango.' : 'Día de mantener: llena el rango con el RIR correcto antes de subir.' };
+    this.setState({ live: null, rest: null, sum, sheet: 'sum' });
+  }
+  buildInforme() {
+    const s = this.state; const wk = this.WK[s.nextIdx]; const nu = this.NUTRI[this.fase()];
+    const peso = s.weightToday ? this.fmt1(s.weightToday) : '95,7 (ayer)';
+    return ['# FORJA — Informe · últimos ' + s.infRange + ' días', '',
+      '## Resumen', '- Fecha: 21 ago 2026', '- Peso actual: ' + peso + ' kg · media 7 d: ' + this.media7() + ' kg',
+      '- Fase nutricional: ' + this.fase() + ' (' + nu.kcal + ' kcal · ' + nu.m + ')',
+      '- Running: Fase 1 · Bloque S' + s.run.block + ' · sesión ' + (s.run.done) + '/' + s.run.total + ' completadas',
+      '- Próxima fuerza: ' + wk.name, '',
+      '## Fuerza', '- 19 ago Torso A · 21 series · laterales +2 reps · jalón estable',
+      '- 17 ago Pierna B · 26 series · hip thrust 110 kg 10/9/8', '- Volumen: 42 series/7 d · 88 series/14 d',
+      '- Estancados: curl femoral (reps bajando 2 sesiones)', '',
+      '## Carrera', '- Bloque S3 en curso · 6×(2′+2′) · RPE 3–4', '- 3 bloques consecutivos al día · sin molestias', '- Tirada más larga: 24 min totales (CaCo)', '',
+      '## Postura', '- Cumplimiento: 5/7 días', '- Test pared 21 jul: 2,5 cm (mejora) · próximo ~1 sep', '',
+      '## Cuerpo', '- Peso 30 d: 97,1 → ' + peso + ' kg', '- Cintura: 88,5 cm (−1,5 cm/mes)', '',
+      '## Notas', '- Sin dolor. Rodilla derecha sin molestias desde el 12 ago.'].join('\n');
+  }
+  fase() { return this.props.fase ?? 'Mini-cut fuerte'; }
+  media7() { const s = this.state; const tail = this.WHIST.slice(-6).concat(s.weightToday ? [s.weightToday] : [this.WHIST[this.WHIST.length - 1]]); return this.fmt1(tail.reduce((a, b) => a + b, 0) / tail.length); }
+  chip(active, color, dark) {
+    return active
+      ? { background: color, color: dark, border: 'none', borderRadius: 999, padding: '10px 15px', fontSize: 12, fontWeight: 800, letterSpacing: '.06em', cursor: 'pointer' }
+      : { background: '#1C1C1C', color: 'rgba(255,255,255,.55)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 999, padding: '10px 15px', fontSize: 12, fontWeight: 700, letterSpacing: '.06em', cursor: 'pointer' };
+  }
+  renderVals() {
+    const s = this.state; const st = (p) => this.setState(p); const setP = (p) => this.setP(p);
+    const rampa = this.props.rampaActiva ?? false;
+    const nu = this.NUTRI[this.fase()];
+    const wk = this.WK[s.nextIdx];
+    const kCol = { fuerza: '#F3FF47', carrera: '#7BDFFF', postura: '#CDB9FF', peso: '#F4F4EF' };
+    // weight chart
+    const data = this.WHIST.concat(s.weightToday ? [s.weightToday] : []);
+    const min = Math.min(...data) - .3, max = Math.max(...data) + .3;
+    const pts = data.map((v, i) => [(i / (data.length - 1)) * 320, 92 - ((v - min) / (max - min)) * 84]);
+    const path = 'M' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L');
+    // live
+    const live = s.live; let lv = {};
+    if (live) {
+      const w = this.WK[live.wi]; const ex = w.ex[live.ei]; const ref = this.REF[ex.id];
+      const logged = live.sets[ex.id] || [];
+      const target = rampa ? Math.max(1, Math.round(ex.s * .75)) : ex.s;
+      lv = {
+        lvWkName: w.name.toUpperCase(), lvPos: (live.ei + 1) + '/' + w.ex.length, lvName: ex.n, lvStar: ex.p ? '⭐ ' : '',
+        lvDose: ex.s + '×' + ex.r, lvRestTxt: ex.rest >= 150 ? '2–3 min' : Math.round(ex.rest / 60 * 10) / 10 + ' min',
+        lvHasRef: !!ref, lvRef: ref ? ref.kg + ' kg · ' + ref.reps.join('/') + ' · RIR ' + ref.rir : '',
+        lvSetsAny: logged.length > 0, lvSets: logged.map((x, i) => ({ i: i + 1, txt: x.kg + ' kg × ' + x.reps + ' · RIR ' + x.rir })),
+        lvSerieTxt: 'SERIE ' + Math.min(logged.length + 1, target) + ' DE ' + target + (logged.length >= target ? ' — objetivo cumplido' : ''),
+        lvRampSets: target + ' de ' + ex.s + ' series',
+        kgVal: s.kgIn, repsVal: s.repsIn
+      };
+    }
+    const rirSt = (v) => s.rirIn === v
+      ? { flex: 1, background: '#F3FF47', color: '#0E0E0E', border: 'none', borderRadius: 14, padding: '13px 0', fontSize: 14, fontWeight: 800, cursor: 'pointer' }
+      : { flex: 1, background: '#242424', color: 'rgba(255,255,255,.65)', border: '1px solid rgba(255,255,255,.09)', borderRadius: 14, padding: '13px 0', fontSize: 14, fontWeight: 700, cursor: 'pointer' };
+    const feelSt = (v) => s.feel === v
+      ? { flex: 1, background: '#7BDFFF', color: '#0E1A1E', border: 'none', borderRadius: 999, padding: '12px 4px', fontSize: 12, fontWeight: 800, cursor: 'pointer' }
+      : { flex: 1, background: '#242424', color: 'rgba(255,255,255,.65)', border: '1px solid rgba(255,255,255,.09)', borderRadius: 999, padding: '12px 4px', fontSize: 12, fontWeight: 700, cursor: 'pointer' };
+    const infSt = (v) => s.infRange === v
+      ? { flex: 1, background: '#F3FF47', color: '#0E0E0E', border: 'none', borderRadius: 999, padding: '11px 0', fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }
+      : { flex: 1, background: '#242424', color: 'rgba(255,255,255,.6)', border: '1px solid rgba(255,255,255,.09)', borderRadius: 999, padding: '11px 0', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' };
+    // rotation strip
+    const rotacion = this.WK.map((w, i) => ({
+      name: w.name, arrow: i < 3,
+      st: i === s.nextIdx
+        ? { fontSize: 12, fontWeight: 800, padding: '8px 12px', borderRadius: 999, background: '#F3FF47', color: '#0E0E0E' }
+        : (i === (s.nextIdx + 3) % 4
+          ? { fontSize: 12, fontWeight: 700, padding: '8px 12px', borderRadius: 999, background: '#242424', color: '#71D98B', border: '1px solid rgba(113,217,139,.35)' }
+          : { fontSize: 12, fontWeight: 600, padding: '8px 12px', borderRadius: 999, background: '#191919', color: 'rgba(255,255,255,.4)', border: '1px solid rgba(255,255,255,.07)' })
+    }));
+    // agenda
+    const dias = ['Vie 21', 'Sáb 22', 'Dom 23', 'Lun 24', 'Mar 25', 'Mié 26', 'Jue 27'];
+    const seq = [0, 1, 2, 3].map(k => this.WK[(s.nextIdx + k) % 4].name);
+    const plan = [{ f: 0 }, { c: 1 }, { f: 1 }, { c: 2 }, { f: 2 }, {}, { c: 3 }];
+    let runN = s.run.session;
+    const agenda = dias.map((d, i) => {
+      const p = plan[i]; let name = 'Descanso', tag = '', col = 'rgba(255,255,255,.35)', done = false, sched = false, omit = false;
+      if (p.f !== undefined) { name = 'Fuerza · ' + seq[p.f]; col = '#F3FF47'; if (i === 0 && s.lastGymTxt.indexOf('hoy') === 0) done = true; if (s.fzSched === i) sched = true; }
+      else if (p.c !== undefined) { name = 'Carrera · S' + s.run.block + ' sesión'; col = '#7BDFFF'; if (s.runOmitDay === i) omit = true; if (s.runSched === i) sched = true; }
+      if (i === 0 && p.f !== undefined && s.hist[0] && s.hist[0].d === 'Hoy' && s.hist[0].k === 'fuerza') done = true;
+      const isRest = name === 'Descanso';
+      tag = isRest ? '' : (done ? 'REALIZADO' : omit ? 'OMITIDA' : sched ? 'PROGRAMADO' : 'SUGERIDO');
+      return {
+        d: d, name: name,
+        st: { flex: 1, fontSize: 13.5, fontWeight: isRest ? 500 : 700, color: omit ? 'rgba(255,255,255,.3)' : isRest ? 'rgba(255,255,255,.35)' : '#F4F4EF', textDecoration: omit ? 'line-through' : 'none' },
+        tag: tag,
+        tagSt: tag === '' ? { display: 'none' } : done
+          ? { fontSize: 9.5, fontWeight: 800, letterSpacing: '.08em', padding: '4px 8px', borderRadius: 999, background: col, color: '#0E0E0E' }
+          : sched
+            ? { fontSize: 9.5, fontWeight: 800, letterSpacing: '.08em', padding: '4px 8px', borderRadius: 999, background: '#242424', color: '#F4F4EF', border: '1px solid rgba(255,255,255,.25)' }
+            : omit
+              ? { fontSize: 9.5, fontWeight: 800, letterSpacing: '.08em', padding: '4px 8px', borderRadius: 999, background: 'none', color: 'rgba(255,255,255,.3)', border: '1px solid rgba(255,255,255,.1)' }
+              : { fontSize: 9.5, fontWeight: 800, letterSpacing: '.08em', padding: '4px 8px', borderRadius: 999, background: 'none', color: col, border: '1px solid ' + col.replace(')', ',.4)').replace('#F3FF47', 'rgba(243,255,71,.4)').replace('#7BDFFF', 'rgba(123,223,255,.4)') }
+      };
+    });
+    const runDays = [1, 3, 6];
+    const progDias = dias.map((d, i) => ({
+      label: i === 0 ? 'Hoy · ' + d.toLowerCase() : d,
+      meta: s.sheet === 'progF' && runDays.includes(i) ? 'carrera sugerida' : plan[i].f !== undefined && s.sheet === 'progC' ? 'fuerza sugerida' : '',
+      on: () => {
+        if (s.sheet === 'progF') {
+          if (runDays.includes(i)) st({ sheet: 'conf', conflictDay: i });
+          else { setP({ fzSched: i, sheet: null }); this.showToast('Fuerza programada: ' + d); }
+        } else { setP({ runSched: i, sheet: null }); this.showToast('Carrera programada: ' + d); }
+      }
+    }));
+    const histF = ['Todos', 'Fuerza', 'Carrera', 'Postura', 'Peso'];
+    const histView = s.hist.filter(h => s.histFilter === 'Todos' || h.k === s.histFilter.toLowerCase()).map(h => ({
+      d: h.d, t: h.t, x: h.x,
+      dotSt: { width: 8, height: 8, borderRadius: 99, background: kCol[h.k], marginTop: 5, flex: 'none' }
+    }));
+    const posDots = (this.state.pos ? this.POS.map((p, i) => ({
+      st: { width: 8, height: 8, borderRadius: 99, background: i < this.state.pos.i ? '#CDB9FF' : i === this.state.pos.i ? '#F4F4EF' : 'rgba(255,255,255,.15)' }
+    })) : []);
+    const pv = s.pos ? this.POS[s.pos.i] : null;
+    const anySheet = !!s.sheet;
+    return Object.assign({
+      // shell
+      isHoy: s.tab === 'hoy' && s.onboarded, isEnt: s.tab === 'ent', isPro: s.tab === 'pro', isPlan: s.tab === 'plan',
+      showOnb: !s.onboarded, onb: () => setP({ onboarded: true }),
+      navTabs: [['hoy', 'HOY', '◆'], ['ent', 'ENTRENAR', '▲'], ['pro', 'PROGRESO', '●'], ['plan', 'PLAN', '■']].map(([k, l, ic]) => ({
+        label: l, icon: ic, on: () => st({ tab: k }),
+        st: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', color: s.tab === k ? '#F3FF47' : 'rgba(255,255,255,.4)' }
+      })),
+      fecha: 'Viernes, 21 agosto', chips: [nu.chip, 'RUN S' + s.run.block, 'RIR ' + (rampa ? '3' : '1–2')],
+      diaVisualOn: this.props.diaVisual ?? false,
+      // peso
+      pesoPendiente: s.weightToday === null, pesoHecho: s.weightToday !== null,
+      pesoAyer: '95,7', pesoLinea: s.weightToday !== null ? this.fmt1(s.weightToday) + ' kg' : '',
+      media7: this.media7(), pesoBig: s.weightToday !== null ? this.fmt1(s.weightToday) : '95,7',
+      cambio30: '−1,4 kg', pesoPath: path, pesoArea: path + ' L320 96 L0 96 Z', pesoMax: this.fmt1(Math.max(...data)),
+      openW: () => st({ sheet: 'w' }), wVal: this.fmt1(s.wVal),
+      wUp: () => st({ wVal: Math.round((s.wVal + .1) * 10) / 10 }), wDown: () => st({ wVal: Math.round((s.wVal - .1) * 10) / 10 }),
+      saveW: () => { setP({ weightToday: s.wVal, sheet: null, hist: [{ d: 'Hoy', t: 'Peso', x: this.fmt1(s.wVal) + ' kg', k: 'peso' }].concat(s.hist) }); this.showToast('Peso guardado'); },
+      // hoy cards
+      nextWkName: wk.name, nextWkNameUp: wk.name.toUpperCase(), lastWkName: this.WK[(s.nextIdx + 3) % 4].name,
+      lastGym: s.lastGymTxt, rampaEstado: rampa ? 'Semana 1 · 75–80 %' : 'No activa', rirObjetivo: rampa ? '3' : '1–2',
+      fzProgramada: s.fzSched !== null, fzProgDia: s.fzSched !== null ? dias[s.fzSched] : '',
+      goEntF: () => st({ tab: 'ent', ent: 'fuerza' }), goEntC: () => st({ tab: 'ent', ent: 'carrera' }), goEntP: () => st({ tab: 'ent', ent: 'postura' }),
+      startNext: () => this.startLive(s.nextIdx, true),
+      progF: () => st({ sheet: 'progF' }), progC: () => st({ sheet: 'progC' }),
+      verRutina: () => { st({ tab: 'plan', wkOpen: { [wk.id]: true } }); },
+      verPlanRun: () => { st({ tab: 'plan', open: Object.assign({}, s.open, { run: true }) }); },
+      openPlanHoy: () => st({ sheet: 'planHoy' }), openAj: () => st({ sheet: 'aj' }),
+      // run
+      runShort: 'CaCo ' + (s.run.done + 1) + '/' + s.run.total, runTitle: '6 × (2′ correr + 2′ caminar)',
+      runBloqueLinea: 'Fase 1 · Bloque S' + s.run.block + ' · Sesión ' + s.run.session,
+      runLast: s.runLast, runRec: s.runLast === 'hoy' ? 'descansa mañana' : 'espera hasta mañana',
+      runBlock: s.run.block, runBlockDone: s.run.block, runBlockNext: s.run.block + 1,
+      runProgTxt: s.run.done + ' de ' + s.run.total + ' sesiones',
+      runDots: Array.from({ length: s.run.total }, (_, i) => ({
+        st: { width: 22, height: 8, borderRadius: 99, background: i < s.run.done ? '#7BDFFF' : 'rgba(255,255,255,.12)' }
+      })),
+      runBars: [{ l: 'S1', v: 12, h: 24, bg: 'rgba(123,223,255,.35)' }, { l: 'S2', v: 27, h: 46, bg: 'rgba(123,223,255,.55)' }, { l: 'S3', v: 12 + s.run.done * 12, h: 24 + s.run.done * 16, bg: '#7BDFFF' }],
+      openRunDone: () => st({ sheet: 'run', feel: null, runNote: '' }),
+      feelF: () => st({ feel: 'f' }), feelJ: () => st({ feel: 'j' }), feelM: () => st({ feel: 'm' }),
+      feelStF: feelSt('f'), feelStJ: feelSt('j'), feelStM: feelSt('m'),
+      onRunNote: (e) => st({ runNote: e.target.value }),
+      saveRun: () => {
+        const done = s.run.done + 1; const hist = [{ d: 'Hoy', t: 'Carrera', x: 'S' + s.run.block + ' · 6×(2′+2′) · hecha' + (s.feel === 'm' ? ' · molestias' : ''), k: 'carrera' }].concat(s.hist);
+        if (done >= s.run.total) setP({ run: Object.assign({}, s.run, { done }), runLast: 'hoy', hist, sheet: 'block' });
+        else { setP({ run: Object.assign({}, s.run, { done, session: s.run.session + 1 }), runLast: 'hoy', hist, sheet: null }); this.showToast('Carrera registrada'); }
+      },
+      blockAdv: () => { setP({ run: { block: s.run.block + 1, session: 1, done: 0, total: 3 }, sheet: null }); this.showToast('Avanzas a S' + (s.run.block + 1)); },
+      blockRep: () => { setP({ run: Object.assign({}, s.run, { session: 1, done: 0 }), sheet: null }); this.showToast('Repetimos S' + s.run.block + ' — buena decisión'); },
+      // entrenar tabs
+      entTabs: [['fuerza', 'FUERZA', '#F3FF47', '#0E0E0E'], ['carrera', 'CARRERA', '#7BDFFF', '#0E1A1E'], ['postura', 'POSTURA', '#CDB9FF', '#17102A']].map(([k, l, c, d]) => ({
+        label: l, on: () => st({ ent: k }), st: this.chip(s.ent === k, c, d)
+      })),
+      entF: s.ent === 'fuerza', entC: s.ent === 'carrera', entP: s.ent === 'postura',
+      rotacion: rotacion,
+      otras: this.WK.map((w, i) => ({
+        name: w.name, meta: i === s.nextIdx ? 'siguiente en rotación' : w.ex.length + ' ejercicios',
+        on: () => { if (i === s.nextIdx) this.startLive(i, true); else st({ sheet: 'other', other: i }); }
+      })),
+      otherName: s.other !== null ? this.WK[s.other].name : '',
+      otherKeep: () => this.startLive(s.other, false),
+      otherAdv: () => this.startLive(s.other, true),
+      omitOpen: () => st({ sheet: 'omit' }),
+      omitAdv: () => { setP({ nextIdx: (s.nextIdx + 1) % 4, sheet: null, hist: [{ d: 'Hoy', t: wk.name, x: 'Omitida manualmente · rotación avanzada', k: 'fuerza' }].concat(s.hist) }); this.showToast('Siguiente: ' + this.WK[(s.nextIdx + 1) % 4].name); },
+      omitKeep: () => { st({ sheet: null }); this.showToast(wk.name + ' sigue pendiente'); },
+      // postura
+      posLinea: s.posDone >= 6 ? 'Hecha hoy ✓' : s.posDone + '/6 hoy', posFrac: s.posDone + '/6',
+      posPendiente: s.posDone < 6, posCompleta: s.posDone >= 6, posCumpl: s.posDone >= 6 ? '6/7' : '5/7',
+      posLista: this.POS.map((p, i) => ({ n: p.n, d: p.d, dotSt: { width: 8, height: 8, borderRadius: 99, flex: 'none', background: i < s.posDone ? '#CDB9FF' : 'rgba(255,255,255,.15)' } })),
+      startPos: () => st({ pos: { i: 0, left: this.POS[0].t, run: true } }),
+      posOn: !!s.pos,
+      pvPos: s.pos ? (s.pos.i + 1) + ' DE 6' : '', pvName: pv ? pv.n : '', pvDose: pv ? pv.d : '',
+      pvInstr: pv ? pv.i : '', pvErr: pv ? pv.e : '', pvTime: s.pos ? this.mmss(s.pos.left) : '',
+      pvToggleTxt: s.pos && s.pos.run ? 'Pausar' : 'Reanudar',
+      posToggle: () => st({ pos: Object.assign({}, s.pos, { run: !s.pos.run }) }),
+      pvDots: posDots,
+      pvNextTxt: s.pos && s.pos.i >= 5 ? 'TERMINAR' : 'SIGUIENTE',
+      posNext: () => {
+        if (!s.pos) return;
+        if (s.pos.i >= 5) { setP({ pos: null, posDone: 6, hist: [{ d: 'Hoy', t: 'Postura', x: '6/6 ejercicios', k: 'postura' }].concat(s.hist) }); this.showToast('Postura completada'); }
+        else { const i = s.pos.i + 1; setP({ pos: { i, left: this.POS[i].t, run: true }, posDone: i }); }
+      },
+      posClose: () => st({ pos: null }),
+      // live
+      liveOn: !!live, finish: () => this.finishLive(),
+      kgUp: () => st({ kgIn: Math.round((s.kgIn + 2.5) * 10) / 10 }), kgDown: () => st({ kgIn: Math.max(0, Math.round((s.kgIn - 2.5) * 10) / 10) }),
+      repsUp: () => st({ repsIn: s.repsIn + 1 }), repsDown: () => st({ repsIn: Math.max(1, s.repsIn - 1) }),
+      rirA: () => st({ rirIn: '0–1' }), rirB: () => st({ rirIn: '2' }), rirC: () => st({ rirIn: '3+' }),
+      rirStA: rirSt('0–1'), rirStB: rirSt('2'), rirStC: rirSt('3+'),
+      useLast: () => { const ex = this.WK[live.wi].ex[live.ei]; const ref = this.REF[ex.id]; if (ref) st({ kgIn: ref.kg, repsIn: ref.reps[0] }); },
+      saveSet: () => {
+        const w = this.WK[live.wi]; const ex = w.ex[live.ei];
+        const sets = Object.assign({}, live.sets); sets[ex.id] = (sets[ex.id] || []).concat([{ kg: s.kgIn, reps: s.repsIn, rir: s.rirIn }]);
+        st({ live: Object.assign({}, live, { sets }), rest: { left: ex.rest, total: ex.rest } });
+      },
+      nextEx: () => { const w = this.WK[live.wi]; if (live.ei < w.ex.length - 1) { const ex = w.ex[live.ei + 1]; const ref = this.REF[ex.id]; st({ live: Object.assign({}, live, { ei: live.ei + 1 }), kgIn: ref ? ref.kg : s.kgIn, repsIn: ref ? ref.reps[0] : 10, rest: null }); } else this.finishLive(); },
+      prevEx: () => { if (live.ei > 0) { const ex = this.WK[live.wi].ex[live.ei - 1]; const ref = this.REF[ex.id]; st({ live: Object.assign({}, live, { ei: live.ei - 1 }), kgIn: ref ? ref.kg : s.kgIn, repsIn: ref ? ref.reps[0] : 10 }); } },
+      skipEx: () => { const ex = this.WK[live.wi].ex[live.ei]; if (ex.p) st({ sheet: 'prio' }); else { const w = this.WK[live.wi]; if (live.ei < w.ex.length - 1) st({ live: Object.assign({}, live, { ei: live.ei + 1 }) }); } },
+      prioStay: () => st({ sheet: null }),
+      prioSkip: () => { const w = this.WK[live.wi]; st({ sheet: null, live: Object.assign({}, live, { ei: Math.min(live.ei + 1, w.ex.length - 1) }) }); },
+      rampaOn: rampa && !!live,
+      restOn: !!s.rest, restTxt: s.rest ? this.mmss(s.rest.left) : '',
+      add30: () => st({ rest: Object.assign({}, s.rest, { left: s.rest.left + 30 }) }),
+      skipRest: () => st({ rest: null }),
+      // summary
+      sumName: s.sum ? s.sum.name : '', sumDur: s.sum ? s.sum.dur : '', sumSets: s.sum ? s.sum.sets : '',
+      sumLines: s.sum ? s.sum.lines : [], sumRec: s.sum ? s.sum.rec : '',
+      sumBtnTxt: s.sum && s.sum.advance ? 'CERRAR — SIGUIENTE: ' + this.WK[(s.sum.wi + 1) % 4].name.toUpperCase() : 'CERRAR',
+      closeSum: () => {
+        const sum = s.sum; if (!sum) { st({ sheet: null }); return; }
+        const patch = { sheet: null, sum: null, lastGymTxt: sum.name + ' · hoy', hist: [{ d: 'Hoy', t: sum.name, x: sum.sets + ' series · ' + sum.dur, k: 'fuerza' }].concat(s.hist) };
+        if (sum.advance) patch.nextIdx = (sum.wi + 1) % 4;
+        setP(patch); this.showToast(sum.advance ? 'Siguiente: ' + this.WK[(sum.wi + 1) % 4].name : 'Rotación sin cambios');
+      },
+      // progreso
+      proTabs: ['CUERPO', 'FUERZA', 'CARRERA', 'POSTURA', 'HISTORIAL'].map(l => ({
+        label: l, on: () => st({ pr: l.toLowerCase() }),
+        st: s.pr === l.toLowerCase()
+          ? { background: '#F4F4EF', color: '#0E0E0E', border: 'none', borderRadius: 999, padding: '9px 13px', fontSize: 11, fontWeight: 800, letterSpacing: '.05em', cursor: 'pointer' }
+          : { background: '#1C1C1C', color: 'rgba(255,255,255,.5)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 999, padding: '9px 13px', fontSize: 11, fontWeight: 700, letterSpacing: '.05em', cursor: 'pointer' }
+      })),
+      prCu: s.pr === 'cuerpo', prFu: s.pr === 'fuerza', prCa: s.pr === 'carrera', prPo: s.pr === 'postura', prHi: s.pr === 'historial',
+      fTrend: this.FTREND.map(e => ({ n: e.n, line: e.line, estado: e.estado, st: { fontSize: 10, fontWeight: 800, letterSpacing: '.06em', padding: '5px 9px', borderRadius: 999, whiteSpace: 'nowrap', flex: 'none', background: 'rgba(255,255,255,.04)', color: e.c, border: '1px solid ' + e.c + '44' } })),
+      histFiltros: histF.map(f => ({
+        label: f, on: () => st({ histFilter: f }),
+        st: s.histFilter === f
+          ? { background: '#F4F4EF', color: '#0E0E0E', border: 'none', borderRadius: 999, padding: '7px 11px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }
+          : { background: 'none', color: 'rgba(255,255,255,.5)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 999, padding: '7px 11px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }
+      })),
+      histView: histView,
+      // plan
+      faseNombre: this.fase(), faseChip: nu.chip, nutriLinea: nu.kcal.toLocaleString('es') + ' kcal · ' + nu.m,
+      kcalBig: nu.kcal.toLocaleString('es'), macrosLinea: nu.m,
+      comidas: nu.meals.map(m => ({ h: m.h, p: m.p, c: m.c, g: m.g })),
+      comidasHoy: nu.meals.map(m => ({
+        h: m.h, mac: m.p + 'P · ' + m.c + 'HC · ' + m.g + 'G', destacada: !!m.dk,
+        st: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 12, marginBottom: 6, background: m.dk ? 'rgba(243,255,71,.06)' : '#141414', border: m.dk ? '1px solid rgba(243,255,71,.25)' : '1px solid rgba(255,255,255,.04)' }
+      })),
+      fases: this.FASES,
+      wkList: this.WK.map(w => ({
+        name: w.name, count: w.ex.length, open: !!s.wkOpen[w.id], chev: s.wkOpen[w.id] ? '▾' : '▸',
+        on: () => st({ wkOpen: Object.assign({}, s.wkOpen, { [w.id]: !s.wkOpen[w.id] }) }),
+        ex: w.ex.map(e => ({ n: e.n, star: e.p ? '⭐ ' : '', dose: e.s + '×' + e.r }))
+      })),
+      runF1: this.RUNF1.map(r => ({ b: r.b, f: r.f, s: r.s, st: Object.assign({ display: 'flex', gap: 8, fontSize: 12.5, padding: '6px 0', borderTop: '1px solid rgba(255,255,255,.04)', alignItems: 'center' }, r.b === s.run.block ? { color: '#7BDFFF', fontWeight: 700 } : { color: 'rgba(255,255,255,.7)' }) })),
+      runF2: this.RUNF2, runF3: this.RUNF3,
+      agenda: agenda,
+      tg: { fases: () => st({ open: Object.assign({}, s.open, { fases: !s.open.fases }) }), run: () => st({ open: Object.assign({}, s.open, { run: !s.open.run }) }), pump: () => st({ open: Object.assign({}, s.open, { pump: !s.open.pump }) }) },
+      open: s.open,
+      // sheets
+      anySheet: anySheet, closeSheet: () => st({ sheet: null, other: null }),
+      shW: s.sheet === 'w', shProg: s.sheet === 'progF' || s.sheet === 'progC', shConf: s.sheet === 'conf',
+      shOther: s.sheet === 'other', shOmit: s.sheet === 'omit', shPrio: s.sheet === 'prio', shSum: s.sheet === 'sum',
+      shRun: s.sheet === 'run', shBlock: s.sheet === 'block', shPlanHoy: s.sheet === 'planHoy', shInf: s.sheet === 'inf', shAj: s.sheet === 'aj',
+      progKindTxt: s.sheet === 'progC' ? 'carrera' : 'fuerza — ' + wk.name, progDias: progDias,
+      cfMover: () => { setP({ fzSched: s.conflictDay, runSched: Math.min(6, s.conflictDay + 1), sheet: null }); this.showToast('Fuerza fijada · carrera movida'); },
+      cfOmitir: () => { setP({ fzSched: s.conflictDay, runOmitDay: s.conflictDay, sheet: null }); this.showToast('Carrera omitida ese día'); },
+      cfAmbos: () => { setP({ fzSched: s.conflictDay, runSched: s.conflictDay, sheet: null }); this.showToast('Ambos el mismo día — vigila la recuperación'); },
+      openInf: () => st({ sheet: 'inf' }),
+      inf7: () => st({ infRange: 7 }), inf14: () => st({ infRange: 14 }), inf30: () => st({ infRange: 30 }),
+      infSt7: infSt(7), infSt14: infSt(14), infSt30: infSt(30),
+      infText: this.buildInforme(),
+      copyInf: () => { try { navigator.clipboard.writeText(this.buildInforme()); this.showToast('Informe copiado'); } catch (e) { this.showToast('No se pudo copiar'); } },
+      dlInf: () => { const b = new Blob([this.buildInforme()], { type: 'text/markdown' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'forja-informe.md'; a.click(); },
+      ajList: [
+        { n: 'Plan', v: 'rotación · bloque · fechas' }, { n: 'Apariencia', v: 'oscuro · lima' },
+        { n: 'Avisos', v: 'vibración on' }, { n: 'Datos', v: 'local' }, { n: 'Avanzado', v: '' }],
+      toastOn: !!s.toast, toast: s.toast
+    }, lv);
+  }
+}
+</script>
+</body>
+</html>
