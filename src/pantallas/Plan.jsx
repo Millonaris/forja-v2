@@ -1,5 +1,5 @@
 /*
- * PLAN (§20). Solo consulta: nutrición, fuerza, carrera, postura y agenda.
+ * PLAN (§20). Solo consulta: fuerza, carrera, postura y agenda.
  *
  * Aquí no se ejecuta nada — para eso está ENTRENAR. Y la agenda de esta
  * pantalla es lo único que queda del calendario de la v1: siete días de
@@ -9,15 +9,17 @@
 import { useState } from "react";
 
 import { BLOQUES, ENVOLTURA, NOMBRES_FASE, REGLAS as REGLAS_CARRERA, describirSesion, proximoHito } from "../datos/planCarrera.js";
-import { FASES, NOTA_PREENTRENO, REGLAS as REGLAS_DIETA, objetivosDe, planEnMarcha } from "../datos/planNutricion.js";
 import { REGLAS_PROGRESION, RUTINAS, dosis } from "../datos/rutinas.js";
 import { EJERCICIOS as POSTURALES, EXTRAS, FRASE, SEGUIMIENTO } from "../datos/rutinaPostural.js";
 import { useAjustes, useEstadoCarrera, useEstadoFuerza } from "../ganchos/useDatos.js";
 import { proximos7Dias } from "../logica/agenda.js";
-import { fechaCorta, hoyISO } from "../logica/fechas.js";
 
+/*
+ * Nutrición NO está aquí: vive en su propia pestaña, DIETA. Tenerla en los dos
+ * sitios sería exactamente el duplicado que el rediseño quiere quitar (§60-C:
+ * se elimina la copia y se enlaza a la fuente única).
+ */
 const SECCIONES = [
-  { id: "nutricion", texto: "NUTRICIÓN" },
   { id: "fuerza", texto: "FUERZA" },
   { id: "carrera", texto: "0→20 KM" },
   { id: "postura", texto: "POSTURA" },
@@ -25,7 +27,7 @@ const SECCIONES = [
 ];
 
 export default function Plan({ sub }) {
-  const [activa, setActiva] = useState(sub ?? "nutricion");
+  const [activa, setActiva] = useState(sub ?? "fuerza");
 
   return (
     <div style={{ padding: "20px var(--margen) 0" }} className="columna">
@@ -50,94 +52,11 @@ export default function Plan({ sub }) {
         ))}
       </div>
 
-      {activa === "nutricion" && <Nutricion />}
       {activa === "fuerza" && <Fuerza />}
       {activa === "carrera" && <Carrera />}
       {activa === "postura" && <Postura />}
       {activa === "agenda" && <Agenda />}
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-
-function Nutricion() {
-  const ajustes = useAjustes();
-  const hoy = hoyISO();
-  const objetivos = objetivosDe(hoy, ajustes?.escalonVolumen ?? 0);
-
-  return (
-    <>
-      <div className="tarjeta">
-        <div className="rotulo">{planEnMarcha(hoy) ? "Fase actual" : "Fase que viene"}</div>
-        <div style={{ fontSize: 23, fontWeight: 800, margin: "6px 0 4px" }}>{objetivos.fase.nombre}</div>
-        <div style={{ fontSize: 17, fontWeight: 700 }}>
-          {objetivos.kcal.toLocaleString("es-ES")} kcal
-        </div>
-        <div className="dato" style={{ fontSize: 14, marginTop: 3 }}>
-          {objetivos.p}P · {objetivos.hc}HC · {objetivos.g}G
-        </div>
-        {!planEnMarcha(hoy) && (
-          <div style={{ fontSize: 12.5, color: "var(--aviso)", marginTop: 8 }}>
-            Empieza el {fechaCorta(objetivos.fase.desde)}.
-          </div>
-        )}
-      </div>
-
-      <div className="tarjeta">
-        <div className="rotulo" style={{ marginBottom: 12 }}>Plan de hoy</div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
-          <thead>
-            <tr style={{ color: "var(--texto-tenue)", fontSize: 11, letterSpacing: ".08em" }}>
-              <th style={{ textAlign: "left", paddingBottom: 8 }}>COMIDA</th>
-              <th style={{ textAlign: "right", paddingBottom: 8 }}>P</th>
-              <th style={{ textAlign: "right", paddingBottom: 8 }}>HC</th>
-              <th style={{ textAlign: "right", paddingBottom: 8 }}>G</th>
-            </tr>
-          </thead>
-          <tbody>
-            {objetivos.comidas.map((c) => (
-              <tr key={c.nombre} style={{ borderTop: "1px solid var(--borde)" }}>
-                <td style={{ padding: "9px 0" }}>
-                  <span style={{ color: "var(--texto-tenue)", marginRight: 7 }}>{c.hora}</span>
-                  {c.nombre}
-                </td>
-                <td style={{ textAlign: "right", fontWeight: 700 }}>{c.p}</td>
-                <td style={{ textAlign: "right", fontWeight: 700 }}>{c.hc}</td>
-                <td style={{ textAlign: "right", fontWeight: 700 }}>{c.g}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p style={{ margin: "14px 0 0", fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
-          La comida se registra en Fitia. Esto es solo la chuleta.
-        </p>
-      </div>
-
-      <Plegable titulo="Fases y fechas">
-        {FASES.map((f) => (
-          <div key={f.id} className="entre" style={{ fontSize: 13.5, padding: "7px 0" }}>
-            <span>{f.nombre}</span>
-            <span style={{ color: "var(--texto-tenue)", textAlign: "right" }}>
-              {fechaCorta(f.desde)}{f.hasta ? ` – ${fechaCorta(f.hasta)}` : " en adelante"} · {f.kcal} kcal
-            </span>
-          </div>
-        ))}
-        <p style={{ fontSize: 12.5, color: "var(--aviso)", marginTop: 10, marginBottom: 0 }}>
-          Las fases van por fecha. Mover un entreno no las desplaza.
-        </p>
-      </Plegable>
-
-      <Plegable titulo="Reglas">
-        <Lista items={REGLAS_DIETA} />
-      </Plegable>
-
-      <Plegable titulo="Preentreno">
-        <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.55 }}>
-          {NOTA_PREENTRENO}
-        </p>
-      </Plegable>
-    </>
   );
 }
 

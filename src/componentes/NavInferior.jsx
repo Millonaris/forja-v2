@@ -1,11 +1,15 @@
 /*
- * Barra de pestañas. Cuatro y solo cuatro (§5 de la spec): Ajustes vive
- * detrás del engranaje de HOY, no aquí.
+ * Barra de pestañas.
+ *
+ * La spec pedía cuatro (§5). Son cinco: DIETA se añadió a petición expresa,
+ * porque hasta el 8 de septiembre es lo único con fecha límite y lo que más
+ * veces al día se consulta. Ajustes sigue fuera, detrás del engranaje de HOY.
  */
 
 const PESTANAS = [
   { id: "hoy", icono: "◆", etiqueta: "HOY" },
   { id: "entrenar", icono: "▲", etiqueta: "ENTRENAR" },
+  { id: "dieta", icono: "◈", etiqueta: "DIETA" },
   { id: "progreso", icono: "●", etiqueta: "PROGRESO" },
   { id: "plan", icono: "■", etiqueta: "PLAN" },
 ];
@@ -24,7 +28,7 @@ export default function NavInferior({ activa, alCambiar }) {
         backdropFilter: "blur(14px)",
         borderTop: "1px solid rgba(255,255,255,.07)",
         display: "flex",
-        padding: "10px 8px calc(12px + env(safe-area-inset-bottom))",
+        padding: "10px 4px calc(12px + env(safe-area-inset-bottom))",
       }}
     >
       {PESTANAS.map((p) => {
@@ -51,7 +55,7 @@ export default function NavInferior({ activa, alCambiar }) {
             }}
           >
             <span style={{ fontSize: 16, lineHeight: 1 }}>{p.icono}</span>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em" }}>
+            <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: ".02em" }}>
               {p.etiqueta}
             </span>
           </button>

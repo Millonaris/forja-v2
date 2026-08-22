@@ -7,6 +7,7 @@ import { formatear } from "./ganchos/useTemporizador.js";
 import { configurarSenales } from "./utiles/senales.js";
 import Ajustes from "./pantallas/Ajustes.jsx";
 import Calibracion from "./pantallas/Calibracion.jsx";
+import Dieta from "./pantallas/Dieta.jsx";
 import Entrenar from "./pantallas/Entrenar.jsx";
 import Hoy from "./pantallas/Hoy.jsx";
 import Plan from "./pantallas/Plan.jsx";
@@ -66,6 +67,7 @@ export default function App() {
       {pestana === "entrenar" && (
         <Entrenar key={sub} sub={sub ?? "fuerza"} alRetomarEntreno={() => setPlegado(false)} />
       )}
+      {pestana === "dieta" && <Dieta key={sub} sub={sub} />}
       {pestana === "progreso" && <Progreso sub={sub} />}
       {pestana === "plan" && <Plan sub={sub} />}
 

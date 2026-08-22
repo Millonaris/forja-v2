@@ -13,7 +13,9 @@ import assert from "node:assert/strict";
 
 import * as fuerza from "../src/logica/motorFuerza.js";
 import * as carrera from "../src/logica/motorCarrera.js";
-import { faseDe, objetivosDe } from "../src/datos/planNutricion.js";
+import {
+  DIAS_ESPECIALES, calendarioDelTramo, diaEspecialDe, faseDe, kcalDe, objetivosDe,
+} from "../src/datos/planNutricion.js";
 import { seriesDeHoy, rirDeHoy } from "../src/datos/rampa.js";
 import * as progresion from "../src/logica/progresion.js";
 import * as volumen from "../src/logica/volumen.js";
@@ -132,12 +134,62 @@ test("el plan termina en una tirada de 20 km", () => {
 /* ------------------------------------------------------------------ */
 
 test("§42 · la nutrición va por fecha y no la mueve el entrenamiento", () => {
-  // Mover el gimnasio del 1 al 2 de septiembre no cambia que el 2 empiece la
-  // fase 2: son dos calendarios distintos a propósito.
-  assert.equal(faseDe("2026-09-01").id, "minicut-fuerte");
-  assert.equal(faseDe("2026-09-02").id, "minicut-moderado");
+  // Mover el gimnasio del 1 al 2 de septiembre no cambia que el 2 suba los
+  // hidratos: son dos calendarios distintos a propósito.
+  assert.equal(faseDe("2026-09-01").id, "recorte-fuerte");
+  assert.equal(faseDe("2026-09-02").id, "recorte-moderado");
   assert.equal(faseDe("2026-09-09").id, "mantenimiento");
   assert.equal(faseDe("2026-10-30").id, "volumen", "la fase de volumen es abierta");
+});
+
+test("los días de recarga y visual mandan sobre su fase", () => {
+  // El 3 y el 4 caen dentro del recorte moderado, pero tienen reparto propio:
+  // son justamente el motivo del plan.
+  assert.equal(faseDe("2026-09-03").id, "recorte-moderado");
+  assert.equal(objetivosDe("2026-09-03").kcal, 2200, "recarga");
+  assert.equal(objetivosDe("2026-09-04").kcal, 2050, "día visual");
+
+  // Y los días de alrededor siguen con las kcal de la fase.
+  assert.equal(objetivosDe("2026-09-02").kcal, 1850);
+  assert.equal(objetivosDe("2026-09-05").kcal, 1850);
+  assert.equal(diaEspecialDe("2026-09-05"), null);
+});
+
+test("las kcal de cada día cuadran con sus macros (4/4/9)", () => {
+  for (const dia of calendarioDelTramo()) {
+    assert.equal(kcalDe(dia), dia.kcal, `las kcal del ${dia.fecha}`);
+  }
+});
+
+test("el calendario del tramo va del 26 de agosto al 8 de septiembre", () => {
+  const dias = calendarioDelTramo();
+  assert.equal(dias.length, 14);
+  assert.equal(dias[0].fecha, "2026-08-26");
+  assert.equal(dias.at(-1).fecha, "2026-09-08");
+
+  // Siete días de recorte fuerte antes de empezar a subir.
+  assert.equal(dias.filter((d) => d.kcal === 1700).length, 7);
+  // Y el pico está en la recarga, no en el día visual.
+  const pico = dias.reduce((a, b) => (a.kcal >= b.kcal ? a : b));
+  assert.equal(pico.fecha, "2026-09-03");
+});
+
+test("las comidas de los días especiales suman su total", () => {
+  for (const [fecha, dia] of Object.entries(DIAS_ESPECIALES)) {
+    const suma = (k) => dia.comidas.reduce((t, c) => t + c[k], 0);
+    assert.equal(suma("p"), dia.p, `proteína del ${fecha}`);
+    assert.equal(suma("hc"), dia.hc, `hidratos del ${fecha}`);
+    assert.equal(suma("g"), dia.g, `grasas del ${fecha}`);
+    assert.equal(kcalDe(dia), dia.kcal, `kcal del ${fecha}`);
+  }
+});
+
+test("la recarga es la que más hidrato lleva, y de largo", () => {
+  const recarga = objetivosDe("2026-09-03");
+  const recorte = objetivosDe("2026-08-27");
+  assert.ok(recarga.hc > recorte.hc * 2, "la recarga más que dobla el hidrato del recorte");
+  // La subida viene del hidrato: la grasa apenas se mueve.
+  assert.ok(Math.abs(recarga.g - recorte.g) <= 5, "la grasa se queda casi igual");
 });
 
 test("las macros por comida suman el total de la fase (§21)", () => {

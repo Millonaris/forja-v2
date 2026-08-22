@@ -22,6 +22,7 @@ import {
   usePesos, usePosturaHoy, useSesionAbierta, useSesionesFuerza,
 } from "../ganchos/useDatos.js";
 import { fechaLarga, haceCuanto, hoyISO } from "../logica/fechas.js";
+import { miles } from "../logica/formato.js";
 import * as motorCarrera from "../logica/motorCarrera.js";
 import * as motorFuerza from "../logica/motorFuerza.js";
 import { formatear as formatearPeso, faltaHoy, media, pesoDe } from "../logica/peso.js";
@@ -236,19 +237,19 @@ export default function Hoy({ irA, alAbrirAjustes, alRetomarEntreno }) {
 
       {/* ---------- Nutrición ---------- */}
       <button
-        onClick={() => irA("plan", "nutricion")}
+        onClick={() => irA("dieta", "hoy")}
         className="tarjeta entre"
         style={{ width: "100%", textAlign: "left", cursor: "pointer" }}
       >
         <div>
           <div style={{ fontSize: 17, fontWeight: 800 }}>
-            {objetivos.kcal.toLocaleString("es-ES")} kcal
+            {miles(objetivos.kcal)} kcal
           </div>
           <div className="dato" style={{ fontSize: 13.5, marginTop: 3 }}>
             {objetivos.p}P · {objetivos.hc}HC · {objetivos.g}G
           </div>
         </div>
-        <span style={{ color: "var(--texto-tenue)", fontSize: 12, fontWeight: 700 }}>VER PLAN ›</span>
+        <span style={{ color: "var(--texto-tenue)", fontSize: 12, fontWeight: 700 }}>VER DIETA ›</span>
       </button>
 
       <DialogoPeso
