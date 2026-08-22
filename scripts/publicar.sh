@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 #
-# FORJA 2.0 · Publicar el prototipo.
+# FORJA 2.0 · Publicar la app.
 #
-# Reconstruye `prototipo/` desde el diseño y lo sube a la rama `gh-pages`, que
-# es la que sirve https://millonaris.github.io/forja-v2/. El móvil recoge la
-# versión nueva la próxima vez que abras la app.
+# Compila y sube el resultado a la rama `gh-pages`, que es la que sirve
+# https://millonaris.github.io/forja-v2/. El móvil recoge la versión nueva la
+# próxima vez que abras la app: el service worker va en autoUpdate.
 #
 #   npm run publicar
 #
-# La rama `gh-pages` contiene SOLO el resultado y se reescribe entera en cada
-# publicación: no guarda historial y no hay nada que conservar en ella.
+# La rama `gh-pages` contiene SOLO el resultado compilado y se reescribe entera
+# en cada publicación: no guarda historial y no hay nada que conservar en ella.
 #
-# Cuando la app real sustituya al prototipo, aquí solo cambia qué carpeta se
-# sube; la URL y la instalación del móvil siguen siendo las mismas.
+# El prototipo de diseño sigue existiendo (`npm run prototipo`) pero ya no se
+# publica: lo que hay en esa URL es la app.
 
 set -euo pipefail
 
@@ -20,18 +20,24 @@ REPO="https://github.com/Millonaris/forja-v2.git"
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 cd "$RAIZ"
-node scripts/generar-iconos.mjs
-node scripts/construir-prototipo.mjs
 
-cd prototipo
+# Si las pruebas de aceptación no pasan, no se publica: son las reglas de las
+# que depende que la app no invente lo que toca entrenar.
+npm test
+npm run iconos
+npm run build
+
+cd dist
 # Sin esto GitHub Pages pasa la carpeta por Jekyll y se come los ficheros que
 # empiezan por guion bajo.
 touch .nojekyll
 
-# Repositorio de usar y tirar: `prototipo/` está en .gitignore, así que este
-# .git de dentro no interfiere con el del proyecto.
+# Repositorio de usar y tirar: `dist` está en .gitignore, así que este .git de
+# dentro no interfiere con el del proyecto.
 rm -rf .git
 git init -q -b gh-pages
+# Con el buffer por defecto, subir todo de golpe hace que GitHub corte la
+# conexión con un 400.
 git config http.postBuffer 157286400
 git add -A
 git commit -q -m "Publicar $(date '+%Y-%m-%d %H:%M')"
