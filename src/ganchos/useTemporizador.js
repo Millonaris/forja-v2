@@ -22,6 +22,11 @@ export function useTemporizador() {
   const [finEn, setFinEn] = useState(null);
   const [restante, setRestante] = useState(0);
   const yaAvisado = useRef(false);
+  // Las opciones del arranque se recuerdan para que `sumar` reprograme el
+  // despertador con el MISMO contrato: sin esto, un +30s perdía el nombre del
+  // ejercicio en la notificación y armaba un aviso de sistema en temporizadores
+  // que se pidieron solo de primer plano (postura).
+  const opciones = useRef({});
 
   useEffect(() => {
     if (finEn == null) return undefined;
@@ -48,11 +53,12 @@ export function useTemporizador() {
     };
   }, [finEn]);
 
-  const arrancar = useCallback((segundos, opciones = {}) => {
+  const arrancar = useCallback((segundos, nuevasOpciones = {}) => {
     yaAvisado.current = false;
+    opciones.current = nuevasOpciones;
     setFinEn(Date.now() + segundos * 1000);
-    if (opciones.enSegundoPlano !== false) {
-      programarFinDeDescanso(segundos * 1000, { ejercicio: opciones.ejercicio });
+    if (nuevasOpciones.enSegundoPlano !== false) {
+      programarFinDeDescanso(segundos * 1000, { ejercicio: nuevasOpciones.ejercicio });
     }
   }, []);
 
@@ -62,8 +68,11 @@ export function useTemporizador() {
       if (f == null) return null;
       const nuevo = f + segundos * 1000;
       // El despertador del service worker se reprograma entero: no sabe nada
-      // de "sumar", solo de cuánto falta desde ahora.
-      programarFinDeDescanso(nuevo - Date.now());
+      // de "sumar", solo de cuánto falta desde ahora. Se reenvían las opciones
+      // del arranque para no perder el nombre del ejercicio por el camino.
+      if (opciones.current.enSegundoPlano !== false) {
+        programarFinDeDescanso(nuevo - Date.now(), { ejercicio: opciones.current.ejercicio });
+      }
       return nuevo;
     });
   }, []);

@@ -28,9 +28,9 @@ import { useWakeLock } from "../ganchos/useWakeLock.js";
 import { cancelarAviso, estadoPermiso, pedirPermiso } from "../utiles/avisos.js";
 import { borrarSerie, descartarSesionFuerza, guardarSerie, terminarSesionFuerza } from "../logica/acciones.js";
 import { hoyISO } from "../logica/fechas.js";
-import ResumenSesion from "./ResumenSesion.jsx";
+import { miles } from "../logica/formato.js";
 
-export default function SesionFuerza({ sesion, alPlegar }) {
+export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
   const rutina = RUTINAS.find((r) => r.id === sesion.plantillaId);
   const ejercicios = useEjercicios(sesion.plantillaId);
   const series = useSeriesDeSesion(sesion.id);
@@ -43,7 +43,6 @@ export default function SesionFuerza({ sesion, alPlegar }) {
   useWakeLock(true);
   const [terminando, setTerminando] = useState(false);
   const [avisoPrioritario, setAvisoPrioritario] = useState(null);
-  const [resumen, setResumen] = useState(null);
   const [permiso, setPermiso] = useState(() => estadoPermiso());
 
   // El cronómetro se calcula desde la marca de inicio guardada, no sumando:
@@ -54,6 +53,42 @@ export default function SesionFuerza({ sesion, alPlegar }) {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [sesion.empezada]);
+
+  /*
+   * El fin del descanso se guarda también en la fila de la sesión: si la app
+   * se recarga a mitad de descanso, al volver se retoma la cuenta donde iba
+   * (y se rearma el despertador del service worker, que un reinicio del
+   * navegador puede haber matado).
+   */
+  useEffect(() => {
+    if (sesion.descansoFin && sesion.descansoFin > Date.now()) {
+      descanso.arrancar((sesion.descansoFin - Date.now()) / 1000, {
+        ejercicio: sesion.descansoEjercicio,
+      });
+    }
+    // Solo al montar la sesión: el resto de cambios de la fila no reinician nada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion.id]);
+
+  function armarDescanso(segundos, nombreEjercicio) {
+    descanso.arrancar(segundos, { ejercicio: nombreEjercicio });
+    db.sesionesFuerza.update(sesion.id, {
+      descansoFin: Date.now() + segundos * 1000,
+      descansoEjercicio: nombreEjercicio,
+    });
+  }
+
+  function sumarDescanso(segundos) {
+    descanso.sumar(segundos);
+    db.sesionesFuerza.update(sesion.id, {
+      descansoFin: (sesion.descansoFin ?? Date.now()) + segundos * 1000,
+    });
+  }
+
+  function pararDescanso() {
+    descanso.parar();
+    db.sesionesFuerza.update(sesion.id, { descansoFin: null });
+  }
 
   const porEjercicio = useMemo(() => {
     const mapa = new Map();
@@ -69,8 +104,6 @@ export default function SesionFuerza({ sesion, alPlegar }) {
   const volumen = series.reduce((t, s) => t + (s.hecha ? (s.kg ?? 0) * (s.reps ?? 0) : 0), 0);
   const rampa = rampaDe(hoyISO());
 
-  if (resumen) return <ResumenSesion resumen={resumen} alCerrar={() => setResumen(null)} />;
-
   async function alMarcar(ejercicio, numeroSerie, datos) {
     // Saltarse un prioritario avisa, pero nunca impide (§9).
     const pendientePrioritario = ejercicios.find(
@@ -82,16 +115,19 @@ export default function SesionFuerza({ sesion, alPlegar }) {
     }
 
     await guardarSerie(sesion.id, ejercicio.id, numeroSerie, { ...datos, hecha: true });
-    descanso.arrancar(ejercicio.descanso ?? 120, { ejercicio: ejercicio.nombre });
+    armarDescanso(ejercicio.descanso ?? 120, ejercicio.nombre);
   }
 
   async function terminar() {
     // Un despertador pendiente sonaría con el entreno ya cerrado.
+    descanso.parar();
     await cancelarAviso();
     const resultado = await terminarSesionFuerza(sesion.id);
     setTerminando(false);
     if (resultado?.vacia) return;
-    setResumen({ ...resultado, rutina, series, ejercicios, anteriores });
+    // El resumen sube a App: al completarse la sesión, este componente se
+    // desmonta (deja de haber sesión abierta) y un resumen local moriría con él.
+    alResumen?.({ ...resultado, rutina, series, ejercicios, anteriores });
   }
 
   return (
@@ -101,7 +137,9 @@ export default function SesionFuerza({ sesion, alPlegar }) {
         inset: 0,
         zIndex: 80,
         background: "var(--fondo)",
-        display: "flex",
+        // Plegada se oculta, no se desmonta: el descanso sigue contando y
+        // avisa aunque estés mirando otra pestaña de la app.
+        display: oculta ? "none" : "flex",
         justifyContent: "center",
       }}
     >
@@ -141,7 +179,7 @@ export default function SesionFuerza({ sesion, alPlegar }) {
 
           <div className="fila" style={{ gap: 22, marginTop: 12 }}>
             <Contador etiqueta="Duración" valor={formatearTiempo(duracion)} />
-            <Contador etiqueta="Volumen" valor={`${Math.round(volumen).toLocaleString("es-ES")} kg`} />
+            <Contador etiqueta="Volumen" valor={`${miles(Math.round(volumen))} kg`} />
             <Contador etiqueta="Series" valor={`${hechas}/${previstas}`} />
           </div>
 
@@ -206,8 +244,8 @@ export default function SesionFuerza({ sesion, alPlegar }) {
               <div style={{ fontSize: 25, fontWeight: 800, marginTop: 2 }}>{descanso.texto}</div>
             </div>
             <div className="fila" style={{ gap: 8 }}>
-              <button onClick={() => descanso.sumar(30)} style={estiloBotonDescanso}>+30s</button>
-              <button onClick={descanso.parar} style={estiloBotonDescanso}>SALTAR</button>
+              <button onClick={() => sumarDescanso(30)} style={estiloBotonDescanso}>+30s</button>
+              <button onClick={pararDescanso} style={estiloBotonDescanso}>SALTAR</button>
             </div>
           </div>
         )}
@@ -226,13 +264,12 @@ export default function SesionFuerza({ sesion, alPlegar }) {
             ]}
             alElegir={async (id) => {
               const pendiente = avisoPrioritario;
-              setAvisoPrioritario({ ...pendiente, resuelto: true });
+              setAvisoPrioritario(null);
               if (id === "seguir") {
                 const { ejercicio, numeroSerie, datos } = pendiente.seguir;
                 await guardarSerie(sesion.id, ejercicio.id, numeroSerie, { ...datos, hecha: true });
-                descanso.arrancar(ejercicio.descanso ?? 120, { ejercicio: ejercicio.nombre });
+                armarDescanso(ejercicio.descanso ?? 120, ejercicio.nombre);
               }
-              setAvisoPrioritario(null);
             }}
           />
         </Hoja>
@@ -263,6 +300,10 @@ export default function SesionFuerza({ sesion, alPlegar }) {
             alElegir={async (id) => {
               if (id === "terminar") await terminar();
               else if (id === "descartar") {
+                // Sin esto, el despertador seguía armado y avisaba de un
+                // descanso de un entreno que ya no existe.
+                descanso.parar();
+                await cancelarAviso();
                 await descartarSesionFuerza(sesion.id);
                 setTerminando(false);
               } else setTerminando(false);
@@ -279,8 +320,12 @@ export default function SesionFuerza({ sesion, alPlegar }) {
 function Ejercicio({ ejercicio, guardadas, anterior, alMarcar, alDesmarcar }) {
   const previstas = seriesDeHoy(ejercicio, hoyISO());
   const maxGuardada = Math.max(0, ...guardadas.keys());
-  const [extra, setExtra] = useState(0);
-  const total = Math.max(previstas, maxGuardada) + extra;
+  // `filas` son las filas PEDIDAS con "+ Añadir serie", no un incremento: sumar
+  // un `extra` hacía que la fila añadida contara dos veces en cuanto se
+  // guardaba (ya entraba en `maxGuardada`) y aparecía una fila fantasma nueva
+  // con cada serie extra completada.
+  const [filas, setFilas] = useState(0);
+  const total = Math.max(previstas, maxGuardada, filas);
 
   return (
     <section style={{ marginBottom: 22 }}>
@@ -318,7 +363,7 @@ function Ejercicio({ ejercicio, guardadas, anterior, alMarcar, alDesmarcar }) {
       </div>
 
       <button
-        onClick={() => setExtra(extra + 1)}
+        onClick={() => setFilas(total + 1)}
         style={{
           width: "100%",
           marginTop: 8,

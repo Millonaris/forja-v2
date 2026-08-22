@@ -48,12 +48,21 @@ export async function exportar() {
   return copia;
 }
 
+/*
+ * Tablas con id autonumérico: sus filas exportadas llevan los ids del móvil
+ * viejo, y un `bulkPut` a ciegas PISARÍA filas locales que casualmente tengan
+ * el mismo número — con `series` apuntando además a la sesión equivocada.
+ * Sobre una instalación con datos, estas tablas se insertan con ids nuevos y
+ * `series.sesionId` se remapea. Las tablas con clave natural (fecha) sí se
+ * fusionan con bulkPut, que ahí es lo correcto.
+ */
+const TABLAS_AUTONUMERICAS = ["sesionesFuerza", "series", "carreras", "fotos", "agenda"];
+
 /**
  * Restaura una copia sobre lo que haya.
  *
- * Se usa `bulkPut`, no `clear` + `bulkAdd`: si algo fallase a mitad, lo peor
- * que puede pasar es que queden datos duplicados de sitio, no que se vacíe la
- * base de datos entera.
+ * Nunca borra: sobre una base vacía es una restauración idéntica (ids
+ * incluidos); sobre una base con datos, fusiona sin pisar lo local.
  */
 export async function importar(texto) {
   const copia = JSON.parse(texto);
@@ -63,11 +72,34 @@ export async function importar(texto) {
 
   const cuentas = {};
   await db.transaction("rw", TABLAS.map((t) => db[t]), async () => {
+    // Con las tablas autonuméricas vacías se restauran los ids tal cual:
+    // restaurar dos veces la misma copia sigue sin duplicar nada.
+    const hayLocales = (
+      await Promise.all(TABLAS_AUTONUMERICAS.map((t) => db[t].count()))
+    ).some((n) => n > 0);
+
+    const mapaSesiones = new Map();
+
     for (const tabla of TABLAS) {
       const filas = copia.datos[tabla];
       if (!Array.isArray(filas) || !filas.length) continue;
-      await db[tabla].bulkPut(filas);
       cuentas[tabla] = filas.length;
+
+      if (!hayLocales || !TABLAS_AUTONUMERICAS.includes(tabla)) {
+        await db[tabla].bulkPut(filas);
+        continue;
+      }
+
+      // Fusión sobre datos existentes: ids nuevos, y las series siguen a su
+      // sesión. TABLAS lista sesionesFuerza antes que series a propósito.
+      for (const fila of filas) {
+        const { id: idViejo, ...resto } = fila;
+        if (tabla === "series" && mapaSesiones.has(resto.sesionId)) {
+          resto.sesionId = mapaSesiones.get(resto.sesionId);
+        }
+        const idNuevo = await db[tabla].add(resto);
+        if (tabla === "sesionesFuerza") mapaSesiones.set(idViejo, idNuevo);
+      }
     }
   });
 

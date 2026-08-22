@@ -47,10 +47,13 @@ export async function pedirPermiso() {
 
 async function trabajador() {
   if (!("serviceWorker" in navigator)) return null;
-  // `ready` espera al service worker activo; en la primera carga aún puede
-  // estar instalándose.
-  const registro = await navigator.serviceWorker.ready;
-  return registro.active ?? null;
+  // OJO: `ready` aquí sería un cuelgue, no una espera. Si no hay service
+  // worker registrado (primer arranque, o el servidor de desarrollo), `ready`
+  // no se resuelve JAMÁS — y `terminar()` la esperaba, así que el botón de
+  // terminar el entreno se quedaba colgado para siempre. `getRegistration`
+  // contesta al momento, con undefined si no hay nada.
+  const registro = await navigator.serviceWorker.getRegistration();
+  return registro?.active ?? null;
 }
 
 /**

@@ -21,7 +21,7 @@ import {
   useAjustes, useCarreras, useEstadoCarrera, useEstadoFuerza,
   usePesos, usePosturaHoy, useSesionAbierta, useSesionesFuerza,
 } from "../ganchos/useDatos.js";
-import { fechaLarga, haceCuanto, hoyISO } from "../logica/fechas.js";
+import { diasEntre, fechaLarga, haceCuanto, hoyISO } from "../logica/fechas.js";
 import { miles } from "../logica/formato.js";
 import * as motorCarrera from "../logica/motorCarrera.js";
 import * as motorFuerza from "../logica/motorFuerza.js";
@@ -51,7 +51,10 @@ export default function Hoy({ irA, alAbrirAjustes, alRetomarEntreno }) {
   const recFuerza = motorFuerza.recomendacion(ultimaFuerza, adherenciaFuerza(sesiones).hechas);
   const recCarrera = motorCarrera.recomendacion(ultimaCarrera);
 
-  const ejPostura = ejerciciosDeHoy(0);
+  // Con el día real desde la instalación: la basculación pélvica sale de la
+  // rutina a las 4 semanas, y contar "día 0" fijo dejaba el 0/6 de HOY
+  // descuadrado con la pantalla de postura para siempre.
+  const ejPostura = ejerciciosDeHoy(ajustes?.creada ? diasEntre(ajustes.creada, hoy) : 0);
   const hechosPostura = posturaHoy?.hechos?.length ?? 0;
 
   const objetivos = objetivosDe(hoy, ajustes?.escalonVolumen ?? 0);

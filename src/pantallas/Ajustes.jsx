@@ -10,10 +10,11 @@
 import { useRef, useState } from "react";
 
 import Hoja from "../componentes/Hoja.jsx";
-import { db, guardarAjustes } from "../datos/db.js";
+import { guardarAjustes } from "../datos/db.js";
 import { BLOQUES, describirSesion } from "../datos/planCarrera.js";
 import { RUTINAS } from "../datos/rutinas.js";
 import { useAjustes, useEstadoCarrera, useEstadoFuerza } from "../ganchos/useDatos.js";
+import { corregirEstadoCarrera, corregirEstadoFuerza } from "../logica/acciones.js";
 import { haceCuanto } from "../logica/fechas.js";
 import { estadoPermiso, pedirPermiso } from "../utiles/avisos.js";
 import { exportar, importar, inventario } from "../utiles/copiaSeguridad.js";
@@ -53,7 +54,7 @@ export default function Ajustes({ abierto, alCerrar }) {
             etiqueta="Siguiente rutina"
             valor={estadoFuerza?.indiceSiguiente ?? 0}
             opciones={RUTINAS.map((r) => ({ valor: r.orden, texto: r.nombre }))}
-            alCambiar={(v) => db.estadoFuerza.put({ ...estadoFuerza, id: 1, indiceSiguiente: Number(v) })}
+            alCambiar={(v) => corregirEstadoFuerza(Number(v))}
           />
 
           <Selector
@@ -63,7 +64,7 @@ export default function Ajustes({ abierto, alCerrar }) {
               valor: b.numero,
               texto: `Bloque ${b.numero} · ${describirSesion(b.sesiones[0])}`,
             }))}
-            alCambiar={(v) => db.estadoCarrera.put({ ...estadoCarrera, id: 1, bloque: Number(v), sesion: 1 })}
+            alCambiar={(v) => corregirEstadoCarrera(Number(v))}
           />
 
           <Selector

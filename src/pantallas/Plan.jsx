@@ -11,7 +11,7 @@ import { useState } from "react";
 import { BLOQUES, ENVOLTURA, NOMBRES_FASE, REGLAS as REGLAS_CARRERA, describirSesion, proximoHito } from "../datos/planCarrera.js";
 import { REGLAS_PROGRESION, RUTINAS, dosis } from "../datos/rutinas.js";
 import { EJERCICIOS as POSTURALES, EXTRAS, FRASE, SEGUIMIENTO } from "../datos/rutinaPostural.js";
-import { useAjustes, useEstadoCarrera, useEstadoFuerza } from "../ganchos/useDatos.js";
+import { useAjustes, useCarreras, useEstadoCarrera, useEstadoFuerza } from "../ganchos/useDatos.js";
 import { proximos7Dias } from "../logica/agenda.js";
 
 /*
@@ -247,10 +247,16 @@ function Agenda() {
   const ajustes = useAjustes();
   const estadoFuerza = useEstadoFuerza();
   const estadoCarrera = useEstadoCarrera();
+  const carreras = useCarreras();
 
   if (!ajustes || !estadoFuerza || !estadoCarrera) return null;
 
-  const dias = proximos7Dias({ ajustes, estadoFuerza, estadoCarrera });
+  const dias = proximos7Dias({
+    ajustes,
+    estadoFuerza,
+    estadoCarrera,
+    ultimaCarreraHecha: carreras.find((c) => c.estado === "completada")?.fecha ?? null,
+  });
 
   return (
     <>

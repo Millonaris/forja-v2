@@ -12,6 +12,7 @@ import Entrenar from "./pantallas/Entrenar.jsx";
 import Hoy from "./pantallas/Hoy.jsx";
 import Plan from "./pantallas/Plan.jsx";
 import Progreso from "./pantallas/Progreso.jsx";
+import ResumenSesion from "./pantallas/ResumenSesion.jsx";
 import SesionFuerza from "./pantallas/SesionFuerza.jsx";
 
 export default function App() {
@@ -21,6 +22,10 @@ export default function App() {
   const [sembrada, setSembrada] = useState(false);
   // Entreno plegado: sigue en curso, pero deja usar el resto de la app.
   const [plegado, setPlegado] = useState(false);
+  // El resumen del entreno vive AQUÍ y no dentro de SesionFuerza: cerrar la
+  // sesión hace que `useSesionAbierta` pase a null y desmonte SesionFuerza, y
+  // un resumen guardado ahí dentro desaparecía con ella sin dar tiempo a leerlo.
+  const [resumen, setResumen] = useState(null);
 
   const ajustes = useAjustes();
   const sesionAbierta = useSesionAbierta();
@@ -41,6 +46,10 @@ export default function App() {
   }, [sesionAbierta?.id]);
 
   function irA(destino, subseccion = null) {
+    // Re-tocar la pestaña en la que ya estás no debe remontar la pantalla:
+    // Entrenar y Dieta van con key={sub}, y el remonte perdía la subpestaña y
+    // cualquier hoja abierta.
+    if (destino === pestana && subseccion === sub) return;
     setPestana(destino);
     setSub(subseccion);
   }
@@ -49,11 +58,6 @@ export default function App() {
 
   // Sin calibrar no hay nada que enseñar que no fuese inventado (§54).
   if (!ajustes?.calibrada) return <Calibracion alTerminar={() => irA("hoy")} />;
-
-  // El entreno se pliega, no se cierra: puedes consultar el plan o apuntar el
-  // peso a mitad de sesión sin perder nada. Sin esto, empezar un entreno
-  // dejaba la app sin barra de pestañas y sin salida que no fuese terminarlo.
-  const enEntreno = Boolean(sesionAbierta) && !plegado;
 
   return (
     <div className="lienzo con-nav">
@@ -77,9 +81,20 @@ export default function App() {
         <BarraEntreno sesion={sesionAbierta} alRetomar={() => setPlegado(false)} />
       )}
 
-      {enEntreno && (
-        <SesionFuerza sesion={sesionAbierta} alPlegar={() => setPlegado(true)} />
+      {/* El entreno plegado se OCULTA, no se desmonta: el temporizador de
+          descanso vive en su estado, y desmontarlo a mitad de descanso lo
+          mataba — al volver no había cuenta atrás y el aviso en primer plano
+          no sonaba (el service worker se calla cuando la app está visible). */}
+      {sesionAbierta && (
+        <SesionFuerza
+          sesion={sesionAbierta}
+          oculta={plegado}
+          alPlegar={() => setPlegado(true)}
+          alResumen={setResumen}
+        />
       )}
+
+      {resumen && <ResumenSesion resumen={resumen} alCerrar={() => setResumen(null)} />}
 
       <Ajustes abierto={ajustesAbiertos} alCerrar={() => setAjustesAbiertos(false)} />
     </div>

@@ -417,3 +417,26 @@ test("cada día del tramo explica por qué es como es, sin números absurdos", (
   // Y antes de que empiece el plan se dice, en vez de contar hacia atrás.
   assert.match(porQueDe("2026-08-22"), /arranca el 26 de agosto/);
 });
+
+test("§38 · la agenda respeta las carreras reales, no solo las suyas", () => {
+  // Corriste AYER de verdad: hoy no puede proponer carrera aunque sea tu día
+  // preferido. Este fallo existía porque la regla solo miraba las carreras
+  // que la propia agenda iba proponiendo.
+  const conAyer = agenda.proximos7Dias({
+    ajustes: { diasFuerza: [], diasCarrera: [0, 1, 2, 3, 4, 5, 6] },
+    estadoFuerza: { indiceSiguiente: 0 },
+    estadoCarrera: { bloque: 3, sesion: 1 },
+    ultimaCarreraHecha: sumarDias(hoyISO(), -1),
+  });
+  assert.equal(conAyer[0].entradas.some((e) => e.tipo === "carrera"), false, "hoy descansa");
+  assert.equal(conAyer[1].entradas.some((e) => e.tipo === "carrera"), true, "mañana sí");
+
+  // Y si ya corriste HOY, hoy tampoco.
+  const conHoy = agenda.proximos7Dias({
+    ajustes: { diasFuerza: [], diasCarrera: [0, 1, 2, 3, 4, 5, 6] },
+    estadoFuerza: { indiceSiguiente: 0 },
+    estadoCarrera: { bloque: 3, sesion: 2 },
+    ultimaCarreraHecha: hoyISO(),
+  });
+  assert.equal(conHoy[0].entradas.some((e) => e.tipo === "carrera"), false);
+});

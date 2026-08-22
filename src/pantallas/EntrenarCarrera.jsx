@@ -207,7 +207,9 @@ function RegistroCarrera({ abierto, alCerrar, proxima, esCaco, alGuardar }) {
     setGuardando(true);
     await alGuardar({
       km: km ? Number(km.replace(",", ".")) : null,
-      minutos: minutos ? Number(minutos) : null,
+      // Con teclado español el decimal llega con coma, igual que en km:
+      // Number("32,5") es NaN y se colaba tal cual en el registro.
+      minutos: minutos ? Number(minutos.replace(",", ".")) : null,
       notas,
     });
     setKm(""); setMinutos(""); setNotas(""); setGuardando(false);

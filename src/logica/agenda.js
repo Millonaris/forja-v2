@@ -26,7 +26,16 @@ export const ESTADOS = ["realizado", "programado", "sugerido", "pendiente", "omi
  * según el bloque, evitar carrera en días consecutivos, y en caso de choque la
  * fuerza tiene prioridad.
  */
-export function proximos7Dias({ ajustes, estadoFuerza, estadoCarrera, eventos = [] }) {
+export function proximos7Dias({
+  ajustes,
+  estadoFuerza,
+  estadoCarrera,
+  eventos = [],
+  // La última carrera REALMENTE hecha: sin ella, la regla de no correr dos
+  // días seguidos solo veía las carreras que la propia agenda proponía, y
+  // sugería correr hoy aunque hubieras corrido ayer (o esta misma mañana).
+  ultimaCarreraHecha = null,
+}) {
   const desde = hoyISO();
   const diasFuerza = new Set(ajustes?.diasFuerza ?? [1, 3, 5]);
   const diasCarrera = new Set(ajustes?.diasCarrera ?? [2, 4, 0]);
@@ -37,7 +46,7 @@ export function proximos7Dias({ ajustes, estadoFuerza, estadoCarrera, eventos = 
 
   let rotacion = { indiceSiguiente: 0, ...estadoFuerza };
   let carrerasPuestas = 0;
-  let ultimaCarrera = null;
+  let ultimaCarrera = ultimaCarreraHecha;
 
   return Array.from({ length: 7 }, (_, i) => {
     const fecha = sumarDias(desde, i);
@@ -65,8 +74,10 @@ export function proximos7Dias({ ajustes, estadoFuerza, estadoCarrera, eventos = 
     } else if (
       diasCarrera.has(diaSemana) &&
       carrerasPuestas < cupoCarrera &&
-      // Nunca dos días seguidos en esta fase (§15).
-      ultimaCarrera !== sumarDias(fecha, -1)
+      // Nunca dos días seguidos en esta fase (§15), y nunca proponer una
+      // carrera en un día en el que ya se corrió.
+      ultimaCarrera !== sumarDias(fecha, -1) &&
+      (ultimaCarrera == null || fecha > ultimaCarrera)
     ) {
       entradas.push({
         fecha,

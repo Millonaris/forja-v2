@@ -108,8 +108,16 @@ export async function omitirCarrera({ avanzar }) {
   });
 
   if (avanzar) {
+    // Mismo tratamiento que al completar: si la omitida era la última sesión
+    // del bloque, `completar` devuelve el estado SIN avanzar y toca preguntar
+    // qué hacer con el bloque. Sin esto, omitir la última dejaba el estado
+    // clavado y la misma sesión se ofrecía para siempre.
     const paso = motorCarrera.completar(estado);
-    await db.estadoCarrera.put({ ...paso.estado, id: 1 });
+    await db.estadoCarrera.put({
+      ...paso.estado,
+      id: 1,
+      esperandoCierre: paso.bloqueCompletado ? paso.bloque : null,
+    });
   }
 }
 
@@ -193,7 +201,10 @@ export async function terminarSesionFuerza(sesionId) {
     id: 1,
   });
 
-  return { vacia: false, sesionId, duracion, series: series.length };
+  // `numSeries` y no `series`: el que llama compone el resumen con el ARRAY de
+  // series bajo ese mismo nombre, y un número que lo pisa por orden de spread
+  // es un accidente esperando a un refactor.
+  return { vacia: false, sesionId, duracion, numSeries: series.length };
 }
 
 /** Descartar una sesión en curso sin dejar rastro. */
@@ -208,6 +219,36 @@ export async function omitirFuerza({ avanzar }) {
   if (!avanzar) return;
   const toca = motorFuerza.siguiente(estado);
   await db.estadoFuerza.put({ ...motorFuerza.avanzar(estado, toca.id), id: 1 });
+}
+
+/* ------------------------------------------------------------------ */
+/* Correcciones manuales de estado (Ajustes)                           */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Ajustes escribía directamente en las tablas de estado con un spread del
+ * estado viejo, y eso arrastraba `esperandoCierre` y `revisar`: corregías el
+ * bloque a mano y la app seguía preguntando por el cierre del bloque antiguo —
+ * y al contestar, machacaba tu corrección. Una corrección manual empieza
+ * siempre de un estado limpio.
+ */
+
+/** Fija a mano la siguiente rutina de la rotación. */
+export async function corregirEstadoFuerza(indiceSiguiente) {
+  const estado = await leerEstadoFuerza();
+  await db.estadoFuerza.put({ ...estado, id: 1, indiceSiguiente });
+}
+
+/** Fija a mano el bloque de carrera, limpiando cualquier cierre pendiente. */
+export async function corregirEstadoCarrera(bloque) {
+  const estado = await leerEstadoCarrera();
+  await db.estadoCarrera.put({
+    id: 1,
+    bloque,
+    sesion: 1,
+    bloquesRepetidos: estado.bloquesRepetidos ?? [],
+    esperandoCierre: null,
+  });
 }
 
 /* ------------------------------------------------------------------ */

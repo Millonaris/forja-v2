@@ -11,6 +11,7 @@
 import { useState } from "react";
 
 import { formatear as formatearTiempo } from "../ganchos/useTemporizador.js";
+import { miles } from "../logica/formato.js";
 import { formatearPeso, repsTotales } from "../logica/progresion.js";
 
 export default function ResumenSesion({ resumen, alCerrar }) {
@@ -52,7 +53,7 @@ export default function ResumenSesion({ resumen, alCerrar }) {
         <div className="tarjeta fila" style={{ gap: 24 }}>
           <Cifra etiqueta="Duración" valor={duracion ? formatearTiempo(duracion) : "—"} />
           <Cifra etiqueta="Series" valor={series.filter((s) => s.hecha).length} />
-          <Cifra etiqueta="Volumen" valor={`${Math.round(volumen).toLocaleString("es-ES")} kg`} />
+          <Cifra etiqueta="Volumen" valor={`${miles(Math.round(volumen))} kg`} />
         </div>
 
         {mejoras.length > 0 && (

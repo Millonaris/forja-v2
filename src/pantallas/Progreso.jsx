@@ -12,12 +12,12 @@ import { BLOQUES, NOMBRES_FASE } from "../datos/planCarrera.js";
 import { RUTINAS } from "../datos/rutinas.js";
 import { ejerciciosDeHoy } from "../datos/rutinaPostural.js";
 import {
-  useCarreras, useCatalogoEjercicios, useEstadoCarrera,
+  useAjustes, useCarreras, useCatalogoEjercicios, useEstadoCarrera,
   usePesos, usePostura, useSesionesFuerza,
 } from "../ganchos/useDatos.js";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../datos/db.js";
-import { fechaCorta, haceCuanto, hoyISO, ultimosDias } from "../logica/fechas.js";
+import { diasEntre, fechaCorta, hoyISO, ultimosDias } from "../logica/fechas.js";
 import { cambioSemanal, formatear as formatearPeso, media, serie, serieMedia } from "../logica/peso.js";
 import { porSesion, veredicto } from "../logica/progresion.js";
 import * as motorCarrera from "../logica/motorCarrera.js";
@@ -305,8 +305,11 @@ function Carrera() {
 /* ------------------------------------------------------------------ */
 
 function Postura() {
+  const ajustes = useAjustes();
   const dias = usePostura();
-  const total = ejerciciosDeHoy(0).length;
+  const total = ejerciciosDeHoy(
+    ajustes?.creada ? diasEntre(ajustes.creada, hoyISO()) : 0,
+  ).length;
   const adherencia = adherenciaPostura(dias);
   const completos = dias.filter((d) => d.completada);
 
@@ -461,4 +464,3 @@ const NOMBRES = {
 };
 const nombreRutina = (id) => NOMBRES[id] ?? id;
 
-export { haceCuanto, hoyISO };

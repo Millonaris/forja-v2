@@ -6,7 +6,7 @@
  * porque leerlo mientras lo haces tiene que ser cuestión de un vistazo.
  */
 
-import { EJERCICIOS, EXTRAS, FRASE, ejerciciosDeHoy } from "../datos/rutinaPostural.js";
+import { EXTRAS, FRASE, ejerciciosDeHoy } from "../datos/rutinaPostural.js";
 import { useAjustes, usePosturaHoy } from "../ganchos/useDatos.js";
 import { useTemporizador, formatear } from "../ganchos/useTemporizador.js";
 import { alternarPostura } from "../logica/acciones.js";
@@ -136,5 +136,3 @@ export default function EntrenarPostura() {
     </>
   );
 }
-
-export { EJERCICIOS };
