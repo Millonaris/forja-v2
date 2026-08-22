@@ -8,8 +8,10 @@
 
 import { useState } from "react";
 
+import Volver from "../componentes/Volver.jsx";
+
 import { BLOQUES, NOMBRES_FASE } from "../datos/planCarrera.js";
-import { RUTINAS } from "../datos/rutinas.js";
+import { RUTINAS, nombreDe } from "../datos/rutinas.js";
 import { ejerciciosDeHoy } from "../datos/rutinaPostural.js";
 import {
   useAjustes, useCarreras, useCatalogoEjercicios, useEstadoCarrera,
@@ -34,12 +36,15 @@ const SECCIONES = [
   { id: "historial", texto: "HISTORIAL" },
 ];
 
-export default function Progreso({ sub }) {
+export default function Progreso({ sub, alVolver }) {
   const [activa, setActiva] = useState(sub ?? "cuerpo");
 
   return (
     <div style={{ padding: "20px var(--margen) 0" }} className="columna">
-      <h1 className="titulo" style={{ paddingTop: 10 }}>Progreso</h1>
+      <div className="fila" style={{ gap: 12, paddingTop: 10 }}>
+        <Volver alVolver={alVolver} />
+        <h1 className="titulo">Progreso</h1>
+      </div>
 
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
         {SECCIONES.map((s) => (
@@ -351,7 +356,7 @@ function Historial() {
 
   const eventos = [
     ...sesiones.filter((s) => s.estado === "completada").map((s) => ({
-      fecha: s.fecha, tipo: "fuerza", texto: nombreRutina(s.plantillaId), color: "var(--fuerza)",
+      fecha: s.fecha, tipo: "fuerza", texto: nombreDe(s.plantillaId), color: "var(--fuerza)",
     })),
     ...carreras.map((c) => ({
       fecha: c.fecha,
@@ -458,9 +463,4 @@ function Vacio({ texto }) {
   );
 }
 
-const NOMBRES = {
-  "torso-a": "Torso A", "pierna-a": "Pierna A",
-  "torso-b": "Torso B", "pierna-b": "Pierna B",
-};
-const nombreRutina = (id) => NOMBRES[id] ?? id;
 

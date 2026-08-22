@@ -8,6 +8,8 @@
 
 import { useState } from "react";
 
+import Volver from "../componentes/Volver.jsx";
+
 import { BLOQUES, ENVOLTURA, NOMBRES_FASE, REGLAS as REGLAS_CARRERA, describirSesion, proximoHito } from "../datos/planCarrera.js";
 import { REGLAS_PROGRESION, RUTINAS, dosis } from "../datos/rutinas.js";
 import { EJERCICIOS as POSTURALES, EXTRAS, FRASE, SEGUIMIENTO } from "../datos/rutinaPostural.js";
@@ -26,12 +28,15 @@ const SECCIONES = [
   { id: "agenda", texto: "AGENDA" },
 ];
 
-export default function Plan({ sub }) {
+export default function Plan({ sub, alVolver }) {
   const [activa, setActiva] = useState(sub ?? "fuerza");
 
   return (
     <div style={{ padding: "20px var(--margen) 0" }} className="columna">
-      <h1 className="titulo" style={{ paddingTop: 10 }}>Plan</h1>
+      <div className="fila" style={{ gap: 12, paddingTop: 10 }}>
+        <Volver alVolver={alVolver} />
+        <h1 className="titulo">Plan</h1>
+      </div>
 
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
         {SECCIONES.map((s) => (

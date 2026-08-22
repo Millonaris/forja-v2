@@ -34,6 +34,34 @@ self.addEventListener("message", (evento) => {
     cancelarDespertador();
     return;
   }
+
+  /*
+   * Recordatorio de entreno en curso: notificación silenciosa y fija mientras
+   * la app está en segundo plano con una sesión abierta. Tag propio para no
+   * pisar el despertador del descanso.
+   */
+  if (tipo === "mostrar-entreno") {
+    evento.waitUntil(
+      self.registration.showNotification("Entreno en curso", {
+        body: `${cuerpo} · toca para volver`,
+        tag: "forja-entreno",
+        silent: true,
+        icon: "iconos/icono-192.png",
+        badge: "iconos/badge-96.png",
+        lang: "es",
+      }),
+    );
+    return;
+  }
+  if (tipo === "ocultar-entreno") {
+    evento.waitUntil(
+      self.registration
+        .getNotifications({ tag: "forja-entreno" })
+        .then((lista) => lista.forEach((n) => n.close())),
+    );
+    return;
+  }
+
   if (tipo !== "programar-aviso") return;
 
   cancelarDespertador(); // solo hay un descanso a la vez: el nuevo pisa al viejo

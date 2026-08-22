@@ -5,6 +5,8 @@
 
 import { useState } from "react";
 
+import Volver from "../componentes/Volver.jsx";
+
 import EntrenarCarrera from "./EntrenarCarrera.jsx";
 import EntrenarFuerza from "./EntrenarFuerza.jsx";
 import EntrenarPostura from "./EntrenarPostura.jsx";
@@ -15,12 +17,15 @@ const PESTANAS = [
   { id: "postura", texto: "POSTURA", color: "var(--postura)" },
 ];
 
-export default function Entrenar({ sub = "fuerza", alRetomarEntreno }) {
+export default function Entrenar({ sub = "fuerza", alRetomarEntreno, alVolver }) {
   const [activa, setActiva] = useState(sub);
 
   return (
     <div style={{ padding: "20px var(--margen) 0" }} className="columna">
-      <h1 className="titulo" style={{ paddingTop: 10 }}>Entrenar</h1>
+      <div className="fila" style={{ gap: 12, paddingTop: 10 }}>
+        <Volver alVolver={alVolver} />
+        <h1 className="titulo">Entrenar</h1>
+      </div>
 
       <div className="fila" style={{ gap: 8 }}>
         {PESTANAS.map((p) => {

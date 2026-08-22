@@ -108,6 +108,11 @@ export const REGLAS_PROGRESION = [
   "Reconstruir repeticiones desde abajo del rango con el peso nuevo.",
 ];
 
+/** "pierna-a" → "Pierna A". Un único sitio: había cuatro copias de este mapa. */
+export function nombreDe(plantillaId) {
+  return RUTINAS.find((r) => r.id === plantillaId)?.nombre ?? plantillaId;
+}
+
 /** El texto del rango de un ejercicio: "3×8–12", "2×20–30 s/lado". */
 export function dosis(ej) {
   const porLado = ej.porLado ? "/lado" : "";

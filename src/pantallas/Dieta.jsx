@@ -18,6 +18,8 @@
 
 import { useState } from "react";
 
+import Volver from "../componentes/Volver.jsx";
+
 import Hoja from "../componentes/Hoja.jsx";
 import {
   DIAS_ESPECIALES, NOTA_PREENTRENO, REGLAS,
@@ -33,12 +35,15 @@ const SECCIONES = [
   { id: "porque", texto: "POR QUÉ" },
 ];
 
-export default function Dieta({ sub }) {
+export default function Dieta({ sub, alVolver }) {
   const [activa, setActiva] = useState(sub ?? "hoy");
 
   return (
     <div style={{ padding: "20px var(--margen) 0" }} className="columna">
-      <h1 className="titulo" style={{ paddingTop: 10 }}>Dieta</h1>
+      <div className="fila" style={{ gap: 12, paddingTop: 10 }}>
+        <Volver alVolver={alVolver} />
+        <h1 className="titulo">Dieta</h1>
+      </div>
 
       <div className="fila" style={{ gap: 6 }}>
         {SECCIONES.map((s) => (

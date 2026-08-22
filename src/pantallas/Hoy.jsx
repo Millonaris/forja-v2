@@ -17,6 +17,7 @@ import { objetivosDe, planEnMarcha } from "../datos/planNutricion.js";
 import { ejerciciosDeHoy } from "../datos/rutinaPostural.js";
 import { protocolosDe } from "../datos/protocolos.js";
 import { rampaDe, rirDeHoy } from "../datos/rampa.js";
+import { nombreDe } from "../datos/rutinas.js";
 import {
   useAjustes, useCarreras, useEstadoCarrera, useEstadoFuerza,
   usePesos, usePosturaHoy, useSesionAbierta, useSesionesFuerza,
@@ -309,11 +310,6 @@ function Accion({ letra, color, tinte, titulo, detalle, alPulsar }) {
   );
 }
 
-const NOMBRES = {
-  "torso-a": "Torso A", "pierna-a": "Pierna A",
-  "torso-b": "Torso B", "pierna-b": "Pierna B",
-};
-const nombreDe = (id) => NOMBRES[id] ?? id;
 
 function colorTono(tono) {
   if (tono === "bien") return "var(--exito)";

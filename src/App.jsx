@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import NavInferior from "./componentes/NavInferior.jsx";
+import { nombreDe } from "./datos/rutinas.js";
 import { sembrar } from "./datos/semilla.js";
 import { useAjustes, useSesionAbierta } from "./ganchos/useDatos.js";
 import { formatear } from "./ganchos/useTemporizador.js";
+import { mostrarEntrenoEnCurso, ocultarEntrenoEnCurso } from "./utiles/avisos.js";
 import { configurarSenales } from "./utiles/senales.js";
 import Ajustes from "./pantallas/Ajustes.jsx";
 import Calibracion from "./pantallas/Calibracion.jsx";
@@ -45,11 +47,57 @@ export default function App() {
     if (sesionAbierta?.id) setPlegado(false);
   }, [sesionAbierta?.id]);
 
+  /*
+   * Con una sesión abierta, salir de la app deja una notificación fija de
+   * "Entreno en curso"; tocarla vuelve al entreno y al volver desaparece sola.
+   */
+  useEffect(() => {
+    if (!sesionAbierta) {
+      ocultarEntrenoEnCurso();
+      return undefined;
+    }
+    const nombre = nombreDe(sesionAbierta.plantillaId);
+    const alCambiarVisibilidad = () => {
+      if (document.visibilityState === "hidden") mostrarEntrenoEnCurso(nombre);
+      else ocultarEntrenoEnCurso();
+    };
+    document.addEventListener("visibilitychange", alCambiarVisibilidad);
+    return () => {
+      document.removeEventListener("visibilitychange", alCambiarVisibilidad);
+      ocultarEntrenoEnCurso();
+    };
+  }, [sesionAbierta?.id, sesionAbierta?.plantillaId]);
+
+  /*
+   * Gesto de atrás de Android. Al salir de HOY se apila una entrada de
+   * historial; el gesto (o la flecha ‹) la consume y vuelve a HOY en vez de
+   * cerrar la app, que es lo que hacía antes y desconcertaba.
+   */
+  const entradaApilada = useRef(false);
+  useEffect(() => {
+    const alRetroceder = () => {
+      entradaApilada.current = false;
+      setPestana("hoy");
+      setSub(null);
+    };
+    window.addEventListener("popstate", alRetroceder);
+    return () => window.removeEventListener("popstate", alRetroceder);
+  }, []);
+
+  function volverAHoy() {
+    if (entradaApilada.current) history.back();
+    else irA("hoy");
+  }
+
   function irA(destino, subseccion = null) {
     // Re-tocar la pestaña en la que ya estás no debe remontar la pantalla:
     // Entrenar y Dieta van con key={sub}, y el remonte perdía la subpestaña y
     // cualquier hoja abierta.
     if (destino === pestana && subseccion === sub) return;
+    if (destino !== "hoy" && !entradaApilada.current) {
+      history.pushState({ forja: true }, "");
+      entradaApilada.current = true;
+    }
     setPestana(destino);
     setSub(subseccion);
   }
@@ -69,11 +117,16 @@ export default function App() {
         />
       )}
       {pestana === "entrenar" && (
-        <Entrenar key={sub} sub={sub ?? "fuerza"} alRetomarEntreno={() => setPlegado(false)} />
+        <Entrenar
+          key={sub}
+          sub={sub ?? "fuerza"}
+          alRetomarEntreno={() => setPlegado(false)}
+          alVolver={volverAHoy}
+        />
       )}
-      {pestana === "dieta" && <Dieta key={sub} sub={sub} />}
-      {pestana === "progreso" && <Progreso sub={sub} />}
-      {pestana === "plan" && <Plan sub={sub} />}
+      {pestana === "dieta" && <Dieta key={sub} sub={sub} alVolver={volverAHoy} />}
+      {pestana === "progreso" && <Progreso sub={sub} alVolver={volverAHoy} />}
+      {pestana === "plan" && <Plan sub={sub} alVolver={volverAHoy} />}
 
       <NavInferior activa={pestana} alCambiar={(p) => irA(p)} />
 
@@ -140,7 +193,7 @@ function BarraEntreno({ sesion, alRetomar }) {
           ENTRENO EN CURSO
         </span>
         <span style={{ display: "block", fontSize: 15, fontWeight: 800, marginTop: 2 }}>
-          {NOMBRES[sesion.plantillaId] ?? sesion.plantillaId} · {formatear(duracion)}
+          {nombreDe(sesion.plantillaId)} · {formatear(duracion)}
         </span>
       </span>
       <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".06em" }}>VOLVER ›</span>
@@ -148,10 +201,6 @@ function BarraEntreno({ sesion, alRetomar }) {
   );
 }
 
-const NOMBRES = {
-  "torso-a": "Torso A", "pierna-a": "Pierna A",
-  "torso-b": "Torso B", "pierna-b": "Pierna B",
-};
 
 function Cargando() {
   return (

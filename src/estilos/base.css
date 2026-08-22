@@ -16,6 +16,8 @@
 html,
 body {
   background: var(--fondo);
+  /* Controles nativos (select, scrollbars, autofill) en su variante oscura. */
+  color-scheme: dark;
 }
 
 body {
@@ -32,6 +34,9 @@ textarea,
 button,
 select {
   font-family: inherit;
+  /* Sin esto, los botones usan el negro por defecto del navegador y el texto
+   * de las tarjetas-botón (FUERZA, CORRER, POSTURA…) sale negro sobre negro. */
+  color: inherit;
 }
 
 /* La barra de scroll dentro de la app sobra: es un móvil. */

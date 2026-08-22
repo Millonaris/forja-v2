@@ -12,7 +12,7 @@
 import { useState } from "react";
 
 import Hoja, { Opciones } from "../componentes/Hoja.jsx";
-import { RUTINAS } from "../datos/rutinas.js";
+import { RUTINAS, nombreDe } from "../datos/rutinas.js";
 import { rampaDe, rirDeHoy } from "../datos/rampa.js";
 import { useEstadoFuerza, useSesionAbierta, useSesionesFuerza } from "../ganchos/useDatos.js";
 import { empezarSesionFuerza, omitirFuerza } from "../logica/acciones.js";
@@ -221,8 +221,3 @@ function Dato({ etiqueta, valor }) {
   );
 }
 
-const NOMBRES = {
-  "torso-a": "Torso A", "pierna-a": "Pierna A",
-  "torso-b": "Torso B", "pierna-b": "Pierna B",
-};
-const nombreDe = (id) => NOMBRES[id] ?? id;

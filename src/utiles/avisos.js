@@ -87,3 +87,23 @@ export async function cancelarAviso() {
   const sw = await trabajador();
   sw?.postMessage({ tipo: "cancelar-aviso" });
 }
+
+/*
+ * Recordatorio de entreno en curso.
+ *
+ * Al salir de la app con una sesión abierta queda una notificación fija y
+ * silenciosa: "Entreno en curso · Pierna A". Tocarla trae la app de vuelta al
+ * entreno. Al volver a la app, se retira sola. Sin ella, salir a contestar un
+ * WhatsApp a mitad de entreno era la manera de olvidarse de que había entreno.
+ */
+
+export async function mostrarEntrenoEnCurso(nombreRutina) {
+  if (Notification.permission !== "granted") return;
+  const sw = await trabajador();
+  sw?.postMessage({ tipo: "mostrar-entreno", cuerpo: nombreRutina });
+}
+
+export async function ocultarEntrenoEnCurso() {
+  const sw = await trabajador();
+  sw?.postMessage({ tipo: "ocultar-entreno" });
+}
