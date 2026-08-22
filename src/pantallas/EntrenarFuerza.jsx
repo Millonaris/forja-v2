@@ -18,6 +18,7 @@ import { useEstadoFuerza, useSesionAbierta, useSesionesFuerza } from "../ganchos
 import { empezarSesionFuerza, omitirFuerza } from "../logica/acciones.js";
 import { haceCuanto, hoyISO } from "../logica/fechas.js";
 import * as motor from "../logica/motorFuerza.js";
+import { pedirPermiso } from "../utiles/avisos.js";
 
 export default function EntrenarFuerza({ alRetomarEntreno }) {
   const estado = useEstadoFuerza();
@@ -41,6 +42,9 @@ export default function EntrenarFuerza({ alRetomarEntreno }) {
       setAviso({ texto: avisoRec, plantillaId, avanzarRotacion });
       return;
     }
+    // El permiso de notificaciones solo se puede pedir desde un toque, y este
+    // lo es. Sin él no hay aviso de descanso con el móvil bloqueado.
+    await pedirPermiso();
     await empezarSesionFuerza(plantillaId, { avanzarRotacion });
   }
 
@@ -180,6 +184,7 @@ export default function EntrenarFuerza({ alRetomarEntreno }) {
             const guardado = aviso;
             setAviso(null);
             if (id === "seguir") {
+              await pedirPermiso();
               await empezarSesionFuerza(guardado.plantillaId, {
                 avanzarRotacion: guardado.avanzarRotacion,
               });

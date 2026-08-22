@@ -80,7 +80,7 @@ export default function EntrenarPostura() {
 
               {e.segundos && !hecho && (
                 <button
-                  onClick={() => crono.arrancar(e.segundos)}
+                  onClick={() => crono.arrancar(e.segundos, { enSegundoPlano: false })}
                   className="boton-texto"
                   style={{ marginTop: 10, color: "var(--postura)" }}
                 >

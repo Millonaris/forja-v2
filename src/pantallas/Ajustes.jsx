@@ -15,6 +15,7 @@ import { BLOQUES, describirSesion } from "../datos/planCarrera.js";
 import { RUTINAS } from "../datos/rutinas.js";
 import { useAjustes, useEstadoCarrera, useEstadoFuerza } from "../ganchos/useDatos.js";
 import { haceCuanto } from "../logica/fechas.js";
+import { estadoPermiso, pedirPermiso } from "../utiles/avisos.js";
 import { exportar, importar, inventario } from "../utiles/copiaSeguridad.js";
 
 export default function Ajustes({ abierto, alCerrar }) {
@@ -78,6 +79,7 @@ export default function Ajustes({ abierto, alCerrar }) {
 
         {/* ---------- Avisos ---------- */}
         <Seccion titulo="Avisos">
+          <AvisoDeSistema />
           <Interruptor
             etiqueta="Vibración al terminar el descanso"
             puesto={ajustes.vibracion}
@@ -132,6 +134,43 @@ export default function Ajustes({ abierto, alCerrar }) {
         </button>
       </Hoja>
     </Hoja>
+  );
+}
+
+/*
+ * Permiso de notificaciones. Es lo único que hace que el descanso avise con la
+ * app cerrada o el móvil bloqueado: sin él, el temporizador solo suena si
+ * tienes FORJA delante.
+ */
+function AvisoDeSistema() {
+  const [estado, setEstado] = useState(() => estadoPermiso());
+
+  if (estado === "concedido") {
+    return (
+      <div style={{ fontSize: 13, color: "var(--exito)" }}>
+        Avisos activados: el descanso suena aunque tengas el móvil bloqueado.
+      </div>
+    );
+  }
+
+  if (estado === "denegado" || estado === "no-soportado") {
+    return (
+      <p style={{ margin: 0, fontSize: 13, color: "var(--aviso)", lineHeight: 1.5 }}>
+        {estado === "denegado"
+          ? "Los avisos están bloqueados para FORJA. Se activan desde los ajustes de notificaciones del móvil, no desde aquí."
+          : "Este navegador no puede avisar en segundo plano. Instala FORJA como app para que funcione."}
+      </p>
+    );
+  }
+
+  return (
+    <button
+      className="boton boton-primario"
+      style={{ width: "100%" }}
+      onClick={async () => setEstado(await pedirPermiso())}
+    >
+      ACTIVAR AVISOS DE DESCANSO
+    </button>
   );
 }
 

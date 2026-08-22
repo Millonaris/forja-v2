@@ -55,6 +55,12 @@ export default defineConfig({
 
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg,ico}"],
+        // Es parte del propio service worker (ver importScripts): precachearlo
+        // sería guardar una copia del trabajador dentro del trabajador.
+        globIgnores: ["sw-avisos.js"],
+        // El despertador del descanso, que es lo único capaz de avisar con la
+        // app en segundo plano o el móvil bloqueado.
+        importScripts: ["sw-avisos.js"],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         navigateFallback: "index.html",
         cleanupOutdatedCaches: true,

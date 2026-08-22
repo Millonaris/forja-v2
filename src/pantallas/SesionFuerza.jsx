@@ -24,6 +24,8 @@ import { RUTINAS, dosis } from "../datos/rutinas.js";
 import { rampaDe, rirDeHoy, seriesDeHoy } from "../datos/rampa.js";
 import { useEjercicios, useSeriesDeSesion } from "../ganchos/useDatos.js";
 import { useTemporizador, formatear as formatearTiempo } from "../ganchos/useTemporizador.js";
+import { useWakeLock } from "../ganchos/useWakeLock.js";
+import { cancelarAviso, estadoPermiso, pedirPermiso } from "../utiles/avisos.js";
 import { borrarSerie, descartarSesionFuerza, guardarSerie, terminarSesionFuerza } from "../logica/acciones.js";
 import { hoyISO } from "../logica/fechas.js";
 import ResumenSesion from "./ResumenSesion.jsx";
@@ -36,9 +38,13 @@ export default function SesionFuerza({ sesion, alPlegar }) {
 
   const descanso = useTemporizador();
   const [duracion, setDuracion] = useState(0);
+
+  // La pantalla no se apaga mientras entrenas.
+  useWakeLock(true);
   const [terminando, setTerminando] = useState(false);
   const [avisoPrioritario, setAvisoPrioritario] = useState(null);
   const [resumen, setResumen] = useState(null);
+  const [permiso, setPermiso] = useState(() => estadoPermiso());
 
   // El cronómetro se calcula desde la marca de inicio guardada, no sumando:
   // así sobrevive a que Android duerma la pestaña.
@@ -76,10 +82,12 @@ export default function SesionFuerza({ sesion, alPlegar }) {
     }
 
     await guardarSerie(sesion.id, ejercicio.id, numeroSerie, { ...datos, hecha: true });
-    descanso.arrancar(ejercicio.descanso ?? 120);
+    descanso.arrancar(ejercicio.descanso ?? 120, { ejercicio: ejercicio.nombre });
   }
 
   async function terminar() {
+    // Un despertador pendiente sonaría con el entreno ya cerrado.
+    await cancelarAviso();
     const resultado = await terminarSesionFuerza(sesion.id);
     setTerminando(false);
     if (resultado?.vacia) return;
@@ -142,6 +150,30 @@ export default function SesionFuerza({ sesion, alPlegar }) {
               {rampa.etiqueta} · series recortadas, RIR objetivo {rirDeHoy(hoyISO())}
             </div>
           )}
+
+          {/* Sin permiso, el descanso solo avisa con la app delante. Conviene
+              saberlo ANTES de guardarse el móvil en el bolsillo. */}
+          {permiso !== "concedido" && (
+            <button
+              onClick={async () => setPermiso(await pedirPermiso())}
+              style={{
+                marginTop: 10,
+                width: "100%",
+                textAlign: "left",
+                background: "rgba(255,194,75,.1)",
+                border: "1px solid rgba(255,194,75,.3)",
+                borderRadius: 12,
+                padding: "9px 12px",
+                fontSize: 12.5,
+                color: "var(--aviso)",
+                cursor: permiso === "sin-pedir" ? "pointer" : "default",
+              }}
+            >
+              {permiso === "sin-pedir"
+                ? "Toca aquí para permitir avisos: si no, el descanso no suena con el móvil bloqueado."
+                : "Avisos bloqueados. El descanso solo sonará con la app abierta."}
+            </button>
+          )}
         </header>
 
         {/* ---------- Ejercicios ---------- */}
@@ -198,7 +230,7 @@ export default function SesionFuerza({ sesion, alPlegar }) {
               if (id === "seguir") {
                 const { ejercicio, numeroSerie, datos } = pendiente.seguir;
                 await guardarSerie(sesion.id, ejercicio.id, numeroSerie, { ...datos, hecha: true });
-                descanso.arrancar(ejercicio.descanso ?? 120);
+                descanso.arrancar(ejercicio.descanso ?? 120, { ejercicio: ejercicio.nombre });
               }
               setAvisoPrioritario(null);
             }}
