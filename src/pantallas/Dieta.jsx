@@ -18,9 +18,10 @@
 
 import { useState } from "react";
 
+import Hoja from "../componentes/Hoja.jsx";
 import {
   DIAS_ESPECIALES, NOTA_PREENTRENO, REGLAS,
-  calendarioDelTramo, kcalDe, objetivosDe, planEnMarcha,
+  calendarioDelTramo, kcalDe, objetivosDe, planEnMarcha, porQueDe,
 } from "../datos/planNutricion.js";
 import { useAjustes } from "../ganchos/useDatos.js";
 import { diaCorto, fechaCorta, fechaLarga, hoyISO } from "../logica/fechas.js";
@@ -59,7 +60,7 @@ export default function Dieta({ sub }) {
       </div>
 
       {activa === "hoy" && <Hoy />}
-      {activa === "calendario" && <Calendario alVerDia={() => setActiva("hoy")} />}
+      {activa === "calendario" && <Calendario />}
       {activa === "porque" && <PorQue />}
     </div>
   );
@@ -70,8 +71,34 @@ export default function Dieta({ sub }) {
 /* ------------------------------------------------------------------ */
 
 function Hoy() {
+  return (
+    <>
+      <DetalleDia fecha={hoyISO()} />
+
+      <Plegable titulo="Reglas de fondo">
+        <Lista items={REGLAS} />
+      </Plegable>
+
+      <Plegable titulo="Preentreno">
+        <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.55 }}>
+          {NOTA_PREENTRENO}
+        </p>
+      </Plegable>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Detalle de un día                                                   */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Lo mismo sirve para HOY y para cualquier día que abras desde el calendario:
+ * un solo componente, así no puede haber dos versiones de la misma tabla que
+ * se desincronicen.
+ */
+function DetalleDia({ fecha }) {
   const ajustes = useAjustes();
-  const [fecha, setFecha] = useState(hoyISO());
   const o = objetivosDe(fecha, ajustes?.escalonVolumen ?? 0);
   const esHoy = fecha === hoyISO();
 
@@ -85,23 +112,15 @@ function Hoy() {
         <div className="entre" style={{ alignItems: "flex-start" }}>
           <div>
             <div className="rotulo" style={{ color: o.especial ? "var(--aviso)" : undefined }}>
-              {esHoy ? "Hoy" : fechaLarga(fecha)}
+              {esHoy ? "Hoy" : o.especial ? `Excepción dentro de ${o.fase.nombre}` : "Objetivo del día"}
             </div>
             <div style={{ fontSize: 21, fontWeight: 800, marginTop: 5 }}>{o.nombre}</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1 }}>
-              {miles(o.kcal)}
-            </div>
+            <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{miles(o.kcal)}</div>
             <div style={{ fontSize: 11, color: "var(--texto-tenue)", marginTop: 3 }}>kcal</div>
           </div>
         </div>
-
-        {o.resumen && (
-          <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.5 }}>
-            {o.resumen}
-          </p>
-        )}
 
         <div className="fila" style={{ gap: 8 }}>
           <Macro etiqueta="Proteína" valor={o.p} color="var(--fuerza)" />
@@ -114,6 +133,16 @@ function Hoy() {
             El plan empieza el 26 de agosto. Esto es lo que tocará entonces.
           </div>
         )}
+      </div>
+
+      {/* Por qué este día es como es */}
+      <div className="tarjeta">
+        <div className="rotulo" style={{ color: o.especial ? "var(--aviso)" : undefined }}>
+          Por qué este día
+        </div>
+        <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
+          {porQueDe(fecha)}
+        </p>
       </div>
 
       {/* Comidas */}
@@ -168,38 +197,6 @@ function Hoy() {
 
       {/* Lo específico de un día especial */}
       {o.especial && <DetalleEspecial dia={o.especial} />}
-
-      {/* Saltar a los días clave sin tener que esperar a que lleguen */}
-      <div className="tarjeta columna" style={{ gap: 10 }}>
-        <div className="rotulo">Ver otro día</div>
-        <div className="fila" style={{ gap: 8, flexWrap: "wrap" }}>
-          {[hoyISO(), "2026-09-03", "2026-09-04"].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFecha(f)}
-              className="chip"
-              style={{
-                cursor: "pointer",
-                background: fecha === f ? "var(--texto)" : "var(--superficie-3)",
-                color: fecha === f ? "var(--fondo)" : undefined,
-                borderColor: fecha === f ? "var(--texto)" : undefined,
-              }}
-            >
-              {f === hoyISO() ? "HOY" : fechaCorta(f).toUpperCase()}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Plegable titulo="Reglas de fondo">
-        <Lista items={REGLAS} />
-      </Plegable>
-
-      <Plegable titulo="Preentreno">
-        <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.55 }}>
-          {NOTA_PREENTRENO}
-        </p>
-      </Plegable>
     </>
   );
 }
@@ -282,6 +279,7 @@ function DetalleEspecial({ dia }) {
 /* ------------------------------------------------------------------ */
 
 function Calendario() {
+  const [abierto, setAbierto] = useState(null);
   const dias = calendarioDelTramo();
   const hoy = hoyISO();
   const maxKcal = Math.max(...dias.map((d) => d.kcal));
@@ -289,7 +287,8 @@ function Calendario() {
   return (
     <>
       <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.55 }}>
-        Del 26 de agosto al 8 de septiembre. Esto va por fecha: mover un entreno no lo desplaza.
+        Del 26 de agosto al 8 de septiembre. Toca cualquier día para ver sus comidas y por qué
+        es así. Esto va por fecha: mover un entreno no lo desplaza.
       </p>
 
       <div className="tarjeta columna" style={{ gap: 2 }}>
@@ -297,9 +296,17 @@ function Calendario() {
           const esHoy = d.fecha === hoy;
           const pasado = d.fecha < hoy;
           return (
-            <div
+            <button
               key={d.fecha}
+              onClick={() => setAbierto(d.fecha)}
+              aria-label={`Ver el ${d.fecha}`}
               style={{
+                display: "block",
+                width: "calc(100% + 20px)",
+                textAlign: "left",
+                border: "none",
+                cursor: "pointer",
+                color: "var(--texto)",
                 padding: "9px 10px",
                 margin: "0 -10px",
                 borderRadius: 10,
@@ -335,6 +342,7 @@ function Calendario() {
                     {d.p}P · {d.hc}HC · {d.g}G
                   </div>
                 </div>
+                <span style={{ color: "var(--texto-tenue)", fontSize: 15, flexShrink: 0 }}>›</span>
               </div>
 
               {/* Barra proporcional: la forma del plan se ve de un vistazo, sin
@@ -357,7 +365,7 @@ function Calendario() {
                   }}
                 />
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -365,6 +373,14 @@ function Calendario() {
       <p style={{ margin: 0, fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.55 }}>
         Después del 8 de septiembre: mantenimiento hasta el 15, y volumen limpio desde el 16.
       </p>
+
+      <Hoja
+        abierta={Boolean(abierto)}
+        alCerrar={() => setAbierto(null)}
+        titulo={abierto ? fechaLarga(abierto) : ""}
+      >
+        <div className="columna">{abierto && <DetalleDia fecha={abierto} />}</div>
+      </Hoja>
     </>
   );
 }

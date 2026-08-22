@@ -298,6 +298,90 @@ export function calendarioDelTramo() {
   return dias;
 }
 
+/**
+ * Por qué este día es como es.
+ *
+ * Dos o tres frases, no un tratado: es lo que lees al abrir un día del
+ * calendario para entender qué pinta ahí, y si no cabe de un vistazo no se
+ * lee (§35).
+ */
+export function porQueDe(iso) {
+  // Antes del 26 de agosto no hay "día N de 7" que contar: el plan todavía no
+  // ha empezado y decir "día -3" sería absurdo.
+  if (!planEnMarcha(iso)) {
+    return (
+      "El plan arranca el 26 de agosto. Hasta entonces esto es solo la referencia de lo que " +
+      "tocará el primer día: 1.700 kcal con la proteína muy alta."
+    );
+  }
+
+  const especial = diaEspecialDe(iso);
+
+  if (especial?.id === "recarga") {
+    return (
+      "Este es el día que hace que el 4 funcione. Los 225 g de hidratos rellenan el glucógeno " +
+      "del músculo, que es lo que llena hombros, dorsal, pecho y brazos. Toda la subida viene " +
+      "del hidrato: la proteína y la grasa apenas se mueven. Por eso no es un día libre."
+    );
+  }
+
+  if (especial?.id === "visual") {
+    return (
+      "El día. Llegas con el músculo lleno de ayer, así que hoy solo hay que mantenerlo: 192 g " +
+      "de hidratos repartidos hacia la primera mitad del día. Se entrena buscando congestión, " +
+      "sin destrozarse y sin llegar al fallo."
+    );
+  }
+
+  switch (iso) {
+    case "2026-08-26":
+      return (
+        "Primer día del recorte. Empieza el déficit fuerte con la proteína muy alta, que es lo " +
+        "que protege el músculo mientras se va la grasa y la hinchazón de las vacaciones."
+      );
+    case "2026-08-29":
+      return (
+        "Día visual de ensayo, no el importante. No se toca nada: mismas kcal, agua y sal " +
+        "normales. Sirve para ver cómo respondes con una semana de antelación."
+      );
+    case "2026-09-01":
+      return "Último día a 1.700. A partir de mañana empiezan a subir los hidratos.";
+    case "2026-09-02":
+      return (
+        "Primer escalón hacia arriba: los hidratos pasan de 104 a 137 g y la proteína se queda " +
+        "donde estaba. El músculo empieza a recuperar glucógeno, todavía en déficit."
+      );
+    case "2026-09-05":
+      return (
+        "Vuelta al mini-cut sin compensar nada. No hay que comer de menos para pagar la recarga " +
+        "de anteayer: se retoma el plan y ya está."
+      );
+    case "2026-09-08":
+      return "Último día de la fase. Toca medir: peso, cintura y foto de perfil.";
+    default:
+      break;
+  }
+
+  const fase = faseDe(iso);
+  if (fase.id === "recorte-fuerte") {
+    const dia = diasDesde(fase.desde, iso) + 1;
+    return (
+      `Día ${dia} de 7 de recorte fuerte. Sin cambios respecto a ayer, y es lo correcto: el ` +
+      "déficit funciona por acumulación, no por hacer algo distinto cada día."
+    );
+  }
+
+  return "Recorte moderado. Mismo reparto que el resto de la fase, con los hidratos a 137 g.";
+}
+
+function diasDesde(a, b) {
+  const fecha = (iso) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d, 12);
+  };
+  return Math.round((fecha(b) - fecha(a)) / 86400000);
+}
+
 /** La etiqueta corta de la columna "Objetivo" del calendario. */
 function objetivoDelDia(iso, objetivos) {
   if (objetivos.especial) return objetivos.especial.nombre;

@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import * as fuerza from "../src/logica/motorFuerza.js";
 import * as carrera from "../src/logica/motorCarrera.js";
 import {
-  DIAS_ESPECIALES, calendarioDelTramo, diaEspecialDe, faseDe, kcalDe, objetivosDe,
+  DIAS_ESPECIALES, calendarioDelTramo, diaEspecialDe, faseDe, kcalDe, objetivosDe, porQueDe,
 } from "../src/datos/planNutricion.js";
 import { seriesDeHoy, rirDeHoy } from "../src/datos/rampa.js";
 import * as progresion from "../src/logica/progresion.js";
@@ -404,4 +404,16 @@ test("el peso se escribe con coma, como se dice", () => {
   // La media sale de una división y trae muchos decimales: se recorta a uno.
   assert.equal(peso.formatear(95.4666), "95,5");
   assert.equal(peso.formatear(null), "—");
+});
+
+test("cada día del tramo explica por qué es como es, sin números absurdos", () => {
+  for (const dia of calendarioDelTramo()) {
+    const texto = porQueDe(dia.fecha);
+    assert.ok(texto.length > 40, `el ${dia.fecha} se queda sin explicación`);
+    // "Día -3 de 7" salía al mirar un día anterior al arranque del plan.
+    assert.ok(!/-\d/.test(texto), `el ${dia.fecha} cuenta días en negativo: ${texto}`);
+  }
+
+  // Y antes de que empiece el plan se dice, en vez de contar hacia atrás.
+  assert.match(porQueDe("2026-08-22"), /arranca el 26 de agosto/);
 });
