@@ -18,9 +18,8 @@ import { useEstadoFuerza, useSesionAbierta, useSesionesFuerza } from "../ganchos
 import { empezarSesionFuerza, omitirFuerza } from "../logica/acciones.js";
 import { haceCuanto, hoyISO } from "../logica/fechas.js";
 import * as motor from "../logica/motorFuerza.js";
-import SesionFuerza from "./SesionFuerza.jsx";
 
-export default function EntrenarFuerza() {
+export default function EntrenarFuerza({ alRetomarEntreno }) {
   const estado = useEstadoFuerza();
   const sesiones = useSesionesFuerza();
   const abierta = useSesionAbierta();
@@ -30,10 +29,6 @@ export default function EntrenarFuerza() {
   const [aviso, setAviso] = useState(null);
 
   if (!estado) return null;
-
-  // Con una sesión en curso, la pantalla ES la sesión: se puede salir de la
-  // app a mitad de entreno y volver justo donde estabas.
-  if (abierta) return <SesionFuerza sesion={abierta} />;
 
   const toca = motor.siguiente(estado);
   const completadas = sesiones.filter((s) => s.estado === "completada");
@@ -57,6 +52,23 @@ export default function EntrenarFuerza() {
 
   return (
     <>
+      {/* ---------- Entreno plegado ---------- */}
+      {abierta && (
+        <button
+          onClick={alRetomarEntreno}
+          className="tarjeta entre"
+          style={{ width: "100%", cursor: "pointer", textAlign: "left", borderColor: "var(--fuerza)" }}
+        >
+          <div>
+            <div className="rotulo" style={{ color: "var(--fuerza)" }}>Entreno en curso</div>
+            <div style={{ fontSize: 17, fontWeight: 800, marginTop: 4 }}>
+              {nombreDe(abierta.plantillaId)}
+            </div>
+          </div>
+          <span className="boton boton-primario">CONTINUAR</span>
+        </button>
+      )}
+
       {/* ---------- Lo que toca ---------- */}
       <div className="tarjeta columna" style={{ gap: 14 }}>
         <div>

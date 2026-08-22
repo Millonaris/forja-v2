@@ -15,7 +15,7 @@ const PESTANAS = [
   { id: "postura", texto: "POSTURA", color: "var(--postura)" },
 ];
 
-export default function Entrenar({ sub = "fuerza" }) {
+export default function Entrenar({ sub = "fuerza", alRetomarEntreno }) {
   const [activa, setActiva] = useState(sub);
 
   return (
@@ -49,7 +49,7 @@ export default function Entrenar({ sub = "fuerza" }) {
         })}
       </div>
 
-      {activa === "fuerza" && <EntrenarFuerza />}
+      {activa === "fuerza" && <EntrenarFuerza alRetomarEntreno={alRetomarEntreno} />}
       {activa === "carrera" && <EntrenarCarrera />}
       {activa === "postura" && <EntrenarPostura />}
     </div>

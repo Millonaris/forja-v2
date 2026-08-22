@@ -28,7 +28,7 @@ import { borrarSerie, descartarSesionFuerza, guardarSerie, terminarSesionFuerza 
 import { hoyISO } from "../logica/fechas.js";
 import ResumenSesion from "./ResumenSesion.jsx";
 
-export default function SesionFuerza({ sesion }) {
+export default function SesionFuerza({ sesion, alPlegar }) {
   const rutina = RUTINAS.find((r) => r.id === sesion.plantillaId);
   const ejercicios = useEjercicios(sesion.plantillaId);
   const series = useSeriesDeSesion(sesion.id);
@@ -107,9 +107,24 @@ export default function SesionFuerza({ sesion }) {
           }}
         >
           <div className="entre">
-            <div>
-              <div className="rotulo" style={{ color: "var(--fuerza)" }}>En curso</div>
-              <h1 style={{ fontSize: 22, marginTop: 4 }}>{rutina?.nombre}</h1>
+            <div className="fila" style={{ gap: 10 }}>
+              {/* Plegar, no cerrar: el entreno sigue corriendo por debajo y se
+                  recupera desde la barra flotante. */}
+              <button
+                onClick={alPlegar}
+                aria-label="Plegar el entreno y volver a la app"
+                style={{
+                  width: 36, height: 36, borderRadius: 999, flexShrink: 0,
+                  background: "var(--superficie-3)", border: "1px solid var(--borde)",
+                  color: "var(--texto-medio)", fontSize: 15, cursor: "pointer",
+                }}
+              >
+                ⌄
+              </button>
+              <div>
+                <div className="rotulo" style={{ color: "var(--fuerza)" }}>En curso</div>
+                <h1 style={{ fontSize: 22, marginTop: 4 }}>{rutina?.nombre}</h1>
+              </div>
             </div>
             <button className="boton boton-primario" onClick={() => setTerminando(true)}>
               TERMINAR

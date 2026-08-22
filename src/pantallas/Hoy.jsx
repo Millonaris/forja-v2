@@ -19,7 +19,7 @@ import { protocolosDe } from "../datos/protocolos.js";
 import { rampaDe, rirDeHoy } from "../datos/rampa.js";
 import {
   useAjustes, useCarreras, useEstadoCarrera, useEstadoFuerza,
-  usePesos, usePosturaHoy, useSesionesFuerza,
+  usePesos, usePosturaHoy, useSesionAbierta, useSesionesFuerza,
 } from "../ganchos/useDatos.js";
 import { fechaLarga, haceCuanto, hoyISO } from "../logica/fechas.js";
 import * as motorCarrera from "../logica/motorCarrera.js";
@@ -27,7 +27,7 @@ import * as motorFuerza from "../logica/motorFuerza.js";
 import { formatear as formatearPeso, faltaHoy, media, pesoDe } from "../logica/peso.js";
 import { adherenciaFuerza } from "../logica/volumen.js";
 
-export default function Hoy({ irA, alAbrirAjustes }) {
+export default function Hoy({ irA, alAbrirAjustes, alRetomarEntreno }) {
   const hoy = hoyISO();
   const ajustes = useAjustes();
   const pesos = usePesos();
@@ -36,6 +36,7 @@ export default function Hoy({ irA, alAbrirAjustes }) {
   const estadoFuerza = useEstadoFuerza();
   const estadoCarrera = useEstadoCarrera();
   const posturaHoy = usePosturaHoy();
+  const sesionAbierta = useSesionAbierta();
 
   const [pidiendoPeso, setPidiendoPeso] = useState(false);
   const [protocoloAbierto, setProtocoloAbierto] = useState(null);
@@ -160,8 +161,12 @@ export default function Hoy({ irA, alAbrirAjustes }) {
       {rutina && (
         <div className="tarjeta columna" style={{ gap: 12 }}>
           <div>
-            <div className="rotulo">Próxima fuerza</div>
-            <div style={{ fontSize: 25, fontWeight: 800, marginTop: 6 }}>{rutina.nombre}</div>
+            <div className="rotulo" style={{ color: sesionAbierta ? "var(--fuerza)" : undefined }}>
+              {sesionAbierta ? "Entreno en curso" : "Próxima fuerza"}
+            </div>
+            <div style={{ fontSize: 25, fontWeight: 800, marginTop: 6 }}>
+              {sesionAbierta ? nombreDe(sesionAbierta.plantillaId) : rutina.nombre}
+            </div>
             <div className="dato" style={{ fontSize: 13.5, marginTop: 6 }}>
               {ultimaFuerza
                 ? `Último gym: ${nombreDe(ultimaFuerza.plantillaId)} · ${haceCuanto(ultimaFuerza.fecha)}`
@@ -177,8 +182,11 @@ export default function Hoy({ irA, alAbrirAjustes }) {
             )}
           </div>
           <div className="acciones">
-            <button className="boton boton-primario" onClick={() => irA("entrenar", "fuerza")}>
-              EMPEZAR
+            <button
+              className="boton boton-primario"
+              onClick={() => (sesionAbierta ? alRetomarEntreno?.() : irA("entrenar", "fuerza"))}
+            >
+              {sesionAbierta ? "CONTINUAR" : "EMPEZAR"}
             </button>
             <button className="boton" onClick={() => irA("plan", "fuerza")}>VER</button>
           </div>
