@@ -9,7 +9,7 @@
  * cuándo; el usuario decide (§4, §37).
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import DialogoPeso from "../componentes/DialogoPeso.jsx";
 import Hoja from "../componentes/Hoja.jsx";
@@ -20,8 +20,10 @@ import { rampaDe, rirDeHoy } from "../datos/rampa.js";
 import { nombreDe } from "../datos/rutinas.js";
 import {
   useAjustes, useCarreras, useEstadoCarrera, useEstadoFuerza,
-  usePesos, usePosturaHoy, useSesionAbierta, useSesionesFuerza,
+  useNota, usePesos, usePosturaHoy, useSesionAbierta, useSesionesFuerza,
 } from "../ganchos/useDatos.js";
+import { guardarNota } from "../logica/acciones.js";
+import { diasSinCopia } from "../utiles/copiaSeguridad.js";
 import { diasEntre, fechaLarga, haceCuanto, hoyISO } from "../logica/fechas.js";
 import { miles } from "../logica/formato.js";
 import * as motorCarrera from "../logica/motorCarrera.js";
@@ -29,7 +31,7 @@ import * as motorFuerza from "../logica/motorFuerza.js";
 import { formatear as formatearPeso, faltaHoy, media, pesoDe } from "../logica/peso.js";
 import { adherenciaFuerza } from "../logica/volumen.js";
 
-export default function Hoy({ irA, alAbrirAjustes, alRetomarEntreno }) {
+export default function Hoy({ irA, alAbrirAjustes, alRetomarEntreno, pedirPeso, alCerrarPeso }) {
   const hoy = hoyISO();
   const ajustes = useAjustes();
   const pesos = usePesos();
@@ -41,6 +43,11 @@ export default function Hoy({ irA, alAbrirAjustes, alRetomarEntreno }) {
   const sesionAbierta = useSesionAbierta();
 
   const [pidiendoPeso, setPidiendoPeso] = useState(false);
+
+  // El atajo "Apuntar peso" del icono abre el diálogo nada más arrancar.
+  useEffect(() => {
+    if (pedirPeso) setPidiendoPeso(true);
+  }, [pedirPeso]);
   const [protocoloAbierto, setProtocoloAbierto] = useState(null);
 
   const rutina = estadoFuerza ? motorFuerza.siguiente(estadoFuerza) : null;
@@ -256,9 +263,18 @@ export default function Hoy({ irA, alAbrirAjustes, alRetomarEntreno }) {
         <span style={{ color: "var(--texto-tenue)", fontSize: 12, fontWeight: 700 }}>VER DIETA ›</span>
       </button>
 
+      {/* ---------- Nota del día ---------- */}
+      <NotaDelDia />
+
+      {/* ---------- Copia de seguridad caducada ---------- */}
+      <AvisoCopia ajustes={ajustes} alAbrirAjustes={alAbrirAjustes} />
+
       <DialogoPeso
         abierto={pidiendoPeso}
-        alCerrar={() => setPidiendoPeso(false)}
+        alCerrar={() => {
+          setPidiendoPeso(false);
+          alCerrarPeso?.();
+        }}
         pesoActual={pesoDe(pesos, hoy)}
         ultimo={pesos.length ? pesos[pesos.length - 1].kg : null}
       />
@@ -281,6 +297,97 @@ export default function Hoy({ irA, alAbrirAjustes, alRetomarEntreno }) {
         )}
       </Hoja>
     </div>
+  );
+}
+
+/*
+ * Nota libre del día (§52). Una línea de "rodilla rara en la prensa" vale oro
+ * tres semanas después, cuando intentas entender por qué se estancó algo.
+ * Se guarda al salir del campo, sin botón: un botón de guardar para una nota
+ * es la manera de que nadie la escriba.
+ */
+function NotaDelDia() {
+  const guardada = useNota(hoyISO());
+  const [texto, setTexto] = useState(null);
+  const [abierta, setAbierta] = useState(false);
+
+  const valor = texto ?? guardada;
+  const hayNota = Boolean(guardada);
+
+  /*
+   * Se guarda sola al parar de escribir. Guardar al salir del campo era peor
+   * de lo que parecía: si cierras la app con el teclado abierto, ese evento no
+   * llega nunca y la nota se pierde.
+   */
+  useEffect(() => {
+    if (texto == null || texto === guardada) return undefined;
+    const id = setTimeout(() => guardarNota(texto), 600);
+    return () => clearTimeout(id);
+  }, [texto, guardada]);
+
+  if (!abierta && !hayNota) {
+    return (
+      <button
+        className="boton-texto"
+        style={{ textAlign: "left", padding: "4px 2px" }}
+        onClick={() => setAbierta(true)}
+      >
+        + Añadir una nota de hoy
+      </button>
+    );
+  }
+
+  return (
+    <div className="tarjeta columna" style={{ gap: 8 }}>
+      <div className="rotulo">Nota de hoy</div>
+      <textarea
+        value={valor}
+        onChange={(e) => setTexto(e.target.value)}
+        placeholder="Cómo te has encontrado, molestias, lo que sea."
+        rows={2}
+        autoFocus={abierta && !hayNota}
+        style={{
+          background: "var(--superficie-3)",
+          border: "1px solid var(--borde)",
+          borderRadius: 12,
+          padding: "11px 13px",
+          color: "var(--texto)",
+          fontSize: 14,
+          lineHeight: 1.45,
+          resize: "none",
+        }}
+      />
+    </div>
+  );
+}
+
+/*
+ * Los datos viven solo en este móvil. Si lo pierdes sin copia, se pierden. Es
+ * de las poquísimas cosas que se ha ganado un sitio en HOY (§34: "no ocupar
+ * Home salvo alerta realmente necesaria").
+ */
+function AvisoCopia({ ajustes, alAbrirAjustes }) {
+  const dias = diasSinCopia(ajustes);
+  const nunca = dias == null;
+  if (!nunca && dias < 14) return null;
+
+  return (
+    <button
+      onClick={alAbrirAjustes}
+      className="tarjeta entre"
+      style={{ width: "100%", textAlign: "left", cursor: "pointer", borderColor: "var(--aviso)" }}
+    >
+      <div>
+        <div className="rotulo" style={{ color: "var(--aviso)" }}>Copia de seguridad</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 4 }}>
+          {nunca ? "Nunca has hecho una copia" : `Hace ${dias} días de la última`}
+        </div>
+        <div style={{ fontSize: 12.5, color: "var(--texto-tenue)", marginTop: 3 }}>
+          Todo está solo en este móvil.
+        </div>
+      </div>
+      <span style={{ fontSize: 12, fontWeight: 800, color: "var(--aviso)" }}>EXPORTAR ›</span>
+    </button>
   );
 }
 

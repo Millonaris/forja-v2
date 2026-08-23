@@ -6,17 +6,24 @@
  * que mover una sesión no puede salir nunca como un fallo (§19).
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
+import DialogoNumero from "../componentes/DialogoNumero.jsx";
+import Fotos from "../componentes/Fotos.jsx";
 import Volver from "../componentes/Volver.jsx";
+import DetalleSesion from "./DetalleSesion.jsx";
+import Informe from "./Informe.jsx";
 
 import { BLOQUES, NOMBRES_FASE } from "../datos/planCarrera.js";
 import { RUTINAS, nombreDe } from "../datos/rutinas.js";
 import { ejerciciosDeHoy } from "../datos/rutinaPostural.js";
 import {
   useAjustes, useCarreras, useCatalogoEjercicios, useEstadoCarrera,
-  usePesos, usePostura, useSesionesFuerza,
+  useMediciones, usePesos, usePostura, useSesionesFuerza, useTestsPared,
 } from "../ganchos/useDatos.js";
+import {
+  borrarMedicion, borrarTestPared, guardarMedicion, guardarTestPared,
+} from "../logica/acciones.js";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../datos/db.js";
 import { diasEntre, fechaCorta, hoyISO, ultimosDias } from "../logica/fechas.js";
@@ -34,6 +41,7 @@ const SECCIONES = [
   { id: "carrera", texto: "CARRERA" },
   { id: "postura", texto: "POSTURA" },
   { id: "historial", texto: "HISTORIAL" },
+  { id: "informe", texto: "INFORME" },
 ];
 
 export default function Progreso({ sub, alVolver }) {
@@ -70,6 +78,7 @@ export default function Progreso({ sub, alVolver }) {
       {activa === "carrera" && <Carrera />}
       {activa === "postura" && <Postura />}
       {activa === "historial" && <Historial />}
+      {activa === "informe" && <Informe />}
     </div>
   );
 }
@@ -122,6 +131,88 @@ function Cuerpo() {
         </div>
         <GraficaPeso puntos={serie(pesos, dias)} medias={serieMedia(pesos, dias)} />
       </div>
+
+      <Cintura />
+
+      <div className="tarjeta">
+        <Fotos />
+      </div>
+    </>
+  );
+}
+
+/*
+ * Cintura (§18). Es el control que la báscula no da: en un mini-cut el peso
+ * puede quedarse quieto una semana por agua mientras la cintura sigue bajando.
+ */
+function Cintura() {
+  const mediciones = useMediciones();
+  const [abierto, setAbierto] = useState(false);
+
+  const ultima = mediciones[0] ?? null;
+  const primera = mediciones.at(-1) ?? null;
+  const cambio =
+    ultima && primera && ultima.fecha !== primera.fecha ? ultima.cintura - primera.cintura : null;
+  const deHoy = mediciones.find((m) => m.fecha === hoyISO()) ?? null;
+
+  return (
+    <>
+      <div className="tarjeta columna" style={{ gap: 12 }}>
+        <div className="entre">
+          <div className="rotulo">Cintura</div>
+          <button className="boton-texto" onClick={() => setAbierto(true)}>
+            {deHoy ? "Corregir" : "Apuntar"}
+          </button>
+        </div>
+
+        {ultima ? (
+          <>
+            <div className="fila" style={{ gap: 24 }}>
+              <Cifra etiqueta="Actual" valor={`${formatearPeso(ultima.cintura)} cm`} />
+              <Cifra
+                etiqueta="Desde el inicio"
+                valor={cambio == null ? "—" : `${cambio > 0 ? "+" : ""}${formatearPeso(cambio)} cm`}
+                color={cambio == null ? undefined : cambio < 0 ? "var(--exito)" : "var(--texto)"}
+              />
+              <Cifra etiqueta="Medida" valor={fechaCorta(ultima.fecha)} />
+            </div>
+
+            {mediciones.length > 1 && (
+              <div className="columna" style={{ gap: 6 }}>
+                {mediciones.slice(0, 6).map((m) => (
+                  <div key={m.fecha} className="entre" style={{ fontSize: 13 }}>
+                    <span style={{ color: "var(--texto-tenue)" }}>{fechaCorta(m.fecha)}</span>
+                    <span style={{ fontWeight: 700 }}>{formatearPeso(m.cintura)} cm</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-tenue)", lineHeight: 1.55 }}>
+            Mídete a la altura del ombligo, en ayunas y sin apretar. Siempre igual: lo que importa
+            es la diferencia, no el número.
+          </p>
+        )}
+      </div>
+
+      <DialogoNumero
+        abierto={abierto}
+        alCerrar={() => setAbierto(false)}
+        titulo="Cintura de hoy"
+        subtitulo={
+          ultima && ultima.fecha !== hoyISO()
+            ? `La última vez: ${formatearPeso(ultima.cintura)} cm el ${fechaCorta(ultima.fecha)}`
+            : "A la altura del ombligo, en ayunas y sin apretar."
+        }
+        unidad="cm"
+        marcador="92,5"
+        min={30}
+        max={250}
+        valorInicial={deHoy ? { valor: deHoy.cintura, notas: deHoy.notas } : null}
+        alGuardar={({ valor, notas }) => guardarMedicion({ cintura: valor, notas })}
+        alBorrar={deHoy ? () => borrarMedicion(hoyISO()) : undefined}
+      />
     </>
   );
 }
@@ -169,16 +260,37 @@ function Fuerza() {
   const ejercicios = useCatalogoEjercicios();
   const todasSeries = useLiveQuery(async () => (await db.series.toArray()) ?? [], [], []);
 
-  const completadas = sesiones.filter((s) => s.estado === "completada");
-  const adherencia = adherenciaFuerza(completadas);
+  const completadas = useMemo(
+    () => sesiones.filter((s) => s.estado === "completada"),
+    [sesiones],
+  );
+
+  /*
+   * Todo el trabajo pesado, memorizado y en UNA pasada.
+   *
+   * Antes: por cada uno de los ~40 ejercicios se recorría la tabla entera de
+   * series (`filter`), y encima se rehacía en cada render — cientos de miles
+   * de comparaciones al tocar cualquier pestaña. Con un año de historial eso
+   * son decenas de milisegundos de bloqueo por toque.
+   */
+  const { porEjercicio, v7, v14, v4, adherencia } = useMemo(() => {
+    const agrupadas = new Map();
+    for (const serie of todasSeries) {
+      if (!agrupadas.has(serie.ejercicioId)) agrupadas.set(serie.ejercicioId, []);
+      agrupadas.get(serie.ejercicioId).push(serie);
+    }
+    return {
+      porEjercicio: agrupadas,
+      v7: volumenPorMusculo(completadas, todasSeries, ejercicios, 7),
+      v14: volumenPorMusculo(completadas, todasSeries, ejercicios, 14),
+      v4: volumenUltimasSesiones(completadas, todasSeries, ejercicios, 4),
+      adherencia: adherenciaFuerza(completadas),
+    };
+  }, [todasSeries, completadas, ejercicios]);
 
   if (!completadas.length) {
     return <Vacio texto="Cuando completes tu primer entreno, aquí verás la progresión por ejercicio." />;
   }
-
-  const v7 = volumenPorMusculo(completadas, todasSeries, ejercicios, 7);
-  const v14 = volumenPorMusculo(completadas, todasSeries, ejercicios, 14);
-  const v4 = volumenUltimasSesiones(completadas, todasSeries, ejercicios, 4);
 
   return (
     <>
@@ -206,7 +318,7 @@ function Fuerza() {
             .filter((e) => e.plantillaId === rutina.id)
             .sort((a, b) => a.orden - b.orden)
             .map((ejercicio) => {
-              const suyas = todasSeries.filter((s) => s.ejercicioId === ejercicio.id);
+              const suyas = porEjercicio.get(ejercicio.id) ?? [];
               if (!suyas.length) return null;
               const v = veredicto(ejercicio, porSesion(suyas, completadas));
               return (
@@ -328,6 +440,8 @@ function Postura() {
         <div className="dato" style={{ fontSize: 13, marginTop: 2 }}>últimos 7 días</div>
       </div>
 
+      <TestPared />
+
       {completos.length > 0 ? (
         <div className="tarjeta columna" style={{ gap: 8 }}>
           <div className="rotulo">Días completos</div>
@@ -345,9 +459,90 @@ function Postura() {
   );
 }
 
+/*
+ * Test de la pared (§26). Cada 6 semanas, y es la única medida objetiva de si
+ * la postura mejora: talones, glúteos, escápulas y cabeza contra la pared, y
+ * se mide el hueco entre la nuca y la pared.
+ */
+function TestPared() {
+  const tests = useTestsPared();
+  const [abierto, setAbierto] = useState(false);
+
+  const ultimo = tests[0] ?? null;
+  const anterior = tests[1] ?? null;
+  const cambio = ultimo && anterior ? ultimo.resultado - anterior.resultado : null;
+  const dias = ultimo ? diasEntre(ultimo.fecha, hoyISO()) : null;
+  const toca = dias == null || dias >= 42;
+
+  return (
+    <>
+      <div
+        className="tarjeta columna"
+        style={{ gap: 12, borderColor: toca ? "var(--aviso)" : undefined }}
+      >
+        <div className="entre">
+          <div className="rotulo" style={{ color: toca ? "var(--aviso)" : undefined }}>
+            Test de la pared
+          </div>
+          <button className="boton-texto" onClick={() => setAbierto(true)}>
+            {ultimo ? "Repetir" : "Hacerlo"}
+          </button>
+        </div>
+
+        {ultimo ? (
+          <div className="fila" style={{ gap: 24 }}>
+            <Cifra etiqueta="Hueco" valor={`${formatearPeso(ultimo.resultado)} cm`} />
+            <Cifra
+              etiqueta="Cambio"
+              valor={cambio == null ? "—" : `${cambio > 0 ? "+" : ""}${formatearPeso(cambio)} cm`}
+              color={cambio == null ? undefined : cambio < 0 ? "var(--exito)" : "var(--aviso)"}
+            />
+            <Cifra etiqueta="Hace" valor={`${dias} d`} />
+          </div>
+        ) : (
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.55 }}>
+            Talones, glúteos y espalda alta contra la pared, sin forzar. Mide el hueco entre la
+            nuca y la pared: cuanto menos, mejor.
+          </p>
+        )}
+
+        {toca && ultimo && (
+          <div style={{ fontSize: 12.5, color: "var(--aviso)" }}>
+            Han pasado {dias} días. Toca repetirlo.
+          </div>
+        )}
+      </div>
+
+      <DialogoNumero
+        abierto={abierto}
+        alCerrar={() => setAbierto(false)}
+        titulo="Test de la pared"
+        subtitulo="Hueco entre la nuca y la pared, en centímetros. Sin forzar la postura."
+        unidad="cm"
+        marcador="4"
+        min={-1}
+        max={40}
+        valorInicial={
+          tests.find((t) => t.fecha === hoyISO())
+            ? {
+                valor: tests.find((t) => t.fecha === hoyISO()).resultado,
+                notas: tests.find((t) => t.fecha === hoyISO()).notas,
+              }
+            : null
+        }
+        alGuardar={({ valor, notas }) => guardarTestPared({ resultado: valor, notas })}
+        alBorrar={
+          tests.some((t) => t.fecha === hoyISO()) ? () => borrarTestPared(hoyISO()) : undefined
+        }
+      />
+    </>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 
 function Historial() {
+  const [abierta, setAbierta] = useState(null);
   const sesiones = useSesionesFuerza();
   const carreras = useCarreras();
   const postura = usePostura();
@@ -357,6 +552,9 @@ function Historial() {
   const eventos = [
     ...sesiones.filter((s) => s.estado === "completada").map((s) => ({
       fecha: s.fecha, tipo: "fuerza", texto: nombreDe(s.plantillaId), color: "var(--fuerza)",
+      // Solo los entrenos se pueden abrir y corregir: son los únicos con
+      // series dentro que puedan estar mal tecleadas.
+      sesion: s,
     })),
     ...carreras.map((c) => ({
       fecha: c.fecha,
@@ -427,19 +625,39 @@ function Historial() {
 
       {eventos.length ? (
         <div className="tarjeta columna" style={{ gap: 10 }}>
-          {eventos.slice(0, 60).map((e, i) => (
-            <div key={`${e.fecha}-${e.tipo}-${i}`} className="fila" style={{ gap: 12, opacity: e.tenue ? 0.5 : 1 }}>
-              <span style={{ width: 54, flexShrink: 0, fontSize: 12.5, color: "var(--texto-tenue)" }}>
-                {fechaCorta(e.fecha)}
-              </span>
-              <span style={{ width: 7, height: 7, borderRadius: 999, background: e.color, flexShrink: 0 }} />
-              <span style={{ fontSize: 13.5 }}>{e.texto}</span>
-            </div>
-          ))}
+          {eventos.slice(0, 60).map((e, i) => {
+            const Etiqueta = e.sesion ? "button" : "div";
+            return (
+              <Etiqueta
+                key={`${e.fecha}-${e.tipo}-${i}`}
+                onClick={e.sesion ? () => setAbierta(e.sesion) : undefined}
+                className="fila"
+                style={{
+                  gap: 12,
+                  opacity: e.tenue ? 0.5 : 1,
+                  width: "100%",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  textAlign: "left",
+                  cursor: e.sesion ? "pointer" : "default",
+                }}
+              >
+                <span style={{ width: 54, flexShrink: 0, fontSize: 12.5, color: "var(--texto-tenue)" }}>
+                  {fechaCorta(e.fecha)}
+                </span>
+                <span style={{ width: 7, height: 7, borderRadius: 999, background: e.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 13.5, flex: 1 }}>{e.texto}</span>
+                {e.sesion && <span style={{ color: "var(--texto-tenue)", fontSize: 13 }}>›</span>}
+              </Etiqueta>
+            );
+          })}
         </div>
       ) : (
         <Vacio texto="Todavía no hay nada registrado." />
       )}
+
+      {abierta && <DetalleSesion sesion={abierta} alCerrar={() => setAbierta(null)} />}
     </>
   );
 }

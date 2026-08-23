@@ -15,19 +15,19 @@
  * salir de la app y volver sin perder nada.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import Hoja, { Opciones } from "../componentes/Hoja.jsx";
 import { db } from "../datos/db.js";
 import { RUTINAS, dosis } from "../datos/rutinas.js";
 import { rampaDe, rirDeHoy, seriesDeHoy } from "../datos/rampa.js";
-import { useEjercicios, useSeriesDeSesion } from "../ganchos/useDatos.js";
+import { useEjercicios, useSeriesDeSesion, useSesionesDeEjercicio } from "../ganchos/useDatos.js";
 import { useTemporizador, formatear as formatearTiempo } from "../ganchos/useTemporizador.js";
 import { useWakeLock } from "../ganchos/useWakeLock.js";
 import { cancelarAviso, estadoPermiso, pedirPermiso } from "../utiles/avisos.js";
 import { borrarSerie, descartarSesionFuerza, guardarSerie, terminarSesionFuerza } from "../logica/acciones.js";
-import { hoyISO } from "../logica/fechas.js";
+import { fechaCorta, hoyISO } from "../logica/fechas.js";
+import { veredicto } from "../logica/progresion.js";
 import { miles } from "../logica/formato.js";
 
 export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
@@ -44,6 +44,7 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
   const [terminando, setTerminando] = useState(false);
   const [avisoPrioritario, setAvisoPrioritario] = useState(null);
   const [permiso, setPermiso] = useState(() => estadoPermiso());
+  const [verHistorial, setVerHistorial] = useState(null);
 
   // El cronómetro se calcula desde la marca de inicio guardada, no sumando:
   // así sobrevive a que Android duerma la pestaña.
@@ -104,7 +105,7 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
   const volumen = series.reduce((t, s) => t + (s.hecha ? (s.kg ?? 0) * (s.reps ?? 0) : 0), 0);
   const rampa = rampaDe(hoyISO());
 
-  async function alMarcar(ejercicio, numeroSerie, datos) {
+  const alMarcar = useCallback(async (ejercicio, numeroSerie, datos) => {
     // Saltarse un prioritario avisa, pero nunca impide (§9).
     const pendientePrioritario = ejercicios.find(
       (e) => e.prioritario && e.orden < ejercicio.orden && !tieneAlgo(porEjercicio.get(e.id)),
@@ -116,7 +117,9 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
 
     await guardarSerie(sesion.id, ejercicio.id, numeroSerie, { ...datos, hecha: true });
     armarDescanso(ejercicio.descanso ?? 120, ejercicio.nombre);
-  }
+    // `armarDescanso` y los ejercicios se recrean con la sesión, no con el tic.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion.id, ejercicios, porEjercicio, avisoPrioritario]);
 
   async function terminar() {
     // Un despertador pendiente sonaría con el entreno ya cerrado.
@@ -222,16 +225,14 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
             padding: `14px var(--margen) calc(140px + env(safe-area-inset-bottom))`,
           }}
         >
-          {ejercicios.map((ejercicio) => (
-            <Ejercicio
-              key={ejercicio.id}
-              ejercicio={ejercicio}
-              guardadas={porEjercicio.get(ejercicio.id) ?? new Map()}
-              anterior={anteriores.get(ejercicio.id)}
-              alMarcar={alMarcar}
-              alDesmarcar={(n) => borrarSerie(sesion.id, ejercicio.id, n)}
-            />
-          ))}
+          <Ejercicios
+            ejercicios={ejercicios}
+            porEjercicio={porEjercicio}
+            anteriores={anteriores}
+            sesionId={sesion.id}
+            alMarcar={alMarcar}
+            alVerHistorial={setVerHistorial}
+          />
         </div>
 
         {/* ---------- Temporizador flotante ---------- */}
@@ -248,6 +249,15 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
               <button onClick={pararDescanso} style={estiloBotonDescanso}>SALTAR</button>
             </div>
           </div>
+        )}
+
+        {/* ---------- Historial del ejercicio ---------- */}
+        {verHistorial && (
+          <HistorialEjercicio
+            ejercicio={verHistorial}
+            sesionActual={sesion.id}
+            alCerrar={() => setVerHistorial(null)}
+          />
         )}
 
         {/* ---------- Prioritario pendiente ---------- */}
@@ -317,7 +327,33 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
 
 /* ------------------------------------------------------------------ */
 
-function Ejercicio({ ejercicio, guardadas, anterior, alMarcar, alDesmarcar }) {
+/*
+ * La lista entera, memorizada.
+ *
+ * El cronómetro y la cuenta atrás del descanso viven en el estado de la
+ * pantalla y cambian cada segundo. Sin esta barrera, cada tic reconciliaba las
+ * 8-12 tablas de ejercicios con sus ~5 filas y 6 celdas cada una: es el tirón
+ * que se nota al teclear kg mientras corre el descanso.
+ */
+const Ejercicios = memo(function Ejercicios({
+  ejercicios, porEjercicio, anteriores, sesionId, alMarcar, alVerHistorial,
+}) {
+  return ejercicios.map((ejercicio) => (
+    <Ejercicio
+      key={ejercicio.id}
+      ejercicio={ejercicio}
+      guardadas={porEjercicio.get(ejercicio.id) ?? VACIO}
+      anterior={anteriores.get(ejercicio.id)}
+      alMarcar={alMarcar}
+      alDesmarcar={(n) => borrarSerie(sesionId, ejercicio.id, n)}
+      alVerHistorial={() => alVerHistorial(ejercicio)}
+    />
+  ));
+});
+
+const VACIO = new Map();
+
+function Ejercicio({ ejercicio, guardadas, anterior, alMarcar, alDesmarcar, alVerHistorial }) {
   const previstas = seriesDeHoy(ejercicio, hoyISO());
   const maxGuardada = Math.max(0, ...guardadas.keys());
   // `filas` son las filas PEDIDAS con "+ Añadir serie", no un incremento: sumar
@@ -330,10 +366,19 @@ function Ejercicio({ ejercicio, guardadas, anterior, alMarcar, alDesmarcar }) {
   return (
     <section style={{ marginBottom: 22 }}>
       <div className="entre" style={{ marginBottom: 2 }}>
-        <h2 style={{ fontSize: 17, color: "var(--fuerza)" }}>
+        {/* Tocar el nombre abre el historial: es lo que uno mira mentalmente
+            antes de decidir con cuánto peso empieza. */}
+        <button
+          onClick={alVerHistorial}
+          style={{
+            background: "none", border: "none", padding: 0, cursor: "pointer",
+            fontSize: 17, fontWeight: 800, color: "var(--fuerza)", textAlign: "left",
+          }}
+        >
           {ejercicio.prioritario && <span style={{ marginRight: 5 }}>⭐</span>}
           {ejercicio.nombre}
-        </h2>
+          <span style={{ color: "var(--texto-tenue)", fontWeight: 400, marginLeft: 6 }}>›</span>
+        </button>
         <span style={{ fontSize: 12, color: "var(--texto-tenue)" }}>{dosis(ejercicio)}</span>
       </div>
 
@@ -518,30 +563,107 @@ function Contador({ etiqueta, valor }) {
  * Se busca la última sesión COMPLETADA con series de ese ejercicio, no la
  * última sesión sin más: si el último día te saltaste el pullover, la
  * referencia útil es la del día que sí lo hiciste.
+ *
+ * Dos decisiones de rendimiento, que aquí se notan:
+ *
+ *  · UNA consulta con `anyOf` en vez de una por ejercicio. Eran 8-12 viajes
+ *    secuenciales a IndexedDB, 20-100 ms en un móvil normal.
+ *  · `useState` + `useEffect`, no `useLiveQuery`. La referencia excluye la
+ *    sesión en curso, así que NO cambia mientras entrenas: con liveQuery se
+ *    recalculaba entera con cada ✓ que marcabas, para dar el mismo resultado.
  */
 function useAnteriores(sesion) {
-  return useLiveQuery(
-    async () => {
-      const mapa = new Map();
-      const ejercicios = await db.ejercicios.where("plantillaId").equals(sesion.plantillaId).toArray();
+  const [mapa, setMapa] = useState(() => new Map());
 
-      for (const ejercicio of ejercicios) {
-        const series = await db.series.where("ejercicioId").equals(ejercicio.id).toArray();
-        const deOtras = series.filter((s) => s.sesionId !== sesion.id);
-        if (!deOtras.length) continue;
+  useEffect(() => {
+    let cancelado = false;
 
-        const ultimaSesionId = Math.max(...deOtras.map((s) => s.sesionId));
-        const porNumero = new Map();
-        for (const s of deOtras.filter((s) => s.sesionId === ultimaSesionId)) {
-          porNumero.set(s.numeroSerie, s);
-        }
-        mapa.set(ejercicio.id, porNumero);
+    (async () => {
+      const ejercicios = await db.ejercicios
+        .where("plantillaId")
+        .equals(sesion.plantillaId)
+        .toArray();
+
+      const series = await db.series
+        .where("ejercicioId")
+        .anyOf(ejercicios.map((e) => e.id))
+        .toArray();
+
+      const porEjercicio = new Map();
+      for (const serie of series) {
+        if (serie.sesionId === sesion.id) continue;
+        if (!porEjercicio.has(serie.ejercicioId)) porEjercicio.set(serie.ejercicioId, []);
+        porEjercicio.get(serie.ejercicioId).push(serie);
       }
 
-      return mapa;
-    },
-    [sesion.id, sesion.plantillaId],
-    new Map(),
+      const resultado = new Map();
+      for (const [ejercicioId, lista] of porEjercicio) {
+        const ultimaSesionId = Math.max(...lista.map((s) => s.sesionId));
+        const porNumero = new Map();
+        for (const s of lista) {
+          if (s.sesionId === ultimaSesionId) porNumero.set(s.numeroSerie, s);
+        }
+        resultado.set(ejercicioId, porNumero);
+      }
+
+      if (!cancelado) setMapa(resultado);
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [sesion.id, sesion.plantillaId]);
+
+  return mapa;
+}
+
+/*
+ * Historial del ejercicio, en vivo.
+ *
+ * Las últimas sesiones con lo que levantaste y el veredicto de progresión.
+ * Excluye la sesión en curso: lo que interesa es contra qué te comparas, no
+ * lo que llevas hecho hoy, que ya tienes delante.
+ */
+function HistorialEjercicio({ ejercicio, sesionActual, alCerrar }) {
+  const sesiones = useSesionesDeEjercicio(ejercicio.id);
+  const anteriores = sesiones.filter((s) => s.sesionId !== sesionActual && s.estado === "completada");
+
+  const historial = anteriores.map((s) => ({ fecha: s.fecha, series: s.series }));
+  const v = historial.length ? veredicto(ejercicio, historial) : null;
+
+  return (
+    <Hoja abierta alCerrar={alCerrar} titulo={ejercicio.nombre} subtitulo={dosis(ejercicio)}>
+      {v && (
+        <div className="tarjeta" style={{ marginBottom: 14 }}>
+          <div className="rotulo" style={{ color: v.color }}>{v.texto}</div>
+          <p style={{ margin: "8px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.5 }}>
+            {v.motivo}
+          </p>
+        </div>
+      )}
+
+      {anteriores.length === 0 ? (
+        <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-tenue)", lineHeight: 1.55 }}>
+          Primera vez con este ejercicio. Busca un peso que te deje en RIR 2 y esa será tu
+          referencia a partir de ahora.
+        </p>
+      ) : (
+        <div className="columna" style={{ gap: 12 }}>
+          {anteriores.slice(0, 6).map((s) => (
+            <div key={s.sesionId}>
+              <div style={{ fontSize: 12, color: "var(--texto-tenue)", marginBottom: 4 }}>
+                {fechaCorta(s.fecha)}
+              </div>
+              <div style={{ fontSize: 14 }}>
+                {s.series
+                  .map((x) => `${x.kg ?? "—"}×${x.reps ?? "—"}${x.rir != null ? ` (${x.rir})` : ""}`)
+                  .join("  ·  ")}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Hoja>
   );
 }
 

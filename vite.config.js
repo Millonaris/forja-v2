@@ -46,6 +46,8 @@ export default defineConfig({
           // la barra de estado de las notificaciones.
           { src: "iconos/icono-monocromo-512.png", sizes: "512x512", type: "image/png", purpose: "monochrome" },
         ],
+        // Mantener pulsado el icono en Android. El hash lo lee App.jsx al
+        // arrancar; sin esa lectura estos atajos serían decorativos.
         shortcuts: [
           { name: "Empezar entreno", short_name: "Entreno", url: "./#entrenar" },
           { name: "Apuntar peso", short_name: "Peso", url: "./#peso" },

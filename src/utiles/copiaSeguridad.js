@@ -10,7 +10,8 @@
  */
 
 import { db } from "../datos/db.js";
-import { hoyISO } from "../logica/fechas.js";
+import { diasEntre, hoyISO } from "../logica/fechas.js";
+import { aBlob, aDataUrl } from "./imagenes.js";
 
 export const VERSION_COPIA = 1;
 
@@ -29,6 +30,17 @@ export async function construirCopia() {
   for (const tabla of TABLAS) {
     datos[tabla] = await db[tabla].toArray();
   }
+
+  // Las fotos son Blob y no sobreviven a JSON.stringify: se pasan a data URL
+  // para que la copia siga siendo un único fichero que puedas mandarte por
+  // correo o guardar en Drive.
+  datos.fotos = await Promise.all(
+    datos.fotos.map(async (f) => ({
+      ...f,
+      imagen: f.imagen ? await aDataUrl(f.imagen) : null,
+    })),
+  );
+
   return { app: "FORJA", schemaVersion: VERSION_COPIA, exportado: new Date().toISOString(), datos };
 }
 
@@ -85,14 +97,25 @@ export async function importar(texto) {
       if (!Array.isArray(filas) || !filas.length) continue;
       cuentas[tabla] = filas.length;
 
+      // Las fotos vuelven de data URL a Blob antes de guardarse.
+      const listas =
+        tabla === "fotos"
+          ? await Promise.all(
+              filas.map(async (f) => ({
+                ...f,
+                imagen: typeof f.imagen === "string" ? await aBlob(f.imagen) : f.imagen,
+              })),
+            )
+          : filas;
+
       if (!hayLocales || !TABLAS_AUTONUMERICAS.includes(tabla)) {
-        await db[tabla].bulkPut(filas);
+        await db[tabla].bulkPut(listas);
         continue;
       }
 
       // Fusión sobre datos existentes: ids nuevos, y las series siguen a su
       // sesión. TABLAS lista sesionesFuerza antes que series a propósito.
-      for (const fila of filas) {
+      for (const fila of listas) {
         const { id: idViejo, ...resto } = fila;
         if (tabla === "series" && mapaSesiones.has(resto.sesionId)) {
           resto.sesionId = mapaSesiones.get(resto.sesionId);
@@ -114,5 +137,12 @@ export async function inventario() {
     carreras: await db.carreras.count(),
     pesos: await db.pesos.count(),
     postura: await db.postura.count(),
+    fotos: await db.fotos.count(),
   };
+}
+
+/** Días desde la última copia, o null si no se ha hecho ninguna. */
+export function diasSinCopia(ajustes) {
+  if (!ajustes?.ultimaCopia) return null;
+  return diasEntre(ajustes.ultimaCopia, hoyISO());
 }

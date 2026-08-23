@@ -222,6 +222,43 @@ export async function omitirFuerza({ avanzar }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Agenda (§27)                                                        */
+/* ------------------------------------------------------------------ */
+
+/*
+ * La agenda propone; esto guarda lo que TÚ decides. Un evento fijado a mano
+ * pisa a la sugerencia de ese día y se marca como "programado" (§56), que se
+ * dibuja distinto de lo que solo sugiere la app.
+ *
+ * Nada de esto toca el registro ni los motores: mover una sesión en la agenda
+ * no adelanta la rotación ni el bloque de carrera (§30).
+ */
+
+export async function fijarEnAgenda({ fecha, tipo, titulo }) {
+  const previo = await db.agenda.where("fecha").equals(fecha).filter((e) => e.tipo === tipo).first();
+  if (previo) {
+    await db.agenda.update(previo.id, { titulo, estado: "programado" });
+    return previo.id;
+  }
+  return db.agenda.add({ fecha, tipo, titulo, estado: "programado" });
+}
+
+/** Mueve un evento fijado a otro día. */
+export async function moverEnAgenda(id, fecha) {
+  await db.agenda.update(id, { fecha });
+}
+
+/** Quita un evento fijado: el día vuelve a lo que sugiera la app. */
+export async function quitarDeAgenda(id) {
+  await db.agenda.delete(id);
+}
+
+/** Marca un evento como omitido a mano. Gris, nunca rojo (§56). */
+export async function omitirEnAgenda(id) {
+  await db.agenda.update(id, { estado: "omitido" });
+}
+
+/* ------------------------------------------------------------------ */
 /* Correcciones manuales de estado (Ajustes)                           */
 /* ------------------------------------------------------------------ */
 
@@ -271,17 +308,77 @@ export async function alternarPostura(ejercicioId, total) {
 /* Cuerpo y diario                                                     */
 /* ------------------------------------------------------------------ */
 
-export async function guardarMedicion({ cintura, notas }, fecha = hoyISO()) {
+/**
+ * Cintura del día (§18).
+ *
+ * Se guarda con la fecha REAL, no con la sugerida por el protocolo: si la
+ * medición del 26 se hace el 27, vale igual (§57).
+ */
+export async function guardarMedicion({ cintura, notas } = {}, fecha = hoyISO()) {
   const previa = (await db.mediciones.get(fecha)) ?? { fecha };
-  await db.mediciones.put({ ...previa, cintura: cintura ?? previa.cintura ?? null, notas });
+  await db.mediciones.put({
+    ...previa,
+    cintura: cintura ?? previa.cintura ?? null,
+    notas: notas ?? previa.notas ?? "",
+  });
 }
 
-export async function guardarTestPared({ resultado, notas }, fecha = hoyISO()) {
+export async function borrarMedicion(fecha) {
+  await db.mediciones.delete(fecha);
+}
+
+/**
+ * Foto de progreso. La imagen entra ya comprimida (utiles/imagenes.js) y se
+ * guarda como Blob dentro de IndexedDB: nunca sale del móvil.
+ */
+export async function guardarFoto(imagen, { fecha = hoyISO(), pose = "frente", notas = "" } = {}) {
+  return db.fotos.add({ fecha, pose, notas, imagen, bytes: imagen.size });
+}
+
+export async function borrarFoto(id) {
+  await db.fotos.delete(id);
+}
+
+/** Test de la pared (§26): cada 6 semanas, la única medida objetiva de postura. */
+export async function guardarTestPared({ resultado, notas } = {}, fecha = hoyISO()) {
   await db.testsPared.put({ fecha, resultado, notas: notas ?? "" });
+}
+
+export async function borrarTestPared(fecha) {
+  await db.testsPared.delete(fecha);
 }
 
 /** Nota libre del día (§52). */
 export async function guardarNota(texto, fecha = hoyISO()) {
   const previa = (await db.diario.get(fecha)) ?? { fecha };
-  await db.diario.put({ ...previa, nota: texto });
+  if (!texto?.trim()) {
+    // Una nota vacía se borra en vez de dejar una fila fantasma en el diario.
+    if (previa.id != null || previa.nota) await db.diario.delete(fecha);
+    return;
+  }
+  await db.diario.put({ ...previa, nota: texto.trim() });
+}
+
+/* ------------------------------------------------------------------ */
+/* Corregir el pasado (§52)                                            */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Un 800 en vez de un 80 envenena la progresión y la referencia de "anterior"
+ * para siempre. Poder corregirlo es lo que permite fiarte de tus propios datos.
+ * La corrección queda marcada para no confundirla con el registro original.
+ */
+
+export async function corregirSerie(serieId, datos) {
+  await db.series.update(serieId, { ...datos, ajusteManual: true });
+}
+
+export async function borrarSerieId(serieId) {
+  await db.series.delete(serieId);
+}
+
+/** Borra una sesión pasada entera, con sus series. */
+export async function borrarSesion(sesionId) {
+  await db.series.where("sesionId").equals(sesionId).delete();
+  await db.sesionesFuerza.delete(sesionId);
 }

@@ -69,6 +69,25 @@ export default function App() {
   }, [sesionAbierta?.id, sesionAbierta?.plantillaId]);
 
   /*
+   * Accesos directos del icono (mantener pulsado en Android). El manifest
+   * apunta a "#entrenar", "#peso" y "#postura"; sin esto la app abría en HOY y
+   * los tres atajos eran decorativos.
+   */
+  const [pedirPeso, setPedirPeso] = useState(false);
+  useEffect(() => {
+    const atajo = location.hash.replace("#", "");
+    if (!atajo) return;
+    // Se limpia el hash para que recargar no repita el atajo.
+    history.replaceState(null, "", location.pathname + location.search);
+
+    if (atajo === "entrenar") irA("entrenar", "fuerza");
+    else if (atajo === "postura") irA("entrenar", "postura");
+    else if (atajo === "peso") setPedirPeso(true);
+    // Solo al arrancar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /*
    * Gesto de atrás de Android. Al salir de HOY se apila una entrada de
    * historial; el gesto (o la flecha ‹) la consume y vuelve a HOY en vez de
    * cerrar la app, que es lo que hacía antes y desconcertaba.
@@ -114,6 +133,8 @@ export default function App() {
           irA={irA}
           alAbrirAjustes={() => setAjustesAbiertos(true)}
           alRetomarEntreno={() => setPlegado(false)}
+          pedirPeso={pedirPeso}
+          alCerrarPeso={() => setPedirPeso(false)}
         />
       )}
       {pestana === "entrenar" && (

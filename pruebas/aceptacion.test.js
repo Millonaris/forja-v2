@@ -21,6 +21,7 @@ import * as progresion from "../src/logica/progresion.js";
 import * as volumen from "../src/logica/volumen.js";
 import * as agenda from "../src/logica/agenda.js";
 import * as peso from "../src/logica/peso.js";
+import { generarInforme } from "../src/logica/informe.js";
 import { sumarDias, hoyISO } from "../src/logica/fechas.js";
 
 const estadoInicial = { id: 1, indiceSiguiente: 0, ultimaCompletada: null };
@@ -439,4 +440,135 @@ test("§38 · la agenda respeta las carreras reales, no solo las suyas", () => {
     ultimaCarreraHecha: hoyISO(),
   });
   assert.equal(conHoy[0].entradas.some((e) => e.tipo === "carrera"), false);
+});
+
+/* ------------------------------------------------------------------ */
+/* §53 · Informe de revisión                                           */
+/* ------------------------------------------------------------------ */
+
+test("§53 · el informe recoge lo que pasó, con las series tal cual", () => {
+  const hoy = hoyISO();
+  const ayer = sumarDias(hoy, -1);
+
+  const datos = {
+    pesos: [{ fecha: ayer, kg: 95.8 }, { fecha: hoy, kg: 95.2 }],
+    mediciones: [{ fecha: hoy, cintura: 92.5 }],
+    fotos: [],
+    sesiones: [{ id: 1, fecha: ayer, plantillaId: "torso-a", estado: "completada", duracion: 3600 }],
+    series: [
+      { sesionId: 1, ejercicioId: "e1", numeroSerie: 1, kg: 70, reps: 10, rir: 2, hecha: true },
+      { sesionId: 1, ejercicioId: "e1", numeroSerie: 2, kg: 70, reps: 9, rir: 1, hecha: true },
+    ],
+    ejercicios: [{ id: "e1", nombre: "Jalón al pecho", repMin: 8, repMax: 12, musculos: ["dorsal"] }],
+    carreras: [
+      { fecha: hoy, bloque: 3, descripcion: "6 × (2′ + 2′)", estado: "completada", notas: "bien" },
+    ],
+    postura: [{ fecha: hoy, completada: true }],
+    testsPared: [{ fecha: hoy, resultado: 4, notas: "" }],
+    diario: [{ fecha: hoy, nota: "Rodilla rara en la prensa" }],
+    estadoFuerza: { indiceSiguiente: 1 },
+    estadoCarrera: { bloque: 3, sesion: 2, bloquesRepetidos: [] },
+    ajustes: { escalonVolumen: 0 },
+  };
+
+  const md = generarInforme(datos, { dias: 7 });
+
+  // Las seis secciones de §53.
+  for (const titulo of ["## Resumen", "## Fuerza", "## Carrera", "## Postura", "## Cuerpo", "## Notas"]) {
+    assert.ok(md.includes(titulo), `falta ${titulo}`);
+  }
+
+  // Series con kg, reps y RIR, que es lo que hace útil el informe.
+  assert.match(md, /Jalón al pecho:\*\* 70×10 \(RIR 2\), 70×9 \(RIR 1\)/);
+  assert.match(md, /Peso actual:\*\* 95,2 kg/);
+  assert.match(md, /Cintura:\*\* 92,5 cm/);
+  assert.match(md, /Rodilla rara en la prensa/);
+  // Las notas de carrera se mezclan con las del diario, no en dos sitios.
+  assert.match(md, /\(carrera\) bien/);
+  assert.match(md, /Bloque de carrera:\*\* 3/);
+  assert.match(md, /Próxima fuerza:\*\* Pierna A/);
+});
+
+test("el informe no inventa nada cuando no hay datos", () => {
+  const vacio = {
+    pesos: [], mediciones: [], fotos: [], sesiones: [], series: [], ejercicios: [],
+    carreras: [], postura: [], testsPared: [], diario: [],
+    estadoFuerza: { indiceSiguiente: 0 },
+    estadoCarrera: { bloque: 1, sesion: 1, bloquesRepetidos: [] },
+    ajustes: {},
+  };
+  const md = generarInforme(vacio, { dias: 7 });
+
+  assert.match(md, /Sin entrenos registrados/);
+  assert.match(md, /Sin carreras en este periodo/);
+  assert.match(md, /Peso actual:\*\* sin datos/);
+  assert.match(md, /Test de la pared:\*\* sin hacer/);
+  // Sin notas no se imprime una sección vacía.
+  assert.ok(!md.includes("## Notas"));
+});
+
+test("el informe solo mira dentro del periodo pedido", () => {
+  const hoy = hoyISO();
+  const datos = {
+    pesos: [], mediciones: [], fotos: [], ejercicios: [], series: [],
+    sesiones: [
+      { id: 1, fecha: sumarDias(hoy, -3), plantillaId: "torso-a", estado: "completada" },
+      { id: 2, fecha: sumarDias(hoy, -20), plantillaId: "pierna-a", estado: "completada" },
+    ],
+    carreras: [], postura: [], testsPared: [], diario: [],
+    estadoFuerza: { indiceSiguiente: 0 },
+    estadoCarrera: { bloque: 1, sesion: 1 },
+    ajustes: {},
+  };
+
+  const semana = generarInforme(datos, { dias: 7 });
+  assert.match(semana, /Sesiones en el periodo:\*\* 1/);
+  assert.ok(!semana.includes("Pierna A"), "la sesión de hace 20 días queda fuera");
+
+  const mes = generarInforme(datos, { dias: 30 });
+  assert.match(mes, /Sesiones en el periodo:\*\* 2/);
+});
+
+test("§27 · lo que fijas a mano consume cupo y no se duplica la sugerencia", () => {
+  const base = {
+    ajustes: { diasFuerza: [0, 1, 2, 3, 4, 5, 6], diasCarrera: [] },
+    estadoFuerza: { indiceSiguiente: 0 },
+    estadoCarrera: { bloque: 3, sesion: 1 },
+  };
+
+  // Sin nada fijado: la app propone su cupo de ~3 sesiones de fuerza.
+  const sinFijar = agenda.proximos7Dias(base);
+  const cuenta = (dias) =>
+    dias.reduce((t, d) => t + d.entradas.filter((e) => e.tipo === "fuerza").length, 0);
+  assert.equal(cuenta(sinFijar), 3);
+
+  // Al fijar dos a mano, la app solo propone una más: tres en total, no cinco.
+  const conFijadas = agenda.proximos7Dias({
+    ...base,
+    eventos: [
+      { id: 1, fecha: sumarDias(hoyISO(), 4), tipo: "fuerza", titulo: "Torso B", estado: "programado" },
+      { id: 2, fecha: sumarDias(hoyISO(), 6), tipo: "fuerza", titulo: "Pierna B", estado: "programado" },
+    ],
+  });
+  assert.equal(cuenta(conFijadas), 3, "dos fijadas + una sugerida");
+
+  // Y ninguna rutina sale dos veces: mover Torso B al jueves hace que los
+  // días anteriores propongan otra, no la misma sesión repetida.
+  const titulos = conFijadas.flatMap((d) =>
+    d.entradas.filter((e) => e.tipo === "fuerza").map((e) => e.titulo),
+  );
+  assert.equal(new Set(titulos).size, titulos.length, `rutina repetida: ${titulos.join(", ")}`);
+
+  // Y una omitida no gasta cupo: sigue habiendo tres sesiones de verdad.
+  const conOmitida = agenda.proximos7Dias({
+    ...base,
+    eventos: [
+      { id: 1, fecha: sumarDias(hoyISO(), 4), tipo: "fuerza", titulo: "Torso B", estado: "omitido" },
+    ],
+  });
+  const reales = conOmitida.reduce(
+    (t, d) => t + d.entradas.filter((e) => e.tipo === "fuerza" && e.estado !== "omitido").length,
+    0,
+  );
+  assert.equal(reales, 3);
 });

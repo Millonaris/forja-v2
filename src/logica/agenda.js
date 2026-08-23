@@ -43,8 +43,25 @@ export function proximos7Dias({
   const puestos = new Map(eventos.map((e) => [`${e.fecha}:${e.tipo}`, e]));
   const bloque = siguienteCarrera(estadoCarrera);
   const cupoCarrera = bloque?.totalSesiones ?? 3;
+  // ~3 sesiones de fuerza cada 7 días (§38).
+  const cupoFuerza = 3;
+
+  /*
+   * Lo que el usuario ha fijado a mano CONSUME cupo. Sin esto, mover Torso B
+   * al jueves dejaba la sugerencia del lunes intacta y la misma sesión salía
+   * dos veces en la misma semana.
+   */
+  const dentroDeLaSemana = (e) => e.fecha >= desde && e.fecha <= sumarDias(desde, 6);
+  const fijados = eventos.filter((e) => dentroDeLaSemana(e) && e.estado !== "omitido");
+  const fuerzaFijada = fijados.filter((e) => e.tipo === "fuerza").length;
+  const carreraFijada = fijados.filter((e) => e.tipo === "carrera").length;
+  // Las rutinas ya colocadas a mano no se vuelven a proponer: si mueves Torso B
+  // al jueves, el lunes pasa a proponer la siguiente de la rotación, no otra
+  // vez la misma sesión.
+  const yaColocadas = new Set(fijados.filter((e) => e.tipo === "fuerza").map((e) => e.titulo));
 
   let rotacion = { indiceSiguiente: 0, ...estadoFuerza };
+  let fuerzasPuestas = 0;
   let carrerasPuestas = 0;
   let ultimaCarrera = ultimaCarreraHecha;
 
@@ -57,9 +74,17 @@ export function proximos7Dias({
     const yaPuesta = puestos.get(`${fecha}:fuerza`);
     if (yaPuesta) {
       entradas.push(yaPuesta);
-    } else if (diasFuerza.has(diaSemana)) {
-      const rutina = siguienteFuerza(rotacion);
+      if (yaPuesta.estado !== "omitido") fuerzasPuestas++;
+    } else if (diasFuerza.has(diaSemana) && fuerzasPuestas < cupoFuerza - fuerzaFijada) {
+      // Salta las rutinas que ya están fijadas en otro día de la semana.
+      let rutina = siguienteFuerza(rotacion);
+      for (let vuelta = 0; vuelta < 4 && yaColocadas.has(rutina.nombre); vuelta++) {
+        rotacion = { ...rotacion, indiceSiguiente: (rotacion.indiceSiguiente + 1) % 4 };
+        rutina = siguienteFuerza(rotacion);
+      }
+
       entradas.push({ fecha, tipo: "fuerza", titulo: rutina.nombre, estado: "sugerido" });
+      fuerzasPuestas++;
       // La agenda simula la rotación hacia delante para no proponer la misma
       // sesión tres veces: es una previsión, no una reserva.
       rotacion = { ...rotacion, indiceSiguiente: (rotacion.indiceSiguiente + 1) % 4 };
@@ -69,11 +94,13 @@ export function proximos7Dias({
     const carreraPuesta = puestos.get(`${fecha}:carrera`);
     if (carreraPuesta) {
       entradas.push(carreraPuesta);
-      ultimaCarrera = fecha;
-      carrerasPuestas++;
+      if (carreraPuesta.estado !== "omitido") {
+        ultimaCarrera = fecha;
+        carrerasPuestas++;
+      }
     } else if (
       diasCarrera.has(diaSemana) &&
-      carrerasPuestas < cupoCarrera &&
+      carrerasPuestas < cupoCarrera - carreraFijada &&
       // Nunca dos días seguidos en esta fase (§15), y nunca proponer una
       // carrera en un día en el que ya se corrió.
       ultimaCarrera !== sumarDias(fecha, -1) &&

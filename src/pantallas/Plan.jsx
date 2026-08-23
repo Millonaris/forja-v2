@@ -13,8 +13,13 @@ import Volver from "../componentes/Volver.jsx";
 import { BLOQUES, ENVOLTURA, NOMBRES_FASE, REGLAS as REGLAS_CARRERA, describirSesion, proximoHito } from "../datos/planCarrera.js";
 import { REGLAS_PROGRESION, RUTINAS, dosis } from "../datos/rutinas.js";
 import { EJERCICIOS as POSTURALES, EXTRAS, FRASE, SEGUIMIENTO } from "../datos/rutinaPostural.js";
-import { useAjustes, useCarreras, useEstadoCarrera, useEstadoFuerza } from "../ganchos/useDatos.js";
-import { proximos7Dias } from "../logica/agenda.js";
+import Hoja, { Opciones } from "../componentes/Hoja.jsx";
+import {
+  useAgenda, useAjustes, useCarreras, useEstadoCarrera, useEstadoFuerza,
+} from "../ganchos/useDatos.js";
+import { fijarEnAgenda, moverEnAgenda, omitirEnAgenda, quitarDeAgenda } from "../logica/acciones.js";
+import { diaCorto, fechaCorta, hoyISO, sumarDias } from "../logica/fechas.js";
+import { conflicto, proximos7Dias } from "../logica/agenda.js";
 
 /*
  * Nutrición NO está aquí: vive en su propia pestaña, DIETA. Tenerla en los dos
@@ -253,6 +258,10 @@ function Agenda() {
   const estadoFuerza = useEstadoFuerza();
   const estadoCarrera = useEstadoCarrera();
   const carreras = useCarreras();
+  const eventos = useAgenda();
+
+  const [tocando, setTocando] = useState(null);
+  const [aviso, setAviso] = useState(null);
 
   if (!ajustes || !estadoFuerza || !estadoCarrera) return null;
 
@@ -260,8 +269,25 @@ function Agenda() {
     ajustes,
     estadoFuerza,
     estadoCarrera,
+    eventos,
     ultimaCarreraHecha: carreras.find((c) => c.estado === "completada")?.fecha ?? null,
   });
+
+  /*
+   * Fijar o mover un evento. Si al soltarlo coinciden fuerza y carrera el
+   * mismo día, se avisa y se ofrecen las salidas de §16 — pero la decisión es
+   * del usuario y ninguna se aplica sola.
+   */
+  async function moverA(evento, fecha) {
+    const destino = dias.find((d) => d.fecha === fecha);
+    const choque = conflicto(fecha, [...(destino?.entradas ?? []), { tipo: evento.tipo }]);
+
+    if (evento.id != null) await moverEnAgenda(evento.id, fecha);
+    else await fijarEnAgenda({ fecha, tipo: evento.tipo, titulo: evento.titulo });
+
+    setTocando(null);
+    if (choque) setAviso({ ...choque, movido: { ...evento, fecha } });
+  }
 
   return (
     <>
@@ -282,19 +308,7 @@ function Agenda() {
                 <span style={{ fontSize: 13, color: "var(--texto-tenue)" }}>Descanso</span>
               ) : (
                 d.entradas.map((e, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      fontSize: 12, padding: "5px 10px", borderRadius: 999,
-                      // Sugerido = contorno punteado y menos opaco. La forma
-                      // distingue el estado, no solo el color (§55, §56).
-                      border: `1px dashed ${e.tipo === "fuerza" ? "var(--fuerza)" : "var(--carrera)"}`,
-                      color: e.tipo === "fuerza" ? "var(--fuerza)" : "var(--carrera)",
-                      opacity: 0.75,
-                    }}
-                  >
-                    {e.titulo}
-                  </span>
+                  <Evento key={i} evento={e} alTocar={() => setTocando({ ...e, fecha: d.fecha })} />
                 ))
               )}
             </div>
@@ -302,12 +316,125 @@ function Agenda() {
         ))}
       </div>
 
-      <p style={{ fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.55, margin: 0 }}>
-        Todo lo de arriba es una sugerencia calculada a partir de tus días preferidos y de por
-        dónde vas. Entrena el día que puedas: la rotación y los bloques avanzan cuando completas,
-        no cuando pasa la fecha.
+      <p style={{ margin: 0, fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.55 }}>
+        Toca cualquier sesión para moverla de día. Lo que propone la app va con contorno
+        punteado; lo que fijas tú, con línea sólida y 🗓. Mover aquí no adelanta la rotación ni
+        el bloque: eso solo avanza cuando completas.
       </p>
+
+      {/* ---------- Mover una sesión ---------- */}
+      <Hoja
+        abierta={Boolean(tocando)}
+        alCerrar={() => setTocando(null)}
+        titulo={tocando?.titulo}
+        subtitulo={tocando ? `Ahora, el ${diaCorto(tocando.fecha)} ${fechaCorta(tocando.fecha)}` : ""}
+      >
+        <div className="columna" style={{ gap: 14 }}>
+          <div className="rotulo">Moverla a</div>
+          <div className="fila" style={{ gap: 6, flexWrap: "wrap" }}>
+            {Array.from({ length: 7 }, (_, i) => sumarDias(hoyISO(), i)).map((f) => (
+              <button
+                key={f}
+                onClick={() => moverA(tocando, f)}
+                disabled={f === tocando?.fecha}
+                className="chip"
+                style={{
+                  cursor: f === tocando?.fecha ? "default" : "pointer",
+                  opacity: f === tocando?.fecha ? 0.35 : 1,
+                }}
+              >
+                {diaCorto(f)} {fechaCorta(f)}
+              </button>
+            ))}
+          </div>
+
+          {tocando?.id != null && (
+            <div className="fila" style={{ gap: 8 }}>
+              <button
+                className="boton"
+                style={{ flex: 1 }}
+                onClick={async () => {
+                  await omitirEnAgenda(tocando.id);
+                  setTocando(null);
+                }}
+              >
+                OMITIR
+              </button>
+              <button
+                className="boton"
+                style={{ flex: 1 }}
+                onClick={async () => {
+                  await quitarDeAgenda(tocando.id);
+                  setTocando(null);
+                }}
+              >
+                DEJAR SUGERIDA
+              </button>
+            </div>
+          )}
+        </div>
+      </Hoja>
+
+      {/* ---------- Choque fuerza / carrera (§16) ---------- */}
+      <Hoja
+        abierta={Boolean(aviso)}
+        alCerrar={() => setAviso(null)}
+        titulo="Ese día ya tienes algo"
+        subtitulo={aviso?.mensaje}
+      >
+        <Opciones
+          opciones={(aviso?.opciones ?? []).filter((o) => o.id !== "cancelar")}
+          alElegir={async (id) => {
+            const carreraDelDia = dias
+              .find((d) => d.fecha === aviso.movido.fecha)
+              ?.entradas.find((e) => e.tipo === "carrera");
+
+            if (id === "mover-carrera" && carreraDelDia) {
+              // Al primer día libre, que es lo que se haría a mano.
+              const libre = Array.from({ length: 7 }, (_, i) => sumarDias(aviso.movido.fecha, i + 1))
+                .find((f) => !dias.find((d) => d.fecha === f)?.entradas.length);
+              if (libre) {
+                if (carreraDelDia.id != null) await moverEnAgenda(carreraDelDia.id, libre);
+                else await fijarEnAgenda({ fecha: libre, tipo: "carrera", titulo: carreraDelDia.titulo });
+              }
+            } else if (id === "omitir-carrera" && carreraDelDia?.id != null) {
+              await omitirEnAgenda(carreraDelDia.id);
+            }
+            setAviso(null);
+          }}
+        />
+        <p style={{ fontSize: 12.5, color: "var(--texto-tenue)", marginTop: 14, marginBottom: 0 }}>
+          Hacer las dos también vale: esto es un aviso, no una prohibición.
+        </p>
+      </Hoja>
     </>
+  );
+}
+
+/** Un evento de la agenda. La forma distingue el estado, no solo el color (§55, §56). */
+function Evento({ evento, alTocar }) {
+  const color = evento.tipo === "fuerza" ? "var(--fuerza)" : "var(--carrera)";
+  const omitido = evento.estado === "omitido";
+  const fijado = evento.estado === "programado";
+
+  return (
+    <button
+      onClick={alTocar}
+      style={{
+        fontSize: 12,
+        padding: "5px 10px",
+        borderRadius: 999,
+        cursor: "pointer",
+        background: "transparent",
+        border: `1px ${fijado ? "solid" : "dashed"} ${omitido ? "var(--borde)" : color}`,
+        color: omitido ? "var(--texto-tenue)" : color,
+        opacity: omitido ? 0.5 : fijado ? 1 : 0.75,
+        textDecoration: omitido ? "line-through" : "none",
+      }}
+    >
+      {fijado && <span style={{ marginRight: 4 }}>🗓</span>}
+      {evento.titulo}
+    </button>
   );
 }
 

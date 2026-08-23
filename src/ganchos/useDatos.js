@@ -106,6 +106,77 @@ export function useHistorialEjercicio(ejercicioId) {
   );
 }
 
+/** Mediciones de cintura, de la más reciente a la más antigua. */
+export function useMediciones() {
+  return useLiveQuery(
+    async () => (await db.mediciones.orderBy("fecha").reverse().toArray()) ?? [],
+    [],
+    [],
+  );
+}
+
+/** Fotos de progreso, de la más reciente a la más antigua. */
+export function useFotos() {
+  return useLiveQuery(
+    async () => (await db.fotos.orderBy("fecha").reverse().toArray()) ?? [],
+    [],
+    [],
+  );
+}
+
+export function useTestsPared() {
+  return useLiveQuery(
+    async () => (await db.testsPared.orderBy("fecha").reverse().toArray()) ?? [],
+    [],
+    [],
+  );
+}
+
+/** La nota libre de un día. */
+export function useNota(fecha) {
+  return useLiveQuery(async () => (await db.diario.get(fecha))?.nota ?? "", [fecha], "");
+}
+
+export function useDiario(dias = 60) {
+  return useLiveQuery(
+    async () => (await db.diario.where("fecha").above(sumarDias(hoyISO(), -dias)).toArray()) ?? [],
+    [dias],
+    [],
+  );
+}
+
+/** Las series de un ejercicio agrupadas por sesión, para el historial en vivo. */
+export function useSesionesDeEjercicio(ejercicioId) {
+  return useLiveQuery(
+    async () => {
+      if (!ejercicioId) return [];
+      const series = await db.series.where("ejercicioId").equals(ejercicioId).toArray();
+      const sesiones = await db.sesionesFuerza.toArray();
+      const fechas = new Map(sesiones.map((s) => [s.id, s]));
+      const grupos = new Map();
+      for (const serie of series) {
+        if (!grupos.has(serie.sesionId)) grupos.set(serie.sesionId, []);
+        grupos.get(serie.sesionId).push(serie);
+      }
+      return [...grupos.entries()]
+        .map(([sesionId, lista]) => ({
+          sesionId,
+          fecha: fechas.get(sesionId)?.fecha ?? "",
+          estado: fechas.get(sesionId)?.estado,
+          series: lista.sort((a, b) => a.numeroSerie - b.numeroSerie),
+        }))
+        .sort((a, b) => b.fecha.localeCompare(a.fecha));
+    },
+    [ejercicioId],
+    [],
+  );
+}
+
+/** Eventos fijados a mano en la agenda. */
+export function useAgenda() {
+  return useLiveQuery(async () => (await db.agenda.toArray()) ?? [], [], []);
+}
+
 /** La sesión de fuerza abierta, si la hay: permite salir de la app y volver. */
 export function useSesionAbierta() {
   return useLiveQuery(async () => {
