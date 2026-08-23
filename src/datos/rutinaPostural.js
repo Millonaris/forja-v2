@@ -65,6 +65,44 @@ export const EXTRAS = [
   { nombre: "Mini-reset de pie", dosis: "10 s", cuando: "3–5 veces al día" },
 ];
 
+/*
+ * Core, en casa (§14 de la rutina del 23 de agosto).
+ *
+ * Sale del gimnasio a propósito: mantenía las sesiones de pierna por encima de
+ * la hora sin aportar a las prioridades del plan (glúteo y hombro). Aquí son
+ * 8–12 minutos, dos días por semana, y encajan justo después de la postura.
+ */
+export const CORE_CASA = {
+  titulo: "Core en casa",
+  frecuencia: "2 días por semana",
+  duracion: "8–12 min",
+  descanso: "45–60 s cuando haga falta",
+  cuando: "Va bien justo después de la rutina postural.",
+  ejercicios: [
+    {
+      id: "dead-bug",
+      nombre: "Dead bug",
+      dosis: "2×8–10/lado",
+      instruccion: "Lumbar pegada al suelo; baja brazo y pierna contrarios sin despegarla.",
+      error: "Arquear la lumbar al estirar la pierna.",
+    },
+    {
+      id: "plancha-lateral",
+      nombre: "Plancha lateral",
+      dosis: "2×20–30 s/lado",
+      instruccion: "Cadera alta y alineada, hombro justo encima del codo.",
+      error: "Dejar caer la cadera o rotar el pecho hacia el suelo.",
+    },
+    {
+      id: "pallof",
+      nombre: "Pallof press con goma",
+      dosis: "2×10–12/lado",
+      instruccion: "Goma al costado: estira los brazos al frente sin dejar que te gire el torso.",
+      error: "Girar con la goma en vez de resistirla.",
+    },
+  ],
+};
+
 /** Recordatorios sugeridos, no obligaciones atadas a un lunes (§26). */
 export const SEGUIMIENTO = [
   { id: "test-pared", titulo: "Test de la pared", cada: 42 },

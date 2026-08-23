@@ -11,13 +11,13 @@
  */
 
 import { db } from "./db.js";
-import { RUTINAS } from "./rutinas.js";
+import { CLAVES_ANTIGUAS, RUTINAS } from "./rutinas.js";
 import { BLOQUES } from "./planCarrera.js";
 import { FASES } from "./planNutricion.js";
 import { PROTOCOLOS } from "./protocolos.js";
 import { hoyISO } from "../logica/fechas.js";
 
-export const VERSION_PLAN = 2;
+export const VERSION_PLAN = 3;
 
 export async function sembrar() {
   const ajustes = await db.ajustes.get(1);
@@ -25,7 +25,7 @@ export async function sembrar() {
 
   await db.transaction(
     "rw",
-    [db.ajustes, db.plantillas, db.ejercicios, db.bloquesCarrera, db.fasesNutricion, db.protocolos],
+    [db.ajustes, db.plantillas, db.ejercicios, db.series, db.bloquesCarrera, db.fasesNutricion, db.protocolos],
     async () => {
       /* --- Rutinas de fuerza --- */
       for (const rutina of RUTINAS) {
@@ -35,24 +35,26 @@ export async function sembrar() {
           orden: rutina.orden,
         });
 
+        /*
+         * Id estable: plantilla + clave. NO lleva la posición ni el nombre
+         * visible, así que reordenar la rutina o renombrar un ejercicio ya no
+         * parte su historial en dos.
+         *
+         * El plan del código MANDA sobre lo guardado: la app no tiene todavía
+         * ninguna pantalla para editar series o descansos, así que "conservar
+         * lo del usuario" no protegía nada y en cambio impedía que una
+         * corrección del plan llegara al móvil.
+         */
         for (const [i, ej] of rutina.ejercicios.entries()) {
-          // Id estable y legible: si mañana se reordena la rutina, el
-          // historial de series sigue apuntando al ejercicio correcto.
-          const id = `${rutina.id}:${i}:${normalizar(ej.nombre)}`;
-          /*
-           * El plan del código MANDA sobre lo que hubiera guardado.
-           *
-           * Antes se conservaban `series` y `descanso` de la fila anterior por
-           * si el usuario los había tocado — pero la app no tiene (todavía)
-           * ninguna pantalla para editarlos, así que eso no protegía nada y en
-           * cambio impedía que una corrección del plan llegara al móvil: los
-           * descansos nuevos se quedaban en el código sin efecto ninguno.
-           *
-           * Cuando exista esa edición, lo suyo será guardar los cambios del
-           * usuario en una tabla aparte y fusionarlos aquí, no adivinar.
-           */
-          await db.ejercicios.put({ ...ej, id, plantillaId: rutina.id, orden: i });
+          await db.ejercicios.put({
+            ...ej,
+            id: `${rutina.id}:${ej.clave}`,
+            plantillaId: rutina.id,
+            orden: i,
+          });
         }
+
+        await migrarEjercicios(rutina);
       }
 
       /* --- Plan de carrera --- */
@@ -90,12 +92,34 @@ export async function sembrar() {
   return db.ajustes.get(1);
 }
 
-/** "Elevaciones laterales" → "elevaciones-laterales". */
-function normalizar(texto) {
-  return texto
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
+/*
+ * Limpia los ejercicios de una versión anterior de la rutina.
+ *
+ * Sin esto, al cambiar la rutina las filas viejas se quedarían en la tabla con
+ * el mismo `plantillaId` y la pantalla del entreno enseñaría los ejercicios
+ * DUPLICADOS, los de antes y los de ahora.
+ *
+ * Las series de un ejercicio que sigue existiendo se reenganchan a su id
+ * nuevo; las de uno que ha desaparecido del plan (el core del gimnasio, el
+ * gemelo de Pierna B) se conservan tal cual: son entrenamientos que pasaron de
+ * verdad y no se borran, solo dejan de aparecer en la rutina.
+ */
+async function migrarEjercicios(rutina) {
+  const validos = new Set(rutina.ejercicios.map((e) => `${rutina.id}:${e.clave}`));
+  const guardados = await db.ejercicios.where("plantillaId").equals(rutina.id).toArray();
+
+  for (const viejo of guardados) {
+    if (validos.has(viejo.id)) continue;
+
+    // Los ids antiguos eran `plantilla:indice:nombre-normalizado`.
+    const trozos = viejo.id.split(":");
+    const nombreViejo = trozos.length >= 3 ? trozos.slice(2).join(":") : null;
+    const clave = CLAVES_ANTIGUAS[nombreViejo];
+    const idNuevo = clave ? `${rutina.id}:${clave}` : null;
+
+    if (idNuevo && validos.has(idNuevo)) {
+      await db.series.where("ejercicioId").equals(viejo.id).modify({ ejercicioId: idNuevo });
+    }
+    await db.ejercicios.delete(viejo.id);
+  }
 }

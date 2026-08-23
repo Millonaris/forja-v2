@@ -17,7 +17,8 @@ import {
   DIAS_ESPECIALES, calendarioDelTramo, diaEspecialDe, faseDe, kcalDe, objetivosDe, porQueDe,
 } from "../src/datos/planNutricion.js";
 import { seriesDeHoy, rirDeHoy } from "../src/datos/rampa.js";
-import { RUTINAS } from "../src/datos/rutinas.js";
+import { RUTINAS, seriesTotales } from "../src/datos/rutinas.js";
+import { CORE_CASA } from "../src/datos/rutinaPostural.js";
 import * as progresion from "../src/logica/progresion.js";
 import * as volumen from "../src/logica/volumen.js";
 import * as agenda from "../src/logica/agenda.js";
@@ -575,17 +576,25 @@ test("§27 · lo que fijas a mano consume cupo y no se duplica la sugerencia", (
 });
 
 /* ------------------------------------------------------------------ */
-/* Descansos por ejercicio                                             */
+/* Rutina del 23 de agosto                                             */
 /* ------------------------------------------------------------------ */
 
+test("cada rutina tiene sus series totales y su duración", () => {
+  const esperado = { "torso-a": 21, "pierna-a": 23, "torso-b": 21, "pierna-b": 21 };
+  for (const rutina of RUTINAS) {
+    assert.equal(seriesTotales(rutina), esperado[rutina.id], `series de ${rutina.nombre}`);
+    assert.match(rutina.duracion, /^\d+–\d+ min$/, `duración de ${rutina.nombre}`);
+  }
+});
+
 test("cada ejercicio tiene su descanso exacto, en segundos", () => {
-  // La tabla acordada, ejercicio por ejercicio. Si alguien toca un número en
-  // rutinas.js sin querer, esta prueba lo caza.
+  // La tabla acordada, ejercicio por ejercicio. En superserie el primero lleva
+  // la transición (20 s) y el segundo el descanso de la pareja.
   const esperados = {
     "torso-a": [120, 75, 150, 120, 120, 75, 90, 90],
-    "pierna-a": [180, 150, 120, 90, 120, 90, 75, 60, 75, 90, 60, 60],
+    "pierna-a": [180, 150, 150, 120, 20, 90, 20, 90, 20, 75],
     "torso-b": [150, 75, 120, 120, 90, 75, 90, 90],
-    "pierna-b": [120, 150, 120, 90, 90, 90, 75, 60, 75, 90, 60, 60],
+    "pierna-b": [150, 150, 120, 120, 20, 90, 90, 20, 75],
   };
 
   for (const rutina of RUTINAS) {
@@ -597,28 +606,90 @@ test("cada ejercicio tiene su descanso exacto, en segundos", () => {
   }
 });
 
-test("ningún ejercicio se queda sin descanso", () => {
+test("las superseries van emparejadas y en orden", () => {
   for (const rutina of RUTINAS) {
+    const grupos = new Map();
     for (const e of rutina.ejercicios) {
-      assert.equal(typeof e.descanso, "number", `${rutina.nombre} · ${e.nombre}`);
-      assert.ok(e.descanso >= 60 && e.descanso <= 180, `${e.nombre}: ${e.descanso} s`);
+      if (!e.superserie) continue;
+      if (!grupos.has(e.superserie)) grupos.set(e.superserie, []);
+      grupos.get(e.superserie).push(e);
+    }
+
+    for (const [grupo, lista] of grupos) {
+      assert.equal(lista.length, 2, `la superserie ${grupo} de ${rutina.nombre} no es una pareja`);
+      assert.deepEqual(lista.map((e) => e.posicionSS), [1, 2], `orden de ${grupo}`);
+      // El primero solo transiciona; el segundo cierra con el descanso real.
+      assert.ok(lista[0].descanso <= 30, `${grupo}: el primero debería transicionar, no descansar`);
+      assert.ok(lista[1].descanso >= 60, `${grupo}: al segundo le falta el descanso de la pareja`);
+      // Y van seguidos en la rutina, o no serían una superserie.
+      const a = rutina.ejercicios.indexOf(lista[0]);
+      const b = rutina.ejercicios.indexOf(lista[1]);
+      assert.equal(b - a, 1, `${grupo} de ${rutina.nombre} no va seguida`);
     }
   }
 });
 
-test("los básicos pesados descansan más que los aislados", () => {
-  const buscar = (rutinaId, nombre) =>
-    RUTINAS.find((r) => r.id === rutinaId).ejercicios.find((e) => e.nombre === nombre);
+test("nunca hay superserie entre dos ejercicios principales de pierna (§13)", () => {
+  for (const rutina of RUTINAS) {
+    for (const e of rutina.ejercicios) {
+      if (!e.superserie) continue;
+      assert.notEqual(e.categoria, "basico", `${e.nombre} es básico y está en superserie`);
+    }
+  }
+});
 
-  // El hack squat es el que más y el tibial de los que menos: la escala tiene
-  // que respetar eso o los tiempos dejan de tener sentido.
-  assert.ok(buscar("pierna-a", "Hack squat").descanso > buscar("pierna-a", "Prensa").descanso);
-  assert.ok(buscar("pierna-a", "Prensa").descanso > buscar("pierna-a", "Curl femoral").descanso);
-  assert.ok(
-    buscar("pierna-a", "Curl femoral").descanso >
-      buscar("pierna-a", "Elevaciones laterales").descanso,
+test("el core ya no está en el gimnasio: se hace en casa", () => {
+  for (const rutina of RUTINAS) {
+    for (const e of rutina.ejercicios) {
+      assert.notEqual(e.categoria, "core", `${rutina.nombre} todavía tiene core: ${e.nombre}`);
+    }
+  }
+  assert.equal(CORE_CASA.ejercicios.length, 3);
+  assert.deepEqual(
+    CORE_CASA.ejercicios.map((e) => e.nombre),
+    ["Dead bug", "Plancha lateral", "Pallof press con goma"],
   );
-  assert.ok(
-    buscar("pierna-a", "Elevaciones laterales").descanso > buscar("pierna-a", "Tibial").descanso,
+});
+
+test("las claves de ejercicio son únicas dentro de cada rutina", () => {
+  // El id se construye con la clave: repetirla dentro de una rutina haría que
+  // dos ejercicios compartieran historial.
+  for (const rutina of RUTINAS) {
+    const claves = rutina.ejercicios.map((e) => e.clave);
+    assert.equal(new Set(claves).size, claves.length, `claves repetidas en ${rutina.nombre}`);
+    for (const c of claves) assert.match(c, /^[a-z0-9-]+$/, `clave rara: ${c}`);
+  }
+});
+
+test("§19 · el deltoide lateral suma 12 series directas cada cuatro sesiones", () => {
+  const porRutina = RUTINAS.map((r) =>
+    r.ejercicios
+      .filter((e) => e.musculos?.includes("deltoide lateral"))
+      .reduce((t, e) => t + e.series, 0),
   );
+  assert.deepEqual(porRutina, [4, 2, 4, 2], "laterales por rutina");
+  assert.equal(porRutina.reduce((a, b) => a + b, 0), 12);
+});
+
+test("Pierna B es el día de glúteo", () => {
+  const glutex = (id) =>
+    RUTINAS.find((r) => r.id === id)
+      .ejercicios.filter((e) => e.musculos?.some((m) => m.startsWith("glúteo")))
+      .reduce((t, e) => t + e.series, 0);
+
+  assert.ok(glutex("pierna-b") > glutex("pierna-a"), "Pierna B debería sesgar más a glúteo");
+  // Y el gemelo de pie solo está en Pierna A (§12).
+  const conGemelo = RUTINAS.filter((r) => r.ejercicios.some((e) => e.clave === "gemelo-pie"));
+  assert.deepEqual(conGemelo.map((r) => r.id), ["pierna-a"]);
+});
+
+test("§4 · la rampa recorta 4→3 y 3→2, y deja los de 2 series", () => {
+  // Primera semana de vuelta: ~75-80 % del volumen.
+  assert.equal(seriesDeHoy({ series: 4 }, "2026-08-28"), 3);
+  assert.equal(seriesDeHoy({ series: 3 }, "2026-08-28"), 2);
+  assert.equal(seriesDeHoy({ series: 2 }, "2026-08-28"), 2);
+
+  // Segunda: ~90-100 %, ya casi todo.
+  assert.equal(seriesDeHoy({ series: 4 }, "2026-09-04"), 4);
+  assert.equal(seriesDeHoy({ series: 3 }, "2026-09-04"), 3);
 });

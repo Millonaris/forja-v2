@@ -6,7 +6,7 @@
  * porque leerlo mientras lo haces tiene que ser cuestión de un vistazo.
  */
 
-import { EXTRAS, FRASE, ejerciciosDeHoy } from "../datos/rutinaPostural.js";
+import { CORE_CASA, EXTRAS, FRASE, ejerciciosDeHoy } from "../datos/rutinaPostural.js";
 import { useAjustes, usePosturaHoy } from "../ganchos/useDatos.js";
 import { useTemporizador, formatear } from "../ganchos/useTemporizador.js";
 import { alternarPostura } from "../logica/acciones.js";
@@ -95,6 +95,30 @@ export default function EntrenarPostura() {
       <div className="tarjeta">
         <div className="rotulo" style={{ color: "var(--postura)" }}>De pie, siempre</div>
         <p style={{ margin: "8px 0 0", fontSize: 14.5, lineHeight: 1.5 }}>{FRASE}</p>
+      </div>
+
+      {/* El core salió del gimnasio: son 8-12 min en casa, dos días por semana. */}
+      <div className="tarjeta columna" style={{ gap: 10 }}>
+        <div className="entre">
+          <div className="rotulo" style={{ color: "var(--fuerza)" }}>{CORE_CASA.titulo}</div>
+          <span style={{ fontSize: 12, color: "var(--texto-tenue)" }}>
+            {CORE_CASA.frecuencia} · {CORE_CASA.duracion}
+          </span>
+        </div>
+        {CORE_CASA.ejercicios.map((e) => (
+          <div key={e.id}>
+            <div className="entre" style={{ fontSize: 14 }}>
+              <span style={{ fontWeight: 700 }}>{e.nombre}</span>
+              <span style={{ color: "var(--texto-tenue)" }}>{e.dosis}</span>
+            </div>
+            <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--texto-medio)", lineHeight: 1.45 }}>
+              {e.instruccion}
+            </p>
+          </div>
+        ))}
+        <p style={{ margin: 0, fontSize: 12.5, color: "var(--texto-tenue)" }}>
+          {CORE_CASA.cuando} Descanso: {CORE_CASA.descanso}.
+        </p>
       </div>
 
       <div className="tarjeta columna" style={{ gap: 8 }}>

@@ -65,17 +65,30 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
     if (sesion.descansoFin && sesion.descansoFin > Date.now()) {
       descanso.arrancar((sesion.descansoFin - Date.now()) / 1000, {
         ejercicio: sesion.descansoEjercicio,
+        enSegundoPlano: !sesion.descansoEsTransicion,
       });
     }
     // Solo al montar la sesión: el resto de cambios de la fila no reinician nada.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sesion.id]);
 
-  function armarDescanso(segundos, nombreEjercicio) {
-    descanso.arrancar(segundos, { ejercicio: nombreEjercicio });
+  /*
+   * `esTransicion` es el hueco corto entre los dos ejercicios de una
+   * superserie. No programa aviso de sistema: una notificación para veinte
+   * segundos, con el móvil en la mano y el otro aparato al lado, es ruido.
+   */
+  function armarDescanso(ejercicio) {
+    const segundos = ejercicio.descanso ?? 120;
+    const esTransicion = ejercicio.posicionSS === 1;
+
+    descanso.arrancar(segundos, {
+      ejercicio: ejercicio.nombre,
+      enSegundoPlano: !esTransicion,
+    });
     db.sesionesFuerza.update(sesion.id, {
       descansoFin: Date.now() + segundos * 1000,
-      descansoEjercicio: nombreEjercicio,
+      descansoEjercicio: ejercicio.nombre,
+      descansoEsTransicion: esTransicion,
     });
   }
 
@@ -116,7 +129,7 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
     }
 
     await guardarSerie(sesion.id, ejercicio.id, numeroSerie, { ...datos, hecha: true });
-    armarDescanso(ejercicio.descanso ?? 120, ejercicio.nombre);
+    armarDescanso(ejercicio);
     // `armarDescanso` y los ejercicios se recrean con la sesión, no con el tic.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sesion.id, ejercicios, porEjercicio, avisoPrioritario]);
@@ -240,7 +253,13 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
           <div style={estiloDescanso(descanso.terminado)}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".14em", opacity: 0.7 }}>
-                {descanso.terminado ? "DESCANSO TERMINADO" : "DESCANSO"}
+                {sesion.descansoEsTransicion
+                  ? descanso.terminado
+                    ? "AL SIGUIENTE"
+                    : "TRANSICIÓN"
+                  : descanso.terminado
+                    ? "DESCANSO TERMINADO"
+                    : "DESCANSO"}
               </div>
               <div style={{ fontSize: 25, fontWeight: 800, marginTop: 2 }}>{descanso.texto}</div>
             </div>
@@ -278,7 +297,7 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
               if (id === "seguir") {
                 const { ejercicio, numeroSerie, datos } = pendiente.seguir;
                 await guardarSerie(sesion.id, ejercicio.id, numeroSerie, { ...datos, hecha: true });
-                armarDescanso(ejercicio.descanso ?? 120, ejercicio.nombre);
+                armarDescanso(ejercicio);
               }
             }}
           />
@@ -338,7 +357,19 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
 const Ejercicios = memo(function Ejercicios({
   ejercicios, porEjercicio, anteriores, sesionId, alMarcar, alVerHistorial,
 }) {
-  return ejercicios.map((ejercicio) => (
+  // Los ejercicios en superserie se pintan dentro de un mismo bloque, para que
+  // se lea de un vistazo que van encadenados y no uno detrás de otro.
+  const bloques = [];
+  for (const ejercicio of ejercicios) {
+    const ultimo = bloques.at(-1);
+    if (ejercicio.superserie && ultimo?.grupo === ejercicio.superserie) {
+      ultimo.ejercicios.push(ejercicio);
+    } else {
+      bloques.push({ grupo: ejercicio.superserie ?? null, ejercicios: [ejercicio] });
+    }
+  }
+
+  const pintar = (ejercicio) => (
     <Ejercicio
       key={ejercicio.id}
       ejercicio={ejercicio}
@@ -348,8 +379,47 @@ const Ejercicios = memo(function Ejercicios({
       alDesmarcar={(n) => borrarSerie(sesionId, ejercicio.id, n)}
       alVerHistorial={() => alVerHistorial(ejercicio)}
     />
-  ));
+  );
+
+  return bloques.map((bloque, i) =>
+    bloque.grupo ? (
+      <Superserie key={`ss-${bloque.grupo}-${i}`} bloque={bloque}>
+        {bloque.ejercicios.map(pintar)}
+      </Superserie>
+    ) : (
+      bloque.ejercicios.map(pintar)
+    ),
+  );
 });
+
+/*
+ * Marco de una superserie. El descanso real va TRAS la pareja: entre los dos
+ * ejercicios solo hay una transición corta, y eso es justo lo que hay que
+ * dejar claro para que no se descanse dos veces.
+ */
+function Superserie({ bloque, children }) {
+  const cierre = bloque.ejercicios.at(-1);
+  return (
+    <section
+      style={{
+        border: "1px solid rgba(243,255,71,.22)",
+        borderRadius: 16,
+        padding: "12px 12px 4px",
+        margin: "0 -2px 22px",
+      }}
+    >
+      <div className="entre" style={{ marginBottom: 10 }}>
+        <span className="rotulo" style={{ color: "var(--fuerza)" }}>
+          Superserie {bloque.grupo}
+        </span>
+        <span style={{ fontSize: 11.5, color: "var(--texto-tenue)" }}>
+          15–30 s entre ambos · {formatearTiempo(cierre?.descanso ?? 90)} al terminar
+        </span>
+      </div>
+      {children}
+    </section>
+  );
+}
 
 const VACIO = new Map();
 
@@ -383,7 +453,9 @@ function Ejercicio({ ejercicio, guardadas, anterior, alMarcar, alDesmarcar, alVe
       </div>
 
       <div style={{ fontSize: 12.5, color: "var(--texto-tenue)", marginBottom: 10 }}>
-        Descanso: {formatearTiempo(ejercicio.descanso ?? 120)}
+        {ejercicio.posicionSS === 1
+          ? `Transición: ${ejercicio.descanso} s y al siguiente`
+          : `Descanso: ${formatearTiempo(ejercicio.descanso ?? 120)}`}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: COLUMNAS, gap: "0 6px", alignItems: "center" }}>
