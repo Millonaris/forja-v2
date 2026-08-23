@@ -724,3 +724,23 @@ test("§4 · la rampa recorta 4→3 y 3→2, y deja los de 2 series", () => {
   // Y la rampa se aplica DESPUÉS de la variante, no antes.
   assert.equal(seriesDeHoy({ series: 3, extraAgresiva: 1 }, "2026-08-28", { agresiva: true }), 3);
 });
+
+test("los dos remos tienen agarre y objetivo distintos", () => {
+  // Sin esto se acababa haciendo el mismo remo dos veces por vuelta.
+  const bajo = RUTINAS.find((r) => r.id === "torso-a").ejercicios
+    .find((e) => e.clave === "remo-pecho-apoyado");
+  const alto = RUTINAS.find((r) => r.id === "torso-b").ejercicios
+    .find((e) => e.clave === "high-row");
+
+  assert.match(bajo.nombre, /agarre bajo/i);
+  assert.match(alto.nombre, /agarre alto/i);
+
+  // Torso A tira de dorsal (anchura); Torso B, de espalda alta y posterior.
+  assert.equal(bajo.musculos[0], "dorsal");
+  assert.deepEqual(alto.musculos, ["espalda alta", "deltoide posterior"]);
+  assert.ok(!bajo.musculos.includes("deltoide posterior"));
+
+  // Y cada uno explica su agarre, que es lo que no se especificaba.
+  assert.match(bajo.nota, /codos relativamente pegados/i);
+  assert.match(alto.nota, /codos más abiertos/i);
+});

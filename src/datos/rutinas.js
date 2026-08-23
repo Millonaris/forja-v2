@@ -72,11 +72,17 @@ export const RUTINAS = [
       },
       {
         clave: "remo-pecho-apoyado",
-        nombre: "Remo con pecho apoyado",
+        // Agarre BAJO y codos pegados: sesgo dorsal, para complementar al jalón
+        // y sumar anchura. En Torso B el mismo movimiento va con agarre alto y
+        // codos abiertos, así ninguna sesión repite el mismo remo.
+        nombre: "Remo sentado agarre bajo",
         series: 3, repMin: 8, repMax: 12, rir: "2",
         ...d(120, 105, 150), ...BASICO,
-        musculos: ["espalda alta", "dorsal"],
-        nota: "Va justo detrás del jalón a propósito: los dos reciben el principio de la sesión. Sin fatiga lumbar innecesaria.",
+        musculos: ["dorsal", "espalda alta"],
+        nota:
+          "Agarre BAJO y codos relativamente pegados al cuerpo: así tira del dorsal y " +
+          "complementa al jalón. Va justo detrás de él a propósito, los dos reciben el " +
+          "principio de la sesión. Sin fatiga lumbar innecesaria.",
         alternativas: ["Remo máquina sentado", "Remo cable con apoyo"],
       },
       {
@@ -271,10 +277,16 @@ export const RUTINAS = [
       },
       {
         clave: "high-row",
-        nombre: "High row / remo pecho apoyado",
+        // Agarre ALTO y codos abiertos: espalda alta y deltoide posterior. Es
+        // el contrapunto del remo bajo de Torso A.
+        nombre: "Remo sentado agarre alto / high row",
         series: 3, repMin: 8, repMax: 12, rir: "2",
         ...d(120, 105, 150), ...BASICO, ...P, ...MAS,
-        musculos: ["espalda alta", "dorsal"],
+        musculos: ["espalda alta", "deltoide posterior"],
+        nota:
+          "Agarre ALTO y codos más abiertos: aquí se busca espalda alta y deltoide " +
+          "posterior, no dorsal. Es lo que distingue este remo del de Torso A, que va " +
+          "con agarre bajo y codos pegados.",
         alternativas: ["Remo máquina sentado", "Remo cable con apoyo"],
       },
 
