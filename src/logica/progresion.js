@@ -183,8 +183,43 @@ export function veredicto(ejercicio, historial, { enRampa = false } = {}) {
       };
     }
 
-    const estancado = sesionesSinMejorar(historial, peso) >= 3;
-    if (estancado) {
+    /*
+     * Estancamiento: sesiones seguidas sin mejorar al mismo peso. La CAUSA
+     * importa más que la cuenta, y el RIR apuntado la delata:
+     *
+     *  · RIR 3+ → no es una meseta, es que se va sobrado. El freno es el
+     *    esfuerzo, no la capacidad: la rep extra ya está en el tanque. Aquí NO
+     *    se sube peso — subir carga yendo lejos del fallo solo esconde el
+     *    problema una sesión más.
+     *  · RIR en objetivo → meseta real. A las 3 se revisan factores; a las 5
+     *    toca cambiar el estímulo, no insistir.
+     */
+    const atascos = sesionesSinMejorar(historial, peso);
+    const rires = series.map((s) => s.rir).filter((r) => r != null);
+    const vaSobrado = rires.length === series.length && rires.every((r) => r >= 3);
+
+    if (atascos >= 3 && vaSobrado) {
+      return {
+        ...ESTADOS.LLENA,
+        motivo:
+          `${atascos} sesiones sin mejorar a ${formatearPeso(peso)}, pero con RIR 3+ apuntado: ` +
+          `vas lejos del fallo. No subas peso todavía — acércate a RIR ${rirObjetivo} y esa ` +
+          "rep extra sale sola.",
+      };
+    }
+
+    if (atascos >= 5) {
+      return {
+        ...ESTADOS.REVISAR,
+        motivo:
+          `${atascos} sesiones clavado en ${total} reps a ${formatearPeso(peso)}: insistir ya no ` +
+          "es el plan, toca cambiar el estímulo. Preferido: -5 % y reconstruir con carrerilla. " +
+          "Alternativa, si el RIR apuntado es honesto y la máquina tiene microcarga: sube lo " +
+          "mínimo una sesión y mira qué pasa.",
+      };
+    }
+
+    if (atascos >= 3) {
       return {
         ...ESTADOS.REVISAR,
         motivo:
@@ -237,12 +272,15 @@ export function objetivoDeHoy(ejercicio, seriesAnteriores) {
   const bajoElRango = series.every((s) => (s.reps ?? 0) < ejercicio.repMin);
   const rires = series.map((s) => s.rir).filter((r) => r != null);
   const sinFallo = rires.length === series.length && rires.every((r) => r >= 1);
+  const sobrado = rires.length === series.length && rires.every((r) => r >= 3);
 
   if (bajoElRango) return `Hoy: baja un punto desde ${formatearPeso(peso)} y llena el rango.`;
   if (rangoLleno && sinFallo) {
     return `Hoy: SUBE el mínimo desde ${formatearPeso(peso)} y apunta a ${ejercicio.repMin}–${ejercicio.repMin + 2}.`;
   }
   if (rangoLleno) return `Hoy: repite ${formatearPeso(peso)} buscando el techo con RIR ${ejercicio.rir ?? "1–2"}.`;
+  // RIR 3+ la última vez: la rep extra ya está en el tanque.
+  if (sobrado) return `Hoy: ${formatearPeso(peso)} · fuiste sobrado (RIR 3+): suma reps sin miedo.`;
   return `Hoy: ${formatearPeso(peso)} · batir ${total} reps totales.`;
 }
 

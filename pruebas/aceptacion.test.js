@@ -865,3 +865,52 @@ test("el reto de hoy sale de la última sesión", () => {
   // Sin historial: nada que batir todavía.
   assert.equal(progresion.objetivoDeHoy(ejercicio, []), null);
 });
+
+test("atascado con RIR 3+ no es meseta: pide esfuerzo, no más peso", () => {
+  // Cinco sesiones idénticas pero yendo sobrado: el consejo correcto es meter
+  // la rep que ya está en el tanque, nunca subir carga para esconderlo.
+  const ejercicio = { repMin: 8, repMax: 12, rir: "2" };
+  const sesion = (fecha) => ({
+    fecha,
+    series: [
+      { numeroSerie: 1, kg: 70, reps: 10, rir: 3 },
+      { numeroSerie: 2, kg: 70, reps: 10, rir: 4 },
+    ],
+  });
+  const historial = ["2026-09-20", "2026-09-14", "2026-09-08", "2026-09-02", "2026-08-27"]
+    .map(sesion);
+
+  const v = progresion.veredicto(ejercicio, historial);
+  assert.equal(v.id, "llena");
+  assert.match(v.motivo, /RIR 3\+/);
+  assert.match(v.motivo, /No subas peso/i);
+});
+
+test("cinco sesiones de meseta real escalan a cambiar el estímulo", () => {
+  const ejercicio = { repMin: 8, repMax: 12, rir: "2" };
+  const sesion = (fecha) => ({
+    fecha,
+    series: [
+      { numeroSerie: 1, kg: 70, reps: 10, rir: 2 },
+      { numeroSerie: 2, kg: 70, reps: 10, rir: 1 },
+    ],
+  });
+  const historial = ["2026-09-20", "2026-09-14", "2026-09-08", "2026-09-02", "2026-08-27", "2026-08-21"]
+    .map(sesion);
+
+  const v = progresion.veredicto(ejercicio, historial);
+  assert.equal(v.id, "revisar");
+  assert.match(v.motivo, /cambiar el estímulo/i);
+  assert.match(v.motivo, /microcarga/i);
+});
+
+test("el reto del día detecta que fuiste sobrado", () => {
+  const ejercicio = { repMin: 8, repMax: 12, rir: "2" };
+  assert.match(
+    progresion.objetivoDeHoy(ejercicio, [
+      { numeroSerie: 1, kg: 70, reps: 10, rir: 3 },
+      { numeroSerie: 2, kg: 70, reps: 10, rir: 4 },
+    ]),
+    /sobrado \(RIR 3\+\): suma reps/,
+  );
+});
