@@ -17,7 +17,7 @@ import { FASES } from "./planNutricion.js";
 import { PROTOCOLOS } from "./protocolos.js";
 import { hoyISO } from "../logica/fechas.js";
 
-export const VERSION_PLAN = 4;
+export const VERSION_PLAN = 5;
 
 export async function sembrar() {
   const ajustes = await db.ajustes.get(1);

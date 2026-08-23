@@ -27,7 +27,7 @@ import { useWakeLock } from "../ganchos/useWakeLock.js";
 import { cancelarAviso, estadoPermiso, pedirPermiso } from "../utiles/avisos.js";
 import { borrarSerie, descartarSesionFuerza, guardarSerie, terminarSesionFuerza } from "../logica/acciones.js";
 import { fechaCorta, hoyISO } from "../logica/fechas.js";
-import { veredicto } from "../logica/progresion.js";
+import { objetivoDeHoy, veredicto } from "../logica/progresion.js";
 import { miles } from "../logica/formato.js";
 
 export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
@@ -429,6 +429,10 @@ const VACIO = new Map();
 
 function Ejercicio({ ejercicio, guardadas, anterior, variante, alMarcar, alDesmarcar, alVerHistorial }) {
   const previstas = seriesDeHoy(ejercicio, hoyISO(), variante);
+  // En rampa no hay retos: se consolida a propósito.
+  const reto = rampaDe(hoyISO())
+    ? null
+    : objetivoDeHoy(ejercicio, anterior ? [...anterior.values()] : null);
   const maxGuardada = Math.max(0, ...guardadas.keys());
   // `filas` son las filas PEDIDAS con "+ Añadir serie", no un incremento: sumar
   // un `extra` hacía que la fila añadida contara dos veces en cuanto se
@@ -461,7 +465,7 @@ function Ejercicio({ ejercicio, guardadas, anterior, variante, alMarcar, alDesma
         </span>
       </div>
 
-      <div style={{ fontSize: 12.5, color: "var(--texto-tenue)", marginBottom: 10 }}>
+      <div style={{ fontSize: 12.5, color: "var(--texto-tenue)", marginBottom: reto ? 4 : 10 }}>
         {ejercicio.posicionSS === 1 ? (
           `Transición: ${ejercicio.descanso} s y al siguiente`
         ) : (
@@ -474,6 +478,14 @@ function Ejercicio({ ejercicio, guardadas, anterior, variante, alMarcar, alDesma
           </>
         )}
       </div>
+
+      {/* El reto del día, calculado con la última sesión: qué batir, cuándo
+          subir. Es lo que diría un entrenador al acercarte a la máquina. */}
+      {reto && (
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--exito)", marginBottom: 10 }}>
+          {reto}
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: COLUMNAS, gap: "0 6px", alignItems: "center" }}>
         <Encabezado>SERIE</Encabezado>
@@ -718,7 +730,9 @@ function HistorialEjercicio({ ejercicio, sesionActual, alCerrar }) {
   const anteriores = sesiones.filter((s) => s.sesionId !== sesionActual && s.estado === "completada");
 
   const historial = anteriores.map((s) => ({ fecha: s.fecha, series: s.series }));
-  const v = historial.length ? veredicto(ejercicio, historial) : null;
+  const v = historial.length
+    ? veredicto(ejercicio, historial, { enRampa: Boolean(rampaDe(hoyISO())) })
+    : null;
 
   return (
     <Hoja

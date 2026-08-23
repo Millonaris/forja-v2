@@ -744,3 +744,124 @@ test("los dos remos tienen agarre y objetivo distintos", () => {
   assert.match(bajo.nota, /codos relativamente pegados/i);
   assert.match(alto.nota, /codos más abiertos/i);
 });
+
+/* ------------------------------------------------------------------ */
+/* El entrenador metódico                                              */
+/* ------------------------------------------------------------------ */
+
+test("techo del rango rozando el fallo NO sube: consolida primero", () => {
+  // El plan pide el techo CON el RIR objetivo. Llegar a 12 al fallo no cuenta.
+  const ejercicio = { repMin: 8, repMax: 12, rir: "2" };
+  const historial = [
+    { fecha: "2026-09-20", series: [
+      { numeroSerie: 1, kg: 70, reps: 12, rir: 1 },
+      { numeroSerie: 2, kg: 70, reps: 12, rir: 0 },
+    ] },
+  ];
+  const v = progresion.veredicto(ejercicio, historial);
+  assert.equal(v.id, "manten");
+  assert.match(v.motivo, /rozando el fallo/i);
+});
+
+test("peso pasado: todas las series bajo el suelo del rango piden bajar", () => {
+  const ejercicio = { repMin: 8, repMax: 12, rir: "2" };
+  const historial = [
+    { fecha: "2026-09-20", series: [
+      { numeroSerie: 1, kg: 80, reps: 6, rir: 1 },
+      { numeroSerie: 2, kg: 80, reps: 5, rir: 0 },
+    ] },
+  ];
+  const v = progresion.veredicto(ejercicio, historial);
+  assert.equal(v.id, "revisar");
+  assert.match(v.motivo, /baja el incremento/i);
+});
+
+test("salto de peso demasiado grande: aconseja volver al anterior", () => {
+  const ejercicio = { repMin: 8, repMax: 12, rir: "2" };
+  const historial = [
+    { fecha: "2026-09-20", series: [{ numeroSerie: 1, kg: 80, reps: 6, rir: 1 }] },
+    { fecha: "2026-09-14", series: [{ numeroSerie: 1, kg: 70, reps: 12, rir: 2 }] },
+  ];
+  const v = progresion.veredicto(ejercicio, historial);
+  assert.equal(v.id, "revisar");
+  assert.match(v.motivo, /Vuelve a 70 kg|incremento menor/);
+});
+
+test("recién subido de peso: reconstruir no es retroceder", () => {
+  const ejercicio = { repMin: 8, repMax: 12, rir: "2" };
+  const historial = [
+    { fecha: "2026-09-20", series: [
+      { numeroSerie: 1, kg: 72.5, reps: 9, rir: 2 },
+      { numeroSerie: 2, kg: 72.5, reps: 8, rir: 2 },
+    ] },
+    { fecha: "2026-09-14", series: [
+      { numeroSerie: 1, kg: 70, reps: 12, rir: 2 },
+      { numeroSerie: 2, kg: 70, reps: 12, rir: 1 },
+    ] },
+  ];
+  const v = progresion.veredicto(ejercicio, historial);
+  assert.equal(v.id, "llena");
+  assert.match(v.motivo, /reconstruye/i);
+  assert.match(v.motivo, /no retroceso|es progreso/i);
+});
+
+test("en rampa de vuelta no se piden récords", () => {
+  const ejercicio = { repMin: 8, repMax: 12, rir: "2" };
+  const historial = [
+    { fecha: "2026-08-20", series: [{ numeroSerie: 1, kg: 70, reps: 12, rir: 2 }] },
+  ];
+  const v = progresion.veredicto(ejercicio, historial, { enRampa: true });
+  assert.equal(v.id, "manten");
+  assert.match(v.motivo, /rampa/i);
+});
+
+test("la mejora dice el objetivo concreto de la próxima sesión", () => {
+  const ejercicio = { repMin: 8, repMax: 12, rir: "2" };
+  const historial = [
+    { fecha: "2026-09-20", series: [
+      { numeroSerie: 1, kg: 70, reps: 11, rir: 2 },
+      { numeroSerie: 2, kg: 70, reps: 10, rir: 2 },
+    ] },
+    { fecha: "2026-09-14", series: [
+      { numeroSerie: 1, kg: 70, reps: 10, rir: 2 },
+      { numeroSerie: 2, kg: 70, reps: 9, rir: 2 },
+    ] },
+  ];
+  const v = progresion.veredicto(ejercicio, historial);
+  assert.equal(v.id, "manten");
+  assert.match(v.motivo, /19 → 21/);
+  assert.match(v.motivo, /22 totales o más/);
+});
+
+test("el reto de hoy sale de la última sesión", () => {
+  const ejercicio = { repMin: 8, repMax: 12, rir: "2" };
+
+  // Con margen: batir el total.
+  assert.match(
+    progresion.objetivoDeHoy(ejercicio, [
+      { numeroSerie: 1, kg: 70, reps: 10, rir: 2 },
+      { numeroSerie: 2, kg: 70, reps: 9, rir: 2 },
+    ]),
+    /70 kg · batir 19 reps/,
+  );
+
+  // Techo con RIR correcto: subir.
+  assert.match(
+    progresion.objetivoDeHoy(ejercicio, [
+      { numeroSerie: 1, kg: 70, reps: 12, rir: 2 },
+      { numeroSerie: 2, kg: 70, reps: 12, rir: 1 },
+    ]),
+    /SUBE el mínimo desde 70 kg/,
+  );
+
+  // Techo al fallo: repetir con RIR objetivo.
+  assert.match(
+    progresion.objetivoDeHoy(ejercicio, [
+      { numeroSerie: 1, kg: 70, reps: 12, rir: 0 },
+    ]),
+    /repite 70 kg/,
+  );
+
+  // Sin historial: nada que batir todavía.
+  assert.equal(progresion.objetivoDeHoy(ejercicio, []), null);
+});

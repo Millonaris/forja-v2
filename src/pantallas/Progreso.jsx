@@ -29,6 +29,7 @@ import { db } from "../datos/db.js";
 import { diasEntre, fechaCorta, hoyISO, ultimosDias } from "../logica/fechas.js";
 import { cambioSemanal, formatear as formatearPeso, media, serie, serieMedia } from "../logica/peso.js";
 import { porSesion, veredicto } from "../logica/progresion.js";
+import { rampaDe } from "../datos/rampa.js";
 import * as motorCarrera from "../logica/motorCarrera.js";
 import {
   adherenciaFuerza, adherenciaPostura, consistencia,
@@ -320,7 +321,9 @@ function Fuerza() {
             .map((ejercicio) => {
               const suyas = porEjercicio.get(ejercicio.id) ?? [];
               if (!suyas.length) return null;
-              const v = veredicto(ejercicio, porSesion(suyas, completadas));
+              const v = veredicto(ejercicio, porSesion(suyas, completadas), {
+                enRampa: Boolean(rampaDe(hoyISO())),
+              });
               return (
                 <div key={ejercicio.id} className="entre" style={{ alignItems: "flex-start" }}>
                   <div style={{ flex: 1 }}>
