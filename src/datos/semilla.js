@@ -17,7 +17,7 @@ import { FASES } from "./planNutricion.js";
 import { PROTOCOLOS } from "./protocolos.js";
 import { hoyISO } from "../logica/fechas.js";
 
-export const VERSION_PLAN = 1;
+export const VERSION_PLAN = 2;
 
 export async function sembrar() {
   const ajustes = await db.ajustes.get(1);
@@ -39,15 +39,19 @@ export async function sembrar() {
           // Id estable y legible: si mañana se reordena la rutina, el
           // historial de series sigue apuntando al ejercicio correcto.
           const id = `${rutina.id}:${i}:${normalizar(ej.nombre)}`;
-          const previo = await db.ejercicios.get(id);
-          await db.ejercicios.put({
-            ...ej,
-            id,
-            plantillaId: rutina.id,
-            orden: i,
-            // Si el usuario ya lo tocó, se respeta lo suyo.
-            ...(previo ? { series: previo.series, descanso: previo.descanso } : null),
-          });
+          /*
+           * El plan del código MANDA sobre lo que hubiera guardado.
+           *
+           * Antes se conservaban `series` y `descanso` de la fila anterior por
+           * si el usuario los había tocado — pero la app no tiene (todavía)
+           * ninguna pantalla para editarlos, así que eso no protegía nada y en
+           * cambio impedía que una corrección del plan llegara al móvil: los
+           * descansos nuevos se quedaban en el código sin efecto ninguno.
+           *
+           * Cuando exista esa edición, lo suyo será guardar los cambios del
+           * usuario en una tabla aparte y fusionarlos aquí, no adivinar.
+           */
+          await db.ejercicios.put({ ...ej, id, plantillaId: rutina.id, orden: i });
         }
       }
 

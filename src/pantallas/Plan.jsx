@@ -11,7 +11,7 @@ import { useState } from "react";
 import Volver from "../componentes/Volver.jsx";
 
 import { BLOQUES, ENVOLTURA, NOMBRES_FASE, REGLAS as REGLAS_CARRERA, describirSesion, proximoHito } from "../datos/planCarrera.js";
-import { REGLAS_PROGRESION, RUTINAS, dosis } from "../datos/rutinas.js";
+import { REGLAS_DESCANSO, REGLAS_PROGRESION, RUTINAS, descansoTexto, dosis } from "../datos/rutinas.js";
 import { EJERCICIOS as POSTURALES, EXTRAS, FRASE, SEGUIMIENTO } from "../datos/rutinaPostural.js";
 import Hoja, { Opciones } from "../componentes/Hoja.jsx";
 import {
@@ -96,11 +96,20 @@ function Fuerza() {
                 {e.prioritario && <span style={{ marginRight: 5 }}>⭐</span>}
                 {e.nombre}
               </span>
-              <span style={{ color: "var(--texto-tenue)" }}>{dosis(e)}</span>
+              <span style={{ color: "var(--texto-tenue)", whiteSpace: "nowrap" }}>
+                {dosis(e)}
+                <span style={{ marginLeft: 8, color: "var(--carrera)" }}>
+                  {descansoTexto(e.descanso)}
+                </span>
+              </span>
             </div>
           ))}
         </div>
       ))}
+
+      <Plegable titulo="Descansos">
+        <Lista items={REGLAS_DESCANSO} />
+      </Plegable>
 
       <Plegable titulo="Doble progresión">
         <Lista items={REGLAS_PROGRESION} numerada />

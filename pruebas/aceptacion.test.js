@@ -17,6 +17,7 @@ import {
   DIAS_ESPECIALES, calendarioDelTramo, diaEspecialDe, faseDe, kcalDe, objetivosDe, porQueDe,
 } from "../src/datos/planNutricion.js";
 import { seriesDeHoy, rirDeHoy } from "../src/datos/rampa.js";
+import { RUTINAS } from "../src/datos/rutinas.js";
 import * as progresion from "../src/logica/progresion.js";
 import * as volumen from "../src/logica/volumen.js";
 import * as agenda from "../src/logica/agenda.js";
@@ -571,4 +572,53 @@ test("§27 · lo que fijas a mano consume cupo y no se duplica la sugerencia", (
     0,
   );
   assert.equal(reales, 3);
+});
+
+/* ------------------------------------------------------------------ */
+/* Descansos por ejercicio                                             */
+/* ------------------------------------------------------------------ */
+
+test("cada ejercicio tiene su descanso exacto, en segundos", () => {
+  // La tabla acordada, ejercicio por ejercicio. Si alguien toca un número en
+  // rutinas.js sin querer, esta prueba lo caza.
+  const esperados = {
+    "torso-a": [120, 75, 150, 120, 120, 75, 90, 90],
+    "pierna-a": [180, 150, 120, 90, 120, 90, 75, 60, 75, 90, 60, 60],
+    "torso-b": [150, 75, 120, 120, 90, 75, 90, 90],
+    "pierna-b": [120, 150, 120, 90, 90, 90, 75, 60, 75, 90, 60, 60],
+  };
+
+  for (const rutina of RUTINAS) {
+    assert.deepEqual(
+      rutina.ejercicios.map((e) => e.descanso),
+      esperados[rutina.id],
+      `descansos de ${rutina.nombre}`,
+    );
+  }
+});
+
+test("ningún ejercicio se queda sin descanso", () => {
+  for (const rutina of RUTINAS) {
+    for (const e of rutina.ejercicios) {
+      assert.equal(typeof e.descanso, "number", `${rutina.nombre} · ${e.nombre}`);
+      assert.ok(e.descanso >= 60 && e.descanso <= 180, `${e.nombre}: ${e.descanso} s`);
+    }
+  }
+});
+
+test("los básicos pesados descansan más que los aislados", () => {
+  const buscar = (rutinaId, nombre) =>
+    RUTINAS.find((r) => r.id === rutinaId).ejercicios.find((e) => e.nombre === nombre);
+
+  // El hack squat es el que más y el tibial de los que menos: la escala tiene
+  // que respetar eso o los tiempos dejan de tener sentido.
+  assert.ok(buscar("pierna-a", "Hack squat").descanso > buscar("pierna-a", "Prensa").descanso);
+  assert.ok(buscar("pierna-a", "Prensa").descanso > buscar("pierna-a", "Curl femoral").descanso);
+  assert.ok(
+    buscar("pierna-a", "Curl femoral").descanso >
+      buscar("pierna-a", "Elevaciones laterales").descanso,
+  );
+  assert.ok(
+    buscar("pierna-a", "Elevaciones laterales").descanso > buscar("pierna-a", "Tibial").descanso,
+  );
 });
