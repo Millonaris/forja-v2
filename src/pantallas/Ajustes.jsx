@@ -68,6 +68,16 @@ export default function Ajustes({ abierto, alCerrar }) {
           />
 
           <Selector
+            etiqueta="Volumen de la rutina"
+            valor={ajustes.rutinaAgresiva ? 1 : 0}
+            opciones={[
+              { valor: 0, texto: "Conservadora — recomendada" },
+              { valor: 1, texto: "Agresiva — una serie más en 6 ejercicios" },
+            ]}
+            alCambiar={(v) => guardarAjustes({ rutinaAgresiva: v === "1" })}
+          />
+
+          <Selector
             etiqueta="Escalón de volumen"
             valor={ajustes.escalonVolumen ?? 0}
             opciones={[

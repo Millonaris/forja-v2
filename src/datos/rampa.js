@@ -9,6 +9,8 @@
  * Esto sí depende de la fecha, como la nutrición.
  */
 
+import { seriesObjetivo } from "./rutinas.js";
+
 export const TRAMOS = [
   {
     id: "rampa-1",
@@ -41,10 +43,11 @@ export function rampaDe(iso) {
  * Se redondea hacia arriba y nunca baja de 1: recortar un 2×12 a cero series
  * sería borrar el ejercicio, que no es lo que pide una rampa.
  */
-export function seriesDeHoy(ejercicio, iso) {
+export function seriesDeHoy(ejercicio, iso, opciones) {
+  const base = seriesObjetivo(ejercicio, opciones);
   const tramo = rampaDe(iso);
-  if (!tramo) return ejercicio.series;
-  return Math.max(1, Math.round(ejercicio.series * tramo.proporcion));
+  if (!tramo) return base;
+  return Math.max(1, Math.round(base * tramo.proporcion));
 }
 
 /** El RIR objetivo del día: el de la rampa si la hay, el del plan si no. */

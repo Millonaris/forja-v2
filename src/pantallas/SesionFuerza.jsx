@@ -19,9 +19,9 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import Hoja, { Opciones } from "../componentes/Hoja.jsx";
 import { db } from "../datos/db.js";
-import { RUTINAS, dosis } from "../datos/rutinas.js";
+import { RUTINAS, dosis, rangoDescansoTexto } from "../datos/rutinas.js";
 import { rampaDe, rirDeHoy, seriesDeHoy } from "../datos/rampa.js";
-import { useEjercicios, useSeriesDeSesion, useSesionesDeEjercicio } from "../ganchos/useDatos.js";
+import { useAjustes, useEjercicios, useSeriesDeSesion, useSesionesDeEjercicio } from "../ganchos/useDatos.js";
 import { useTemporizador, formatear as formatearTiempo } from "../ganchos/useTemporizador.js";
 import { useWakeLock } from "../ganchos/useWakeLock.js";
 import { cancelarAviso, estadoPermiso, pedirPermiso } from "../utiles/avisos.js";
@@ -32,6 +32,8 @@ import { miles } from "../logica/formato.js";
 
 export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
   const rutina = RUTINAS.find((r) => r.id === sesion.plantillaId);
+  const ajustes = useAjustes();
+  const variante = { agresiva: ajustes?.rutinaAgresiva };
   const ejercicios = useEjercicios(sesion.plantillaId);
   const series = useSeriesDeSesion(sesion.id);
   const anteriores = useAnteriores(sesion);
@@ -114,7 +116,7 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
   }, [series]);
 
   const hechas = series.filter((s) => s.hecha).length;
-  const previstas = ejercicios.reduce((t, e) => t + seriesDeHoy(e, hoyISO()), 0);
+  const previstas = ejercicios.reduce((t, e) => t + seriesDeHoy(e, hoyISO(), variante), 0);
   const volumen = series.reduce((t, s) => t + (s.hecha ? (s.kg ?? 0) * (s.reps ?? 0) : 0), 0);
   const rampa = rampaDe(hoyISO());
 
@@ -243,6 +245,7 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
             porEjercicio={porEjercicio}
             anteriores={anteriores}
             sesionId={sesion.id}
+            variante={variante}
             alMarcar={alMarcar}
             alVerHistorial={setVerHistorial}
           />
@@ -355,7 +358,7 @@ export default function SesionFuerza({ sesion, oculta, alPlegar, alResumen }) {
  * que se nota al teclear kg mientras corre el descanso.
  */
 const Ejercicios = memo(function Ejercicios({
-  ejercicios, porEjercicio, anteriores, sesionId, alMarcar, alVerHistorial,
+  ejercicios, porEjercicio, anteriores, sesionId, variante, alMarcar, alVerHistorial,
 }) {
   // Los ejercicios en superserie se pintan dentro de un mismo bloque, para que
   // se lea de un vistazo que van encadenados y no uno detrás de otro.
@@ -375,6 +378,7 @@ const Ejercicios = memo(function Ejercicios({
       ejercicio={ejercicio}
       guardadas={porEjercicio.get(ejercicio.id) ?? VACIO}
       anterior={anteriores.get(ejercicio.id)}
+      variante={variante}
       alMarcar={alMarcar}
       alDesmarcar={(n) => borrarSerie(sesionId, ejercicio.id, n)}
       alVerHistorial={() => alVerHistorial(ejercicio)}
@@ -423,8 +427,8 @@ function Superserie({ bloque, children }) {
 
 const VACIO = new Map();
 
-function Ejercicio({ ejercicio, guardadas, anterior, alMarcar, alDesmarcar, alVerHistorial }) {
-  const previstas = seriesDeHoy(ejercicio, hoyISO());
+function Ejercicio({ ejercicio, guardadas, anterior, variante, alMarcar, alDesmarcar, alVerHistorial }) {
+  const previstas = seriesDeHoy(ejercicio, hoyISO(), variante);
   const maxGuardada = Math.max(0, ...guardadas.keys());
   // `filas` son las filas PEDIDAS con "+ Añadir serie", no un incremento: sumar
   // un `extra` hacía que la fila añadida contara dos veces en cuanto se
@@ -449,13 +453,26 @@ function Ejercicio({ ejercicio, guardadas, anterior, alMarcar, alDesmarcar, alVe
           {ejercicio.nombre}
           <span style={{ color: "var(--texto-tenue)", fontWeight: 400, marginLeft: 6 }}>›</span>
         </button>
-        <span style={{ fontSize: 12, color: "var(--texto-tenue)" }}>{dosis(ejercicio)}</span>
+        <span style={{ fontSize: 12, color: "var(--texto-tenue)", whiteSpace: "nowrap" }}>
+          {dosis(ejercicio)}
+          {ejercicio.rir && (
+            <span style={{ marginLeft: 7, color: "var(--carrera)" }}>RIR {ejercicio.rir}</span>
+          )}
+        </span>
       </div>
 
       <div style={{ fontSize: 12.5, color: "var(--texto-tenue)", marginBottom: 10 }}>
-        {ejercicio.posicionSS === 1
-          ? `Transición: ${ejercicio.descanso} s y al siguiente`
-          : `Descanso: ${formatearTiempo(ejercicio.descanso ?? 120)}`}
+        {ejercicio.posicionSS === 1 ? (
+          `Transición: ${ejercicio.descanso} s y al siguiente`
+        ) : (
+          <>
+            Descanso: {formatearTiempo(ejercicio.descanso ?? 120)}
+            {/* El rango recuerda que el temporizador guía, no obliga. */}
+            {rangoDescansoTexto(ejercicio) && (
+              <span style={{ opacity: 0.7 }}> · rango {rangoDescansoTexto(ejercicio)}</span>
+            )}
+          </>
+        )}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: COLUMNAS, gap: "0 6px", alignItems: "center" }}>
@@ -704,7 +721,41 @@ function HistorialEjercicio({ ejercicio, sesionActual, alCerrar }) {
   const v = historial.length ? veredicto(ejercicio, historial) : null;
 
   return (
-    <Hoja abierta alCerrar={alCerrar} titulo={ejercicio.nombre} subtitulo={dosis(ejercicio)}>
+    <Hoja
+      abierta
+      alCerrar={alCerrar}
+      titulo={ejercicio.nombre}
+      subtitulo={`${dosis(ejercicio)} · RIR ${ejercicio.rir ?? "1–2"}`}
+    >
+      {/* La nota técnica es lo que evita hacerlo mal por no acordarse. */}
+      {ejercicio.nota && (
+        <p
+          style={{
+            margin: "0 0 14px",
+            fontSize: 13.5,
+            color: "var(--texto-medio)",
+            lineHeight: 1.55,
+            background: "var(--superficie-3)",
+            borderRadius: 12,
+            padding: "11px 13px",
+          }}
+        >
+          {ejercicio.nota}
+        </p>
+      )}
+
+      {/* Si la máquina está ocupada, esto evita improvisar algo peor. */}
+      {ejercicio.alternativas?.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div className="rotulo" style={{ marginBottom: 8 }}>Si está ocupada</div>
+          <div className="fila" style={{ gap: 6, flexWrap: "wrap" }}>
+            {ejercicio.alternativas.map((alt) => (
+              <span key={alt} className="chip">{alt}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {v && (
         <div className="tarjeta" style={{ marginBottom: 14 }}>
           <div className="rotulo" style={{ color: v.color }}>{v.texto}</div>

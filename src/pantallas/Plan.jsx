@@ -11,7 +11,10 @@ import { useState } from "react";
 import Volver from "../componentes/Volver.jsx";
 
 import { BLOQUES, ENVOLTURA, NOMBRES_FASE, REGLAS as REGLAS_CARRERA, describirSesion, proximoHito } from "../datos/planCarrera.js";
-import { REGLAS_DESCANSO, REGLAS_PROGRESION, RUTINAS, descansoTexto, dosis } from "../datos/rutinas.js";
+import {
+  REGLAS_DESCANSO, REGLAS_PROGRESION, REGLAS_SUPERSERIE, RUTINAS,
+  descansoTexto, dosis, seriesTotales,
+} from "../datos/rutinas.js";
 import { EJERCICIOS as POSTURALES, EXTRAS, FRASE, SEGUIMIENTO } from "../datos/rutinaPostural.js";
 import Hoja, { Opciones } from "../componentes/Hoja.jsx";
 import {
@@ -74,7 +77,9 @@ export default function Plan({ sub, alVolver }) {
 
 function Fuerza() {
   const estado = useEstadoFuerza();
+  const ajustes = useAjustes();
   const siguienteId = estado ? RUTINAS[(estado.indiceSiguiente ?? 0) % 4].id : null;
+  const opciones = { agresiva: ajustes?.rutinaAgresiva };
 
   return (
     <>
@@ -82,7 +87,7 @@ function Fuerza() {
         <div key={rutina.id} className="tarjeta columna" style={{ gap: 9 }}>
           <div className="entre">
             <div className="rotulo" style={{ color: rutina.id === siguienteId ? "var(--fuerza)" : undefined }}>
-              {rutina.nombre}
+              {rutina.nombre} · {rutina.prioridad}
             </div>
             {rutina.id === siguienteId && (
               <span style={{ fontSize: 10.5, fontWeight: 800, color: "var(--fuerza)", letterSpacing: ".1em" }}>
@@ -90,25 +95,45 @@ function Fuerza() {
               </span>
             )}
           </div>
-          {rutina.ejercicios.map((e) => (
-            <div key={e.nombre} className="entre" style={{ fontSize: 13.5 }}>
-              <span>
-                {e.prioritario && <span style={{ marginRight: 5 }}>⭐</span>}
-                {e.nombre}
-              </span>
-              <span style={{ color: "var(--texto-tenue)", whiteSpace: "nowrap" }}>
-                {dosis(e)}
-                <span style={{ marginLeft: 8, color: "var(--carrera)" }}>
-                  {descansoTexto(e.descanso)}
-                </span>
-              </span>
-            </div>
-          ))}
+          <div style={{ fontSize: 12, color: "var(--texto-tenue)", marginBottom: 2 }}>
+            {seriesTotales(rutina, opciones)} series · {rutina.duracion}
+          </div>
+
+          {rutina.ejercicios.map((e, i) => {
+            // Una línea antes del primero de cada superserie, para que se vea
+            // que van encadenados y el descanso es de la pareja.
+            const abreSS = e.posicionSS === 1;
+            return (
+              <div key={e.clave + i}>
+                {abreSS && (
+                  <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".1em", color: "var(--fuerza)", margin: "6px 0 4px" }}>
+                    SUPERSERIE {e.superserie}
+                  </div>
+                )}
+                <div className="entre" style={{ fontSize: 13.5 }}>
+                  <span style={{ paddingLeft: e.superserie ? 10 : 0 }}>
+                    {e.prioritario && <span style={{ marginRight: 5 }}>⭐</span>}
+                    {e.nombre}
+                  </span>
+                  <span style={{ color: "var(--texto-tenue)", whiteSpace: "nowrap" }}>
+                    {dosis(e, opciones)}
+                    <span style={{ marginLeft: 8, color: "var(--carrera)" }}>
+                      {abreSS ? `${e.descanso} s` : descansoTexto(e.descanso)}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       ))}
 
       <Plegable titulo="Descansos">
         <Lista items={REGLAS_DESCANSO} />
+      </Plegable>
+
+      <Plegable titulo="Superseries">
+        <Lista items={REGLAS_SUPERSERIE} />
       </Plegable>
 
       <Plegable titulo="Doble progresión">

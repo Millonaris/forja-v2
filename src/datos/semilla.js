@@ -17,7 +17,7 @@ import { FASES } from "./planNutricion.js";
 import { PROTOCOLOS } from "./protocolos.js";
 import { hoyISO } from "../logica/fechas.js";
 
-export const VERSION_PLAN = 3;
+export const VERSION_PLAN = 4;
 
 export async function sembrar() {
   const ajustes = await db.ajustes.get(1);
@@ -79,6 +79,9 @@ export async function sembrar() {
         calibrada: previo.calibrada ?? false,
         // Escalón de volumen: 0 = ~2500 kcal, 1 = ~2550.
         escalonVolumen: previo.escalonVolumen ?? 0,
+        // Variante agresiva de la rutina: una serie más en seis ejercicios.
+        // Se empieza SIEMPRE en la conservadora (§ del informe).
+        rutinaAgresiva: previo.rutinaAgresiva ?? false,
         // Preferencias de aviso (§55).
         vibracion: previo.vibracion ?? true,
         sonido: previo.sonido ?? false,

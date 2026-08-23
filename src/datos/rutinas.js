@@ -1,15 +1,22 @@
 /*
  * Las cuatro rutinas de fuerza y su rotación.
  *
- * Versión del 23 de agosto de 2026. Prioridades: hombro y espalda en torso,
- * glúteo en pierna. Superseries solo entre accesorios que no compiten, para
- * que la sesión quepa en una hora. El core sale del gimnasio y se hace en casa.
+ * Versión definitiva (informe de investigación, 23 de agosto de 2026).
  *
  *   TORSO A → PIERNA A → TORSO B → PIERNA B → ↻
  *
- * El orden es una SECUENCIA, no un calendario: aquí no hay ningún día de la
- * semana, y eso es deliberado (§8). Si la última fue Torso A, la siguiente es
- * Pierna A, se haga el miércoles, el jueves o el sábado.
+ * El orden es una SECUENCIA, no un calendario. Entrenando tres veces por
+ * semana una vuelta tarda 1,33 semanas, así que la rutina NO se reinicia los
+ * lunes: la app guarda cuál es la siguiente y punto.
+ *
+ * Las dos sesiones de torso tienen identidad distinta a propósito:
+ *
+ *   Torso A · espalda primero (jalón y remo SEGUIDOS) → lateral → pecho
+ *   Torso B · lateral primero → dorsal → pecho
+ *
+ * El orden de ejercicios no cambia por sí solo la hipertrofia, pero lo que va
+ * al principio rinde mejor. Por eso cada prioridad tiene una sesión donde
+ * arranca fresca.
  *
  * Cada ejercicio lleva `clave`: un identificador estable que NO depende de su
  * posición ni de su nombre visible. Es lo que permite reordenar la rutina o
@@ -23,45 +30,26 @@ const AISLADO = { categoria: "aislado" };
 /** ⭐ Prioritario: si se intenta saltar, la app avisa (pero deja saltarlo). */
 const P = { prioritario: true };
 
-/*
- * Descansos, en segundos. El reloj empieza AL TERMINAR una serie y acaba al
- * empezar la siguiente.
+/**
+ * Descanso: valor por defecto del temporizador + rango autorregulado.
  *
- *   3:00 · hack squat
- *   2:30 · prensa, hip thrust y presses principales
- *   2:00 · jalones, remos, curl femoral, extensión 45°
- *   1:30 · brazos, pec deck, pullover
- *   1:15 · laterales y reverse pec deck
- *
- * En superserie el descanso va TRAS LA PAREJA; entre los dos ejercicios solo
- * hay una transición de 15–30 s.
+ * El primer número es lo que arranca solo al terminar la serie; el rango es
+ * lo aceptable. El botón +30 s está para eso, y usarlo no rompe nada: en hack,
+ * prensa o hip thrust vale más medio minuto extra y una buena serie.
  */
-const D = {
-  hack: 180,
-  prensa: 150,
-  hipThrust: 150,
-  press: 150,
-  jalon: 120,
-  remo: 120,
-  femoral: 120,
-  extension45: 120,
-  brazo: 90,
-  pecDeck: 90,
-  pullover: 90,
-  lateral: 75,
-  reverse: 75,
-};
-
-/** Transición entre los dos ejercicios de una superserie. */
-const TRANSICION = 20;
+const d = (defecto, min, max) => ({ descanso: defecto, descansoMin: min, descansoMax: max });
 
 /**
- * Marca un ejercicio como parte de una superserie.
+ * Superserie: A → 15 s de transición → B → descanso completo → repetir.
  *
- * `posicion: 1` es el primero de la pareja y su "descanso" es solo la
- * transición; `posicion: 2` cierra y lleva el descanso de verdad.
+ * `posicion: 1` solo transiciona; `posicion: 2` cierra y lleva el descanso de
+ * la pareja. NO se descansa entre A y B.
  */
 const ss = (grupo, posicion) => ({ superserie: grupo, posicionSS: posicion });
+const TRANSICION = 15;
+
+/** La versión agresiva solo añade una serie aquí, y no antes de 6-8 semanas. */
+const MAS = { extraAgresiva: 1 };
 
 export const ROTACION = ["torso-a", "pierna-a", "torso-b", "pierna-b"];
 
@@ -70,42 +58,182 @@ export const RUTINAS = [
     id: "torso-a",
     nombre: "Torso A",
     orden: 0,
-    duracion: "55–70 min",
+    prioridad: "Espalda",
+    duracion: "55–63 min",
     ejercicios: [
-      { clave: "jalon-pecho", nombre: "Jalón al pecho", series: 3, repMin: 8, repMax: 12, descanso: D.jalon, musculos: ["dorsal"], ...BASICO },
-      { clave: "laterales", nombre: "Elevaciones laterales", series: 4, repMin: 12, repMax: 20, descanso: D.lateral, musculos: ["deltoide lateral"], ...AISLADO, ...P },
-      { clave: "press-inclinado", nombre: "Press inclinado", series: 3, repMin: 8, repMax: 12, descanso: D.press, musculos: ["pectoral", "tríceps"], ...BASICO },
-      { clave: "remo-pecho-apoyado", nombre: "Remo con pecho apoyado", series: 3, repMin: 8, repMax: 12, descanso: D.remo, musculos: ["espalda alta", "dorsal"], ...BASICO },
-      { clave: "press-hombro", nombre: "Press hombro", series: 2, repMin: 8, repMax: 12, descanso: D.jalon, musculos: ["deltoide anterior", "tríceps"], ...BASICO },
-      { clave: "reverse-pec-deck", nombre: "Reverse pec deck", series: 2, repMin: 12, repMax: 20, descanso: D.reverse, musculos: ["deltoide posterior"], ...AISLADO, ...P },
-      { clave: "curl", nombre: "Curl bíceps", series: 2, repMin: 10, repMax: 15, descanso: D.brazo, musculos: ["bíceps"], ...AISLADO },
-      { clave: "triceps-polea", nombre: "Tríceps en polea", series: 2, repMin: 10, repMax: 15, descanso: D.brazo, musculos: ["tríceps"], ...AISLADO },
+      {
+        clave: "jalon-pecho",
+        nombre: "Jalón al pecho agarre medio",
+        series: 3, repMin: 8, repMax: 12, rir: "2",
+        ...d(120, 105, 150), ...BASICO, ...MAS,
+        musculos: ["dorsal"],
+        nota: "Prioridad dorsal: es el primer ejercicio de la sesión para que reciba tu mejor rendimiento.",
+        alternativas: ["Jalón plate-loaded", "Dominada asistida"],
+      },
+      {
+        clave: "remo-pecho-apoyado",
+        nombre: "Remo con pecho apoyado",
+        series: 3, repMin: 8, repMax: 12, rir: "2",
+        ...d(120, 105, 150), ...BASICO,
+        musculos: ["espalda alta", "dorsal"],
+        nota: "Va justo detrás del jalón a propósito: los dos reciben el principio de la sesión. Sin fatiga lumbar innecesaria.",
+        alternativas: ["Remo máquina sentado", "Remo cable con apoyo"],
+      },
+      {
+        clave: "laterales",
+        nombre: "Elevación lateral máquina/cable",
+        series: 4, repMin: 12, repMax: 20, rir: "1–2",
+        ...d(75, 60, 90), ...AISLADO, ...P,
+        musculos: ["deltoide lateral"],
+        nota: "Prioridad. Sola, sin superserie, para no perder calidad. Control y tensión, nada de balanceo.",
+        alternativas: ["Cable lateral", "Mancuernas"],
+      },
+      {
+        clave: "press-inclinado",
+        nombre: "Press inclinado máquina",
+        series: 3, repMin: 8, repMax: 12, rir: "2",
+        ...d(150, 120, 180), ...BASICO,
+        musculos: ["pectoral", "tríceps"],
+        alternativas: ["Smith inclinado", "Press convergente"],
+      },
+      {
+        clave: "reverse-pec-deck",
+        nombre: "Reverse pec deck",
+        series: 2, repMin: 12, repMax: 20, rir: "1–2",
+        ...d(75, 60, 90), ...AISLADO, ...P,
+        musculos: ["deltoide posterior"],
+        alternativas: ["Reverse fly en cables", "Máquina posterior"],
+      },
+      {
+        clave: "press-hombro",
+        nombre: "Press hombro máquina",
+        series: 2, repMin: 8, repMax: 12, rir: "2",
+        ...d(120, 105, 150), ...BASICO,
+        musculos: ["deltoide anterior", "tríceps"],
+        nota: "No perseguir el fallo aquí.",
+        alternativas: ["Smith sentado", "Otra máquina convergente"],
+      },
+
+      // Superserie A · brazos, acciones opuestas.
+      {
+        clave: "curl",
+        nombre: "Curl bíceps máquina/polea",
+        series: 2, repMin: 10, repMax: 15, rir: "1–2",
+        descanso: TRANSICION, ...AISLADO, ...ss("A", 1),
+        musculos: ["bíceps"],
+      },
+      {
+        clave: "triceps-polea",
+        nombre: "Extensión tríceps polea",
+        series: 2, repMin: 10, repMax: 15, rir: "1–2",
+        ...d(90, 75, 105), ...AISLADO, ...ss("A", 2),
+        musculos: ["tríceps"],
+        nota: "Última serie opcionalmente a 0–1 RIR si la técnica aguanta.",
+      },
     ],
   },
 
   {
-    // Cuádriceps y glúteo. El core ya no está aquí: se hace en casa.
+    // Cuádriceps + glúteo. El core no está aquí: se hace en casa.
     id: "pierna-a",
     nombre: "Pierna A",
     orden: 1,
-    duracion: "55–65 min",
+    prioridad: "Cuádriceps + glúteo",
+    duracion: "60–68 min",
     ejercicios: [
-      { clave: "hack-squat", nombre: "Hack squat", series: 3, repMin: 8, repMax: 12, descanso: D.hack, musculos: ["cuádriceps"], ...BASICO },
-      { clave: "hip-thrust", nombre: "Hip thrust máquina", series: 3, repMin: 8, repMax: 12, descanso: D.hipThrust, musculos: ["glúteo"], ...BASICO, ...P },
-      { clave: "prensa", nombre: "Prensa", series: 2, repMin: 10, repMax: 15, descanso: D.prensa, musculos: ["cuádriceps", "glúteo"], ...BASICO },
-      { clave: "curl-femoral", nombre: "Curl femoral sentado", series: 3, repMin: 10, repMax: 15, descanso: D.femoral, musculos: ["isquios"], ...AISLADO },
+      {
+        clave: "hack-squat",
+        nombre: "Hack squat",
+        series: 3, repMin: 8, repMax: 12, rir: "2",
+        ...d(180, 150, 210), ...BASICO,
+        musculos: ["cuádriceps"],
+        nota: "Nunca en superserie: mucha fatiga sistémica y local.",
+        alternativas: ["Pendulum squat", "Prensa"],
+      },
+      {
+        clave: "hip-thrust",
+        nombre: "Hip thrust máquina",
+        series: 3, repMin: 8, repMax: 12, rir: "1–2",
+        ...d(150, 120, 180), ...BASICO, ...P, ...MAS,
+        musculos: ["glúteo"],
+        nota: "Glúteo prioritario. Extensión de cadera con la cadera como protagonista.",
+        alternativas: ["Glute drive", "Hip thrust Smith"],
+      },
+      {
+        clave: "prensa",
+        nombre: "Prensa",
+        series: 2, repMin: 10, repMax: 15, rir: "2",
+        ...d(150, 120, 180), ...BASICO,
+        musculos: ["cuádriceps", "glúteo"],
+        alternativas: ["Otra prensa estable", "Hack o pendulum"],
+      },
+      {
+        clave: "curl-femoral",
+        nombre: "Curl femoral sentado",
+        series: 3, repMin: 10, repMax: 15, rir: "1–2",
+        ...d(120, 90, 150), ...AISLADO,
+        musculos: ["isquios"],
+        nota: "Sentado antes que tumbado: entrena el isquio a mayor longitud y en comparación directa creció más.",
+        alternativas: ["Curl femoral tumbado", "Curl máquina unilateral"],
+      },
 
-      // Superserie A · extensión + laterales (no compiten entre sí).
-      { clave: "extension-cuadriceps", nombre: "Extensión de cuádriceps", series: 2, repMin: 10, repMax: 15, descanso: TRANSICION, musculos: ["cuádriceps"], ...AISLADO, ...ss("A", 1) },
-      { clave: "laterales", nombre: "Elevaciones laterales", series: 2, repMin: 12, repMax: 20, descanso: 90, musculos: ["deltoide lateral"], ...AISLADO, ...P, ...ss("A", 2) },
+      // Superserie A · extensión + laterales.
+      {
+        clave: "extension-cuadriceps",
+        nombre: "Extensión de cuádriceps",
+        series: 2, repMin: 10, repMax: 15, rir: "1–2",
+        descanso: TRANSICION, ...AISLADO, ...ss("A", 1),
+        musculos: ["cuádriceps"],
+        alternativas: ["Otra máquina de extensión", "Esperar si no hay equivalente"],
+      },
+      {
+        clave: "laterales",
+        nombre: "Elevaciones laterales",
+        series: 2, repMin: 12, repMax: 20, rir: "1–2",
+        ...d(90, 75, 105), ...AISLADO, ...P, ...ss("A", 2), ...MAS,
+        musculos: ["deltoide lateral"],
+        alternativas: ["Cable lateral", "Mancuernas"],
+      },
 
       // Superserie B · gemelo + pullover.
-      { clave: "gemelo-pie", nombre: "Gemelo de pie", series: 2, repMin: 10, repMax: 20, descanso: TRANSICION, musculos: ["gemelo"], ...AISLADO, ...ss("B", 1) },
-      { clave: "pullover", nombre: "Pullover", series: 2, repMin: 10, repMax: 15, descanso: 90, musculos: ["dorsal"], ...AISLADO, ...P, ...ss("B", 2) },
+      {
+        clave: "gemelo-pie",
+        nombre: "Gemelo de pie",
+        series: 2, repMin: 10, repMax: 15, rir: "1–2",
+        descanso: TRANSICION, ...AISLADO, ...ss("B", 1),
+        musculos: ["gemelo"],
+        nota: "Rodilla casi extendida. Bajar el talón controlado, estirar, subir y pausa arriba. Sin rebotes.",
+        alternativas: ["Calf press en prensa", "Gemelo Smith"],
+      },
+      {
+        clave: "pullover",
+        nombre: "Pullover máquina/polea",
+        series: 2, repMin: 10, repMax: 15, rir: "1–2",
+        ...d(90, 75, 105), ...AISLADO, ...P, ...ss("B", 2),
+        musculos: ["dorsal"],
+        nota: "Microdosis de dorsal en día de pierna.",
+        alternativas: ["Straight-arm pulldown", "Máquina pullover"],
+      },
 
       // Superserie C · sóleo + tibial.
-      { clave: "soleo", nombre: "Sóleo sentado", series: 2, repMin: 12, repMax: 20, descanso: TRANSICION, musculos: ["sóleo"], ...AISLADO, ...ss("C", 1) },
-      { clave: "tibial", nombre: "Tibial anterior", series: 2, repMin: 15, repMax: 20, descanso: 75, musculos: ["tibial"], ...AISLADO, ...ss("C", 2) },
+      {
+        clave: "soleo",
+        nombre: "Sóleo sentado",
+        series: 2, repMin: 12, repMax: 20, rir: "1–2",
+        descanso: TRANSICION, ...AISLADO, ...ss("C", 1),
+        musculos: ["sóleo"],
+        nota: "Rodilla flexionada: así es sóleo y no gemelo.",
+        alternativas: ["Seated calf machine", "Calf con rodilla flexionada"],
+      },
+      {
+        clave: "tibial",
+        nombre: "Tibial anterior",
+        series: 2, repMin: 15, repMax: 25, rir: "1–2",
+        ...d(75, 60, 90), ...AISLADO, ...ss("C", 2),
+        musculos: ["tibial"],
+        nota: "Elevar la punta del pie hacia la tibia. Protege la espinilla al correr.",
+        alternativas: ["Tib bar", "Dorsiflexión en cable o banda"],
+      },
     ],
   },
 
@@ -113,43 +241,178 @@ export const RUTINAS = [
     id: "torso-b",
     nombre: "Torso B",
     orden: 2,
-    duracion: "55–70 min",
+    prioridad: "Deltoide lateral",
+    duracion: "54–62 min",
     ejercicios: [
-      { clave: "press-plano", nombre: "Press plano", series: 3, repMin: 8, repMax: 12, descanso: D.press, musculos: ["pectoral", "tríceps"], ...BASICO },
-      { clave: "laterales", nombre: "Elevaciones laterales", series: 4, repMin: 12, repMax: 20, descanso: D.lateral, musculos: ["deltoide lateral"], ...AISLADO, ...P },
-      { clave: "jalon-neutro", nombre: "Jalón neutro", series: 3, repMin: 8, repMax: 12, descanso: D.jalon, musculos: ["dorsal"], ...BASICO },
-      { clave: "high-row", nombre: "High row", series: 3, repMin: 8, repMax: 12, descanso: D.remo, musculos: ["espalda alta"], ...BASICO },
-      { clave: "pec-deck", nombre: "Pec deck", series: 2, repMin: 10, repMax: 15, descanso: D.pecDeck, musculos: ["pectoral"], ...AISLADO },
-      { clave: "reverse-pec-deck", nombre: "Reverse pec deck", series: 2, repMin: 12, repMax: 20, descanso: D.reverse, musculos: ["deltoide posterior"], ...AISLADO, ...P },
-      { clave: "curl", nombre: "Curl bíceps", series: 2, repMin: 10, repMax: 15, descanso: D.brazo, musculos: ["bíceps"], ...AISLADO },
-      { clave: "triceps-sobre-cabeza", nombre: "Tríceps sobre cabeza", series: 2, repMin: 10, repMax: 15, descanso: D.brazo, musculos: ["tríceps"], ...AISLADO },
+      {
+        clave: "laterales",
+        nombre: "Elevación lateral máquina/cable",
+        series: 4, repMin: 12, repMax: 20, rir: "1–2",
+        ...d(75, 60, 90), ...AISLADO, ...P,
+        musculos: ["deltoide lateral"],
+        nota: "Máxima prioridad: primer ejercicio absoluto de la sesión, con el hombro totalmente fresco.",
+        alternativas: ["Cable lateral", "Mancuernas"],
+      },
+      {
+        clave: "jalon-neutro",
+        nombre: "Jalón neutro/semineutro",
+        series: 3, repMin: 8, repMax: 12, rir: "2",
+        ...d(120, 105, 150), ...BASICO, ...P,
+        musculos: ["dorsal"],
+        alternativas: ["Jalón plate-loaded", "Dominada asistida"],
+      },
+      {
+        clave: "press-plano",
+        nombre: "Press plano máquina",
+        series: 3, repMin: 8, repMax: 12, rir: "2",
+        ...d(150, 120, 180), ...BASICO,
+        musculos: ["pectoral", "tríceps"],
+        alternativas: ["Smith plano", "Press convergente"],
+      },
+      {
+        clave: "high-row",
+        nombre: "High row / remo pecho apoyado",
+        series: 3, repMin: 8, repMax: 12, rir: "2",
+        ...d(120, 105, 150), ...BASICO, ...P, ...MAS,
+        musculos: ["espalda alta", "dorsal"],
+        alternativas: ["Remo máquina sentado", "Remo cable con apoyo"],
+      },
+
+      // Superserie A · posterior + pectoral, acciones opuestas.
+      {
+        clave: "reverse-pec-deck",
+        nombre: "Reverse pec deck",
+        series: 2, repMin: 12, repMax: 20, rir: "1–2",
+        descanso: TRANSICION, ...AISLADO, ...P, ...ss("A", 1),
+        musculos: ["deltoide posterior"],
+        alternativas: ["Reverse fly en cables", "Máquina posterior"],
+      },
+      {
+        clave: "pec-deck",
+        nombre: "Pec deck",
+        series: 2, repMin: 10, repMax: 15, rir: "1–2",
+        ...d(90, 75, 105), ...AISLADO, ...ss("A", 2),
+        musculos: ["pectoral"],
+        nota: "Se empareja con el reverse porque son acciones opuestas: ninguno estorba al otro.",
+        alternativas: ["Cruces en polea", "Máquina de aperturas"],
+      },
+
+      // Superserie B · brazos.
+      {
+        clave: "curl",
+        nombre: "Curl bíceps máquina/polea",
+        series: 2, repMin: 10, repMax: 15, rir: "1–2",
+        descanso: TRANSICION, ...AISLADO, ...ss("B", 1),
+        musculos: ["bíceps"],
+      },
+      {
+        clave: "triceps-sobre-cabeza",
+        nombre: "Tríceps overhead con cable",
+        series: 2, repMin: 10, repMax: 15, rir: "1–2",
+        ...d(90, 75, 105), ...AISLADO, ...ss("B", 2),
+        musculos: ["tríceps"],
+      },
     ],
   },
 
   {
-    // El día de mayor sesgo a glúteo. Sin gemelo de pie: se quita para no
-    // alargar la sesión y dejar sitio a la abductora, que es prioridad. El
-    // gastrocnemio se mantiene en Pierna A.
     id: "pierna-b",
     nombre: "Pierna B",
     orden: 3,
-    duracion: "55–65 min",
+    prioridad: "Glúteo",
+    duracion: "60–69 min",
     ejercicios: [
-      { clave: "hip-thrust", nombre: "Hip thrust máquina", series: 3, repMin: 8, repMax: 12, descanso: D.hipThrust, musculos: ["glúteo"], ...BASICO, ...P },
-      { clave: "prensa", nombre: "Prensa con sesgo glúteo", series: 3, repMin: 8, repMax: 12, descanso: D.prensa, musculos: ["glúteo", "cuádriceps"], ...BASICO, ...P },
-      { clave: "curl-femoral", nombre: "Curl femoral", series: 3, repMin: 10, repMax: 15, descanso: D.femoral, musculos: ["isquios"], ...AISLADO },
-      { clave: "extension-45", nombre: "Extensión 45° con sesgo glúteo", series: 2, repMin: 10, repMax: 15, descanso: D.extension45, musculos: ["glúteo", "cadena posterior"], ...BASICO, ...P },
+      {
+        clave: "hip-thrust",
+        nombre: "Hip thrust máquina",
+        series: 3, repMin: 8, repMax: 12, rir: "1–2",
+        ...d(150, 120, 180), ...BASICO, ...P, ...MAS,
+        musculos: ["glúteo"],
+        nota: "Prioridad absoluta de glúteo.",
+        alternativas: ["Glute drive", "Hip thrust Smith"],
+      },
+      {
+        clave: "prensa",
+        nombre: "Prensa con sesgo glúteo",
+        series: 3, repMin: 10, repMax: 15, rir: "2",
+        ...d(150, 120, 180), ...BASICO, ...P,
+        musculos: ["glúteo", "cuádriceps"],
+        nota: "Pies algo más altos que en Pierna A, sin exagerar. Baja solo hasta donde la pelvis siga estable: no despegar el sacro ni redondear lumbar para ganar profundidad.",
+        alternativas: ["Otra prensa estable", "Hack o pendulum"],
+      },
+      {
+        clave: "extension-45",
+        nombre: "Extensión 45° sesgo glúteo",
+        series: 2, repMin: 10, repMax: 15, rir: "1–2",
+        ...d(90, 75, 120), ...BASICO, ...P,
+        musculos: ["glúteo", "cadena posterior"],
+        nota: "Pensar en mover la cadera. Subir hasta quedar alineado y apretar glúteo arriba; no seguir subiendo arqueando la lumbar.",
+        alternativas: ["Máquina de extensión de cadera", "Glute drive ligero"],
+      },
+      {
+        clave: "curl-femoral",
+        nombre: "Curl femoral sentado",
+        series: 3, repMin: 10, repMax: 15, rir: "1–2",
+        ...d(120, 90, 150), ...AISLADO,
+        musculos: ["isquios"],
+        alternativas: ["Curl femoral tumbado", "Curl máquina unilateral"],
+      },
 
-      // Superserie A · abductora + laterales.
-      { clave: "abductora", nombre: "Máquina abductora", series: 2, repMin: 15, repMax: 25, descanso: TRANSICION, musculos: ["glúteo medio"], ...AISLADO, ...P, ...ss("A", 1) },
-      { clave: "laterales", nombre: "Elevaciones laterales", series: 2, repMin: 12, repMax: 20, descanso: 90, musculos: ["deltoide lateral"], ...AISLADO, ...P, ...ss("A", 2) },
+      // Superserie A · abductora + gemelo.
+      {
+        clave: "abductora",
+        nombre: "Máquina abductora",
+        series: 2, repMin: 15, repMax: 25, rir: "1–2",
+        descanso: TRANSICION, ...AISLADO, ...P, ...ss("A", 1),
+        musculos: ["glúteo medio"],
+        alternativas: ["Abducción en cable con apoyo", "Banda solo como emergencia"],
+      },
+      {
+        clave: "gemelo-pie",
+        nombre: "Gemelo de pie",
+        series: 2, repMin: 10, repMax: 15, rir: "1–2",
+        ...d(90, 75, 105), ...AISLADO, ...ss("A", 2),
+        musculos: ["gemelo"],
+        nota: "Rodilla casi extendida, sin rebotes.",
+        alternativas: ["Calf press en prensa", "Gemelo Smith"],
+      },
 
-      // El pullover va suelto, no en superserie.
-      { clave: "pullover", nombre: "Pullover", series: 2, repMin: 10, repMax: 15, descanso: D.pullover, musculos: ["dorsal"], ...AISLADO, ...P },
+      // Superserie B · extensión + laterales.
+      {
+        clave: "extension-cuadriceps",
+        nombre: "Extensión de cuádriceps",
+        series: 2, repMin: 10, repMax: 15, rir: "1–2",
+        descanso: TRANSICION, ...AISLADO, ...ss("B", 1),
+        musculos: ["cuádriceps"],
+        alternativas: ["Otra máquina de extensión", "Esperar si no hay equivalente"],
+      },
+      {
+        clave: "laterales",
+        nombre: "Elevaciones laterales",
+        series: 2, repMin: 12, repMax: 20, rir: "1–2",
+        ...d(90, 75, 105), ...AISLADO, ...P, ...ss("B", 2), ...MAS,
+        musculos: ["deltoide lateral"],
+        alternativas: ["Cable lateral", "Mancuernas"],
+      },
 
-      // Superserie B · sóleo + tibial.
-      { clave: "soleo", nombre: "Sóleo sentado", series: 2, repMin: 12, repMax: 20, descanso: TRANSICION, musculos: ["sóleo"], ...AISLADO, ...ss("B", 1) },
-      { clave: "tibial", nombre: "Tibial anterior", series: 2, repMin: 15, repMax: 20, descanso: 75, musculos: ["tibial"], ...AISLADO, ...ss("B", 2) },
+      // Superserie C · sóleo + tibial.
+      {
+        clave: "soleo",
+        nombre: "Sóleo sentado",
+        series: 2, repMin: 12, repMax: 20, rir: "1–2",
+        descanso: TRANSICION, ...AISLADO, ...ss("C", 1),
+        musculos: ["sóleo"],
+        nota: "Rodilla flexionada.",
+        alternativas: ["Seated calf machine", "Calf con rodilla flexionada"],
+      },
+      {
+        clave: "tibial",
+        nombre: "Tibial anterior",
+        series: 2, repMin: 15, repMax: 25, rir: "1–2",
+        ...d(75, 60, 90), ...AISLADO, ...ss("C", 2),
+        musculos: ["tibial"],
+        alternativas: ["Tib bar", "Dorsiflexión en cable o banda"],
+      },
     ],
   },
 ];
@@ -157,10 +420,8 @@ export const RUTINAS = [
 /*
  * Nombre antiguo (normalizado) → clave nueva.
  *
- * Solo sirve para migrar el historial de la versión anterior de la rutina,
- * cuando los ids se construían con la posición y el nombre visible. Sin esto,
- * las series de "Curl femoral" no seguirían a "Curl femoral sentado" y el
- * historial de ese ejercicio empezaría de cero.
+ * Migra el historial de versiones anteriores de la rutina, cuando los ids se
+ * construían con la posición y el nombre visible.
  */
 export const CLAVES_ANTIGUAS = {
   "jalon-al-pecho": "jalon-pecho",
@@ -189,34 +450,40 @@ export const CLAVES_ANTIGUAS = {
 };
 
 /**
- * Doble progresión. No se exige récord cada sesión: se llena el rango de
- * repeticiones con el RIR correcto y solo entonces se sube el peso mínimo.
+ * Series objetivo de un ejercicio.
+ *
+ * La versión agresiva NO es "más fallo": es exactamente una serie más en seis
+ * ejercicios concretos, conservando RIR y técnica. Se pasa a ella solo después
+ * de 6-8 semanas yendo bien, sin dolor y con el CaCo intacto.
  */
+export function seriesObjetivo(ejercicio, { agresiva = false } = {}) {
+  return ejercicio.series + (agresiva ? (ejercicio.extraAgresiva ?? 0) : 0);
+}
+
+/** Doble progresión. */
 export const REGLAS_PROGRESION = [
-  "Mantener el peso hasta llenar el rango de repeticiones.",
-  "Subir repeticiones dentro del rango antes que el peso.",
-  "Llenar el rango con el RIR objetivo, no a base de fallo.",
-  "Al llenarlo, subir el incremento más pequeño disponible.",
-  "Reconstruir repeticiones desde abajo del rango con el peso nuevo.",
+  "Mantener el peso hasta llenar el rango de repeticiones en TODAS las series.",
+  "Ejemplo con 3×8–12: 10/9/8 → 11/10/9 → 12/11/10 → 12/12/11 → 12/12/12.",
+  "Al llegar al techo del rango con el RIR objetivo, subir el incremento MÍNIMO que permita la máquina.",
+  "Con el peso nuevo es normal volver a 9/9/8. No es un retroceso.",
   "Mirar la tendencia de varias sesiones, no el resultado de una.",
 ];
 
-/** Cómo usar el temporizador. Va plegado en PLAN > FUERZA (§35). */
+/** Cómo usar el temporizador. */
 export const REGLAS_DESCANSO = [
-  "El reloj empieza al TERMINAR una serie y acaba al empezar la siguiente.",
-  "No hace falta cumplirlo al segundo: si necesitas 15–30 s más para mantener las repeticiones y la técnica, los tomas.",
-  "El +30 s es sobre todo para hack squat, prensa, presses, jalones y remos.",
-  "Si en un press haces 12 → 9 → 7 y notas que la caída es por ir ahogado, descansa 30 s más.",
-  "En laterales, reverse pec deck, bíceps o tibial no hace falta estirar el descanso a 2–3 min.",
-  "En superserie el descanso va tras la pareja: entre los dos ejercicios solo hay 15–30 s de transición.",
+  "El reloj arranca solo al terminar la serie, con el descanso del ejercicio.",
+  "El +30 s amplía solo ese descanso: no marca nada como fallido ni cambia la programación.",
+  "Úsalo si aún respiras fuerte, el músculo sigue cargado o la serie anterior fue muy dura.",
+  "En hack, prensa e hip thrust vale más 30 s extra y una gran serie que ahorrar medio minuto.",
+  "En superserie el descanso va tras la pareja: entre los dos ejercicios solo hay 15 s.",
 ];
 
-/** Superseries: solo entre accesorios que no compiten (§13). */
+/** Qué NO emparejar nunca, y por qué. */
 export const REGLAS_SUPERSERIE = [
-  "Extensión + laterales, gemelo + pullover, sóleo + tibial, abductora + laterales.",
-  "Nunca entre dos ejercicios principales de pierna.",
-  "Nada de hack + prensa, hack + hip thrust, prensa + extensión ni hip thrust + prensa.",
-  "Los ejercicios grandes conservan su descanso completo.",
+  "Hack, hip thrust, prensa, jalón y remo principales: nunca en superserie.",
+  "Presses y curl femoral tampoco: se quiere calidad de serie completa.",
+  "Las laterales de Torso A y B van solas: son la prioridad de esas sesiones.",
+  "Solo se emparejan accesorios con acciones opuestas o que no compiten entre sí.",
 ];
 
 /** El descanso en texto: 150 → "2:30". */
@@ -224,23 +491,25 @@ export function descansoTexto(segundos) {
   return `${Math.floor(segundos / 60)}:${String(segundos % 60).padStart(2, "0")}`;
 }
 
+/** El rango recomendado: "1:45–2:30". Null si el ejercicio no lo tiene. */
+export function rangoDescansoTexto(ejercicio) {
+  if (!ejercicio.descansoMin || !ejercicio.descansoMax) return null;
+  return `${descansoTexto(ejercicio.descansoMin)}–${descansoTexto(ejercicio.descansoMax)}`;
+}
+
 /** "pierna-a" → "Pierna A". Un único sitio: había cuatro copias de este mapa. */
 export function nombreDe(plantillaId) {
   return RUTINAS.find((r) => r.id === plantillaId)?.nombre ?? plantillaId;
 }
 
-/** El texto del rango de un ejercicio: "3×8–12", "2×20–30 s/lado". */
-export function dosis(ej) {
-  const porLado = ej.porLado ? "/lado" : "";
-  if (ej.segMin) {
-    const rango = ej.segMin === ej.segMax ? `${ej.segMin}` : `${ej.segMin}–${ej.segMax}`;
-    return `${ej.series}×${rango} s${porLado}`;
-  }
+/** El texto del rango de un ejercicio: "3×8–12". */
+export function dosis(ej, opciones) {
+  const series = seriesObjetivo(ej, opciones);
   const rango = ej.repMin === ej.repMax ? `${ej.repMin}` : `${ej.repMin}–${ej.repMax}`;
-  return `${ej.series}×${rango}${porLado}`;
+  return `${series}×${rango}`;
 }
 
 /** Series totales de una rutina, para comprobar la dosis de un vistazo. */
-export function seriesTotales(rutina) {
-  return rutina.ejercicios.reduce((t, e) => t + e.series, 0);
+export function seriesTotales(rutina, opciones) {
+  return rutina.ejercicios.reduce((t, e) => t + seriesObjetivo(e, opciones), 0);
 }
