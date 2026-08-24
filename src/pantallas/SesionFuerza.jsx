@@ -15,7 +15,7 @@
  * salir de la app y volver sin perder nada.
  */
 
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Hoja, { Opciones } from "../componentes/Hoja.jsx";
 import { db } from "../datos/db.js";
@@ -543,6 +543,27 @@ function Fila({ numero, guardada, anterior, esCore, alMarcar, alDesmarcar }) {
     setRir(guardada?.rir != null ? String(guardada.rir) : "");
   }, [guardada?.kg, guardada?.reps, guardada?.rir]);
 
+  /*
+   * Prerrelleno automático con lo de la última vez: kg y reps vienen puestos
+   * y solo se corrigen si hoy cambia algo, así marcar una serie igual es UN
+   * toque. El RIR se deja vacío A PROPÓSITO: es el dato que tiene que ser
+   * honesto cada día — de él depende que el motor distinga una meseta real de
+   * ir sobrado — y prerrellenado acabaría copiado sin pensar.
+   *
+   * La referencia llega asíncrona, de ahí el efecto con guarda: solo se
+   * aplica una vez, y nunca pisa nada que ya hayas escrito o guardado.
+   */
+  const prefijada = useRef(false);
+  useEffect(() => {
+    if (prefijada.current || guardada || !anterior) return;
+    if (kg !== "" || reps !== "") return;
+    prefijada.current = true;
+    if (anterior.kg != null) setKg(String(anterior.kg).replace(".", ","));
+    if (anterior.reps != null) setReps(String(anterior.reps));
+    // `kg`/`reps` solo se leen como guarda de "aún no has escrito".
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anterior, guardada]);
+
   const num = (v) => (v === "" ? null : Number(String(v).replace(",", ".")));
   // El core no lleva peso: con las repeticiones basta para marcarla.
   const puedeMarcar = reps !== "" && (esCore || kg !== "");
@@ -556,11 +577,11 @@ function Fila({ numero, guardada, anterior, esCore, alMarcar, alDesmarcar }) {
     alMarcar({ kg: num(kg), reps: num(reps), rir: num(rir) });
   }
 
-  // Prerrellenar con lo de la última vez ahorra teclear en cada serie.
+  // Tocar la columna ANTERIOR restaura sus valores si los habías cambiado.
   const usarAnterior = () => {
     if (!anterior || hecha) return;
-    if (kg === "" && anterior.kg != null) setKg(String(anterior.kg).replace(".", ","));
-    if (reps === "" && anterior.reps != null) setReps(String(anterior.reps));
+    if (anterior.kg != null) setKg(String(anterior.kg).replace(".", ","));
+    if (anterior.reps != null) setReps(String(anterior.reps));
   };
 
   return (
