@@ -6,32 +6,40 @@
  * fecha límite y lo que más veces al día se mira, así que esconderla dentro de
  * PLAN la dejaba a dos toques de distancia varias veces cada día.
  *
- * Tres partes, y en este orden a propósito (§35: acción primero, explicación
+ * Cuatro partes, y en este orden a propósito (§35: acción primero, explicación
  * después):
  *
  *   HOY        · qué comes hoy, comida por comida. Es el 95 % de los usos.
- *   CALENDARIO · el tramo 26 ago → 8 sep entero, para ver a dónde vas.
- *   POR QUÉ    · la estrategia explicada. Se lee una vez y no se toca más.
+ *                Aquí aparecen solas la calibración y la revisión mensual.
+ *   CALENDARIO · el tramo con fecha (26 ago → 22 sep), para ver a dónde vas.
+ *   AÑO        · el plan maestro anual por temporadas, y las fichas.
+ *   POR QUÉ    · la estrategia del mini-cut explicada. Se lee una vez.
  *
  * La comida se registra en Fitia. Esto es la chuleta (§58).
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import Volver from "../componentes/Volver.jsx";
 
 import Hoja from "../componentes/Hoja.jsx";
+import { db } from "../datos/db.js";
 import {
-  DIAS_ESPECIALES, NOTA_PREENTRENO, REGLAS,
-  calendarioDelTramo, kcalDe, objetivosDe, planEnMarcha, porQueDe,
+  DIAS_ESPECIALES, FASES_MANUALES, MANTENIMIENTO_HIPOTESIS, NOTA_PREENTRENO, REGLAS,
+  calendarioDelTramo, faseDe, kcalDe, objetivosDe, planEnMarcha, porQueDe,
 } from "../datos/planNutricion.js";
-import { useAjustes } from "../ganchos/useDatos.js";
+import { FICHAS, TEMPORADAS, estadoTemporada } from "../datos/planAnual.js";
+import { useAjustes, useCarreras, useMediciones, usePesos, useSesionesFuerza } from "../ganchos/useDatos.js";
+import { aplicarRevision, empezarFase, guardarMantenimiento, quitarFaseManual } from "../logica/acciones.js";
+import { estadoCalibracion } from "../logica/calibracion.js";
+import { revisar, revisionPendiente } from "../logica/revision.js";
 import { diaCorto, fechaCorta, fechaLarga, hoyISO } from "../logica/fechas.js";
 import { miles } from "../logica/formato.js";
 
 const SECCIONES = [
   { id: "hoy", texto: "HOY" },
   { id: "calendario", texto: "CALENDARIO" },
+  { id: "ano", texto: "AÑO" },
   { id: "porque", texto: "POR QUÉ" },
 ];
 
@@ -66,6 +74,7 @@ export default function Dieta({ sub, alVolver }) {
 
       {activa === "hoy" && <Hoy />}
       {activa === "calendario" && <Calendario />}
+      {activa === "ano" && <Ano />}
       {activa === "porque" && <PorQue />}
     </div>
   );
@@ -78,6 +87,8 @@ export default function Dieta({ sub, alVolver }) {
 function Hoy() {
   return (
     <>
+      <TarjetaCalibracion />
+      <TarjetaRevision />
       <DetalleDia fecha={hoyISO()} />
 
       <Plegable titulo="Reglas de fondo">
@@ -104,7 +115,7 @@ function Hoy() {
  */
 function DetalleDia({ fecha }) {
   const ajustes = useAjustes();
-  const o = objetivosDe(fecha, ajustes?.escalonVolumen ?? 0);
+  const o = objetivosDe(fecha, ajustes ?? {});
   const esHoy = fecha === hoyISO();
 
   return (
@@ -138,6 +149,13 @@ function DetalleDia({ fecha }) {
             El plan empieza el 26 de agosto. Esto es lo que tocará entonces.
           </div>
         )}
+
+        {o.esHipotesis && (
+          <div style={{ fontSize: 12.5, color: "var(--aviso)" }}>
+            Mantenimiento aún sin calibrar: estos números usan la hipótesis de{" "}
+            {miles(MANTENIMIENTO_HIPOTESIS)} kcal. Al guardar la calibración se recalculan solos.
+          </div>
+        )}
       </div>
 
       {/* Por qué este día es como es */}
@@ -146,7 +164,7 @@ function DetalleDia({ fecha }) {
           Por qué este día
         </div>
         <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
-          {porQueDe(fecha)}
+          {porQueDe(fecha, ajustes ?? {})}
         </p>
       </div>
 
@@ -292,8 +310,9 @@ function Calendario() {
   return (
     <>
       <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.55 }}>
-        Del 26 de agosto al 8 de septiembre. Toca cualquier día para ver sus comidas y por qué
-        es así. Esto va por fecha: mover un entreno no lo desplaza.
+        Del 26 de agosto al 22 de septiembre: mini-cut completo y los 14 días de calibración.
+        Toca cualquier día para ver sus comidas y por qué es así. Esto va por fecha: mover un
+        entreno no lo desplaza.
       </p>
 
       <div className="tarjeta columna" style={{ gap: 2 }}>
@@ -376,7 +395,8 @@ function Calendario() {
       </div>
 
       <p style={{ margin: 0, fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.55 }}>
-        Después del 8 de septiembre: mantenimiento hasta el 15, y volumen limpio desde el 16.
+        Después del 22 de septiembre empieza la hipertrofia sobre tu mantenimiento real: ya no
+        hay calendario de kcal escrito, lo cuenta la pestaña AÑO.
       </p>
 
       <Hoja
@@ -491,6 +511,408 @@ function PorQue() {
         </div>
       </div>
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* AÑO — el plan maestro por temporadas                                */
+/* ------------------------------------------------------------------ */
+
+/*
+ * La línea del año entero. Las fases con fecha (hasta la hipertrofia) entran
+ * solas; definición, mantenimiento y recomposición las confirma Jose desde su
+ * ficha, porque el plan maestro manda: los datos reales deciden, no febrero.
+ */
+function Ano() {
+  const ajustes = useAjustes();
+  const [abierta, setAbierta] = useState(null);
+  const [ficha, setFicha] = useState(null);
+  const hoy = hoyISO();
+
+  const fase = faseDe(hoy, ajustes ?? {});
+  const o = objetivosDe(hoy, ajustes ?? {});
+  const temporada = abierta ? TEMPORADAS.find((t) => t.id === abierta) : null;
+
+  return (
+    <>
+      {/* Dónde estás ahora mismo */}
+      <div className="tarjeta">
+        <div className="rotulo">Ahora mismo</div>
+        <div className="entre" style={{ marginTop: 8, alignItems: "baseline" }}>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>{fase.nombre}</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>
+            {miles(o.kcal)} <span style={{ fontSize: 12, fontWeight: 600, color: "var(--texto-tenue)" }}>kcal</span>
+          </div>
+        </div>
+        {fase.dinamica && (
+          <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
+            {ajustes?.mantenimientoReal == null
+              ? `Sobre la hipótesis de ${miles(MANTENIMIENTO_HIPOTESIS)} kcal, hasta que la calibración diga tu mantenimiento real.`
+              : `Mantenimiento real ${miles(ajustes.mantenimientoReal)} kcal${(ajustes.ajusteKcal ?? 0) !== 0 ? ` ${ajustes.ajusteKcal > 0 ? "+" : "−"} ${Math.abs(ajustes.ajusteKcal)} de las revisiones` : ""}.`}
+          </p>
+        )}
+      </div>
+
+      {/* Las siete temporadas */}
+      <div className="tarjeta columna" style={{ gap: 0 }}>
+        <div className="rotulo" style={{ marginBottom: 10 }}>Agosto 2026 → agosto 2027</div>
+        {TEMPORADAS.map((t, i) => {
+          const estado = estadoTemporada(t, hoy, ajustes ?? {});
+          const actual = estado === "actual";
+          return (
+            <button
+              key={t.id}
+              onClick={() => setAbierta(t.id)}
+              aria-label={`Ver la temporada ${t.nombre}`}
+              style={{
+                display: "block", width: "calc(100% + 20px)", margin: "0 -10px",
+                textAlign: "left", border: "none", cursor: "pointer",
+                color: "var(--texto)", padding: "11px 10px", borderRadius: 10,
+                background: actual ? "rgba(244,244,239,.07)" : "transparent",
+                opacity: estado === "pasada" ? 0.45 : 1,
+                borderTop: i === 0 ? "none" : "1px solid var(--borde)",
+              }}
+            >
+              <div className="entre" style={{ gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: actual ? 800 : 700 }}>
+                    {i + 1}. {t.nombre}
+                    {actual && <span style={{ color: "var(--exito)", fontWeight: 700 }}> · ahora</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--texto-tenue)", marginTop: 2 }}>
+                    {t.rango} · {t.kcalTexto}
+                  </div>
+                </div>
+                <span style={{ color: "var(--texto-tenue)", fontSize: 15, flexShrink: 0 }}>›</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Fichas de consulta */}
+      <div className="tarjeta columna" style={{ gap: 0 }}>
+        <div className="rotulo" style={{ marginBottom: 10 }}>Fichas</div>
+        {FICHAS.map((f, i) => (
+          <button
+            key={f.id}
+            onClick={() => setFicha(f.id)}
+            aria-label={`Ver la ficha ${f.titulo}`}
+            style={{
+              display: "block", width: "calc(100% + 20px)", margin: "0 -10px",
+              textAlign: "left", border: "none", cursor: "pointer",
+              color: "var(--texto)", padding: "11px 10px", borderRadius: 10,
+              background: "transparent",
+              borderTop: i === 0 ? "none" : "1px solid var(--borde)",
+            }}
+          >
+            <div className="entre" style={{ gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{f.titulo}</div>
+                <div style={{ fontSize: 12, color: "var(--texto-tenue)", marginTop: 2 }}>{f.resumen}</div>
+              </div>
+              <span style={{ color: "var(--texto-tenue)", fontSize: 15, flexShrink: 0 }}>›</span>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <Hoja abierta={Boolean(temporada)} alCerrar={() => setAbierta(null)} titulo={temporada?.nombre ?? ""}>
+        {temporada && <DetalleTemporada temporada={temporada} ajustes={ajustes ?? {}} alCerrar={() => setAbierta(null)} />}
+      </Hoja>
+
+      <Hoja
+        abierta={Boolean(ficha)}
+        alCerrar={() => setFicha(null)}
+        titulo={FICHAS.find((f) => f.id === ficha)?.titulo ?? ""}
+      >
+        <div className="columna">
+          <Lista items={FICHAS.find((f) => f.id === ficha)?.puntos ?? []} />
+        </div>
+      </Hoja>
+    </>
+  );
+}
+
+/** La ficha completa de una temporada, con el botón de confirmarla si toca. */
+function DetalleTemporada({ temporada, ajustes, alCerrar }) {
+  const hoy = hoyISO();
+  const estado = estadoTemporada(temporada, hoy, ajustes);
+  const faseActual = faseDe(hoy, ajustes);
+
+  // Solo se ofrece empezar la fase manual SIGUIENTE a la actual.
+  const siguienteDe = { hipertrofia: "definicion", definicion: "mantenimiento-post", "mantenimiento-post": "recomp" };
+  const puedeEmpezar = temporada.manual && estado === "futura" && siguienteDe[faseActual.id] === temporada.id;
+  const esActualManual = temporada.manual && estado === "actual";
+
+  const [confirmando, setConfirmando] = useState(false);
+  const sugerido = (ajustes.mantenimientoReal ?? MANTENIMIENTO_HIPOTESIS) + (ajustes.ajusteKcal ?? 0);
+  const [mantenimiento, setMantenimiento] = useState(String(sugerido));
+
+  async function confirmar() {
+    const kcal = Number(mantenimiento.replace(",", "."));
+    if (Number.isNaN(kcal) || kcal < 1500 || kcal > 4000) return;
+    await empezarFase(temporada.id, {
+      mantenimiento: kcal,
+      ajusteInicial: FASES_MANUALES[temporada.id]?.ajusteInicial ?? 0,
+    });
+    alCerrar();
+  }
+
+  return (
+    <div className="columna">
+      <div>
+        <div style={{ fontSize: 12, color: "var(--texto-tenue)", letterSpacing: ".05em" }}>
+      {temporada.rango.toUpperCase()} · {temporada.kcalTexto.toUpperCase()}
+        </div>
+        <p style={{ margin: "8px 0 0", fontSize: 15, fontWeight: 600, lineHeight: 1.5 }}>{temporada.objetivo}</p>
+      </div>
+
+      {temporada.detalle.map((p) => (
+        <p key={p} style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>{p}</p>
+      ))}
+
+      {temporada.empiezaCuando && (
+        <div>
+          <div className="rotulo" style={{ marginBottom: 8 }}>Se empieza cuando…</div>
+          <Lista items={temporada.empiezaCuando} />
+        </div>
+      )}
+
+      {puedeEmpezar && !confirmando && (
+        <button className="boton boton-primario" onClick={() => setConfirmando(true)}>
+          EMPEZAR {temporada.nombre.toUpperCase()}
+        </button>
+      )}
+
+      {puedeEmpezar && confirmando && (
+        <div className="columna" style={{ gap: 10 }}>
+          <label style={{ fontSize: 13, color: "var(--texto-medio)" }}>
+            Tu mantenimiento estimado AHORA (kcal/día):
+            <input
+              type="text"
+              inputMode="numeric"
+              value={mantenimiento}
+              onChange={(e) => setMantenimiento(e.target.value)}
+              style={{
+                width: "100%", marginTop: 6, padding: "12px 14px", fontSize: 18, fontWeight: 700,
+                background: "var(--superficie-3)", border: "1px solid var(--borde-fuerte)",
+                borderRadius: 12, color: "var(--texto)",
+              }}
+            />
+          </label>
+          {FASES_MANUALES[temporada.id]?.ajusteInicial !== 0 && (
+            <p style={{ margin: 0, fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
+              La fase arranca en {miles(Number(mantenimiento.replace(",", ".")) + (FASES_MANUALES[temporada.id]?.ajusteInicial ?? 0) || 0)} kcal
+              ({FASES_MANUALES[temporada.id].ajusteInicial > 0 ? "+" : "−"}{Math.abs(FASES_MANUALES[temporada.id].ajusteInicial)} sobre ese mantenimiento),
+              y la revisión mensual la irá ajustando.
+            </p>
+          )}
+          <button className="boton boton-primario" onClick={confirmar}>CONFIRMAR</button>
+        </div>
+      )}
+
+      {esActualManual && (
+        <button
+          onClick={async () => { await quitarFaseManual(); alCerrar(); }}
+          style={{
+            background: "none", border: "1px solid var(--borde-fuerte)", borderRadius: 12,
+            color: "var(--texto-tenue)", padding: "12px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+          }}
+        >
+          DESHACER · VOLVER AL PLAN POR FECHAS
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Tarjeta de calibración (9–22 sep)                                   */
+/* ------------------------------------------------------------------ */
+
+function TarjetaCalibracion() {
+  const ajustes = useAjustes();
+  const pesos = usePesos(60);
+  const estado = estadoCalibracion(pesos, ajustes ?? {}, hoyISO());
+
+  if (estado.fase === "antes" || estado.fase === "guardada") return null;
+
+  return (
+    <div className="tarjeta columna" style={{ gap: 10, borderColor: "var(--carrera)" }}>
+      <div className="entre">
+        <div className="rotulo" style={{ color: "var(--carrera)" }}>
+          Calibración del mantenimiento
+        </div>
+        {estado.fase === "en-curso" && (
+          <span className="chip">DÍA {Math.min(estado.dia, 14)} DE 14</span>
+        )}
+      </div>
+
+      {estado.fase === "en-curso" && (
+        <>
+          <div className="fila" style={{ gap: 8 }}>
+            <Cifrita etiqueta="Pesajes sem. 1" valor={`${estado.dias1}/7`} />
+            <Cifrita etiqueta="Pesajes sem. 2" valor={`${estado.dias2}/7`} />
+            <Cifrita
+              etiqueta="Media sem. 1"
+              valor={estado.media1 != null ? `${estado.media1.toFixed(1).replace(".", ",")} kg` : "—"}
+            />
+          </div>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.55 }}>
+            Come las 2.600 planas y pésate cada mañana (después del baño, antes de desayunar).
+            Al acabar los 14 días, FORJA compara las dos semanas y te propone tu mantenimiento real.
+          </p>
+        </>
+      )}
+
+      {(estado.fase === "lista" || estado.fase === "incompleta") && (
+        <>
+          {estado.fase === "lista" ? (
+            <>
+              <div className="fila" style={{ gap: 8 }}>
+                <Cifrita etiqueta="Media sem. 1" valor={`${estado.media1.toFixed(1).replace(".", ",")} kg`} />
+                <Cifrita etiqueta="Media sem. 2" valor={`${estado.media2.toFixed(1).replace(".", ",")} kg`} />
+                <Cifrita
+                  etiqueta="Tendencia"
+                  valor={`${estado.porSemana > 0 ? "+" : ""}${estado.porSemana.toFixed(2).replace(".", ",")} kg/sem`}
+                />
+              </div>
+              <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
+                {estado.ajuste === 0
+                  ? "El peso se mantuvo estable comiendo 2.600: ese ES tu mantenimiento real."
+                  : `Comiendo 2.600 el peso ${estado.porSemana > 0 ? "subió" : "bajó"}: tu mantenimiento real está ` +
+                    `alrededor de ${miles(estado.mantenimiento)} kcal.`}
+                {estado.recortado &&
+                  " (La corrección se limita a ±250 kcal: parte del cambio tras el mini-cut es agua y glucógeno, no comida.)"}
+              </p>
+            </>
+          ) : (
+            <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
+              La calibración terminó pero faltan pesajes ({estado.dias1}/7 y {estado.dias2}/7) para
+              una media fiable. Puedes seguir pesándote una semana más, o usar la hipótesis de
+              2.600 y afinarla con las revisiones mensuales.
+            </p>
+          )}
+
+          <button className="boton boton-primario" onClick={() => guardarMantenimiento(estado.mantenimiento)}>
+            GUARDAR {miles(estado.mantenimiento)} KCAL COMO MANTENIMIENTO
+          </button>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--texto-tenue)" }}>
+            Desde ese momento todas las fases calculan sus kcal sobre este número. Se puede
+            corregir en Ajustes.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Tarjeta de revisión mensual (§65–66)                                */
+/* ------------------------------------------------------------------ */
+
+function TarjetaRevision() {
+  const ajustes = useAjustes();
+  const pesos = usePesos(60);
+  const mediciones = useMediciones();
+  const sesiones = useSesionesFuerza(80);
+  const carreras = useCarreras(80);
+  const hoy = hoyISO();
+
+  const fase = faseDe(hoy, ajustes ?? {});
+  const pendiente = revisionPendiente(fase.id, ajustes ?? {}, hoy);
+
+  // Las series de las sesiones del mes solo se cargan si la revisión toca.
+  const [series, setSeries] = useState(null);
+  useEffect(() => {
+    if (!pendiente || !sesiones.length) return;
+    let vivo = true;
+    const ids = sesiones.filter((s) => s.estado === "completada").map((s) => s.id);
+    db.series.where("sesionId").anyOf(ids).toArray().then((filas) => {
+      if (vivo) setSeries(filas);
+    });
+    return () => { vivo = false; };
+  }, [pendiente, sesiones]);
+
+  if (!pendiente || series == null) return null;
+
+  const r = revisar({ pesos, mediciones, sesiones, carreras, series }, fase.id, hoy);
+  const kcalAhora = (ajustes?.mantenimientoReal ?? MANTENIMIENTO_HIPOTESIS) + (ajustes?.ajusteKcal ?? 0);
+
+  const ACCIONES = {
+    cumplir: { titulo: "Sin cambios", color: "var(--texto-medio)" },
+    mantener: { titulo: "Mantener las kcal", color: "var(--exito)" },
+    subir: { titulo: "Subir 100–150 kcal", color: "var(--aviso)" },
+    bajar: { titulo: "Bajar 100–150 kcal", color: "var(--aviso)" },
+  };
+
+  return (
+    <div className="tarjeta columna" style={{ gap: 10, borderColor: "var(--aviso)" }}>
+      <div className="rotulo" style={{ color: "var(--aviso)" }}>Revisión de las 4 semanas</div>
+
+      <div className="fila" style={{ gap: 8, flexWrap: "wrap" }}>
+        <Cifrita
+          etiqueta="Peso"
+          valor={r.peso ? `${r.peso.porSemana > 0 ? "+" : ""}${r.peso.porSemana.toFixed(2).replace(".", ",")} kg/sem` : "—"}
+        />
+        <Cifrita
+          etiqueta="Cintura"
+          valor={r.cintura ? `${r.cintura.delta > 0 ? "+" : ""}${r.cintura.delta.toFixed(1).replace(".", ",")} cm` : "—"}
+        />
+        <Cifrita etiqueta="Sesiones" valor={`${r.cumplido.hechas}/${r.cumplido.objetivo}`} />
+        <Cifrita
+          etiqueta="Progresan"
+          valor={r.progresion.total ? `${r.progresion.mejoran}/${r.progresion.total}` : "—"}
+        />
+      </div>
+
+      <div style={{ fontSize: 16, fontWeight: 800, color: ACCIONES[r.accion].color }}>
+        {ACCIONES[r.accion].titulo}
+      </div>
+      <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>{r.motivo}</p>
+
+      {(r.accion === "subir" || r.accion === "bajar") && (
+        <div className="fila" style={{ gap: 8 }}>
+          {[100, 150].map((n) => (
+            <button
+              key={n}
+              className="boton boton-primario"
+              style={{ flex: 1 }}
+              onClick={() => aplicarRevision(r.accion === "subir" ? n : -n)}
+            >
+              {r.accion === "subir" ? "+" : "−"}{n} → {miles(kcalAhora + (r.accion === "subir" ? n : -n))}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <button
+        onClick={() => aplicarRevision(0)}
+        style={{
+          background: r.accion === "mantener" || r.accion === "cumplir" ? "var(--texto)" : "none",
+          color: r.accion === "mantener" || r.accion === "cumplir" ? "var(--fondo)" : "var(--texto-tenue)",
+          border: "1px solid var(--borde-fuerte)", borderRadius: 12,
+          padding: "12px", fontSize: 13, fontWeight: 800, cursor: "pointer",
+        }}
+      >
+        {r.accion === "subir" || r.accion === "bajar" ? "PREFIERO MANTENER" : "VISTO · SEGUIR IGUAL"}
+      </button>
+      <p style={{ margin: 0, fontSize: 12, color: "var(--texto-tenue)" }}>
+        La próxima revisión aparecerá sola dentro de 4 semanas.
+      </p>
+    </div>
+  );
+}
+
+function Cifrita({ etiqueta, valor }) {
+  return (
+    <div style={{ flex: 1, minWidth: 70, background: "var(--superficie-3)", borderRadius: 10, padding: "8px 10px" }}>
+      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: ".08em", color: "var(--texto-tenue)" }}>
+        {etiqueta.toUpperCase()}
+      </div>
+      <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, whiteSpace: "nowrap" }}>{valor}</div>
+    </div>
   );
 }
 

@@ -28,6 +28,8 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../datos/db.js";
 import { diasEntre, fechaCorta, hoyISO, ultimosDias } from "../logica/fechas.js";
 import { cambioSemanal, formatear as formatearPeso, media, serie, serieMedia } from "../logica/peso.js";
+import { faseDe } from "../datos/planNutricion.js";
+import { semaforoPeso } from "../logica/revision.js";
 import { porSesion, veredicto } from "../logica/progresion.js";
 import { rampaDe } from "../datos/rampa.js";
 import * as motorCarrera from "../logica/motorCarrera.js";
@@ -88,14 +90,24 @@ export default function Progreso({ sub, alVolver }) {
 
 function Cuerpo() {
   const pesos = usePesos();
+  const ajustes = useAjustes();
   const [dias, setDias] = useState(30);
 
   const actual = pesos.length ? pesos[pesos.length - 1] : null;
   const cambio = cambioSemanal(pesos);
+  const fase = faseDe(hoyISO(), ajustes ?? {});
+  const semaforo = semaforoPeso(pesos, fase.id);
 
   if (!pesos.length) {
     return <Vacio texto="Apunta tu peso unos días y aquí aparecerá la tendencia." />;
   }
+
+  const COLORES_SEMAFORO = {
+    verde: "var(--exito)",
+    ambar: "var(--aviso)",
+    rojo: "var(--aviso)",
+    info: "var(--carrera)",
+  };
 
   return (
     <>
@@ -108,6 +120,25 @@ function Cuerpo() {
           color={cambio == null ? undefined : cambio < 0 ? "var(--exito)" : "var(--texto)"}
         />
       </div>
+
+      {/* El semáforo del plan anual: qué significa esta velocidad EN TU FASE.
+          Solo aparece con báscula suficiente en las dos ventanas (7 d y ~4 sem). */}
+      {semaforo && (
+        <div className="tarjeta" style={{ borderColor: COLORES_SEMAFORO[semaforo.estado] }}>
+          <div className="entre">
+            <div className="rotulo" style={{ color: COLORES_SEMAFORO[semaforo.estado] }}>
+              Velocidad · {fase.nombre}
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 800 }}>
+              {semaforo.porSemana > 0 ? "+" : ""}
+              {semaforo.porSemana.toFixed(2).replace(".", ",")} kg/sem
+            </span>
+          </div>
+          <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.55 }}>
+            {semaforo.texto}
+          </p>
+        </div>
+      )}
 
       <div className="tarjeta">
         <div className="entre" style={{ marginBottom: 14 }}>

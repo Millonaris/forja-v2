@@ -58,7 +58,7 @@ export function generarInforme(datos, { dias = 14, hasta = hoyISO() } = {}) {
 /* ------------------------------------------------------------------ */
 
 function seccionResumen({ pesos, estadoCarrera, estadoFuerza, ajustes }, { hasta }) {
-  const objetivos = objetivosDe(hasta, ajustes?.escalonVolumen ?? 0);
+  const objetivos = objetivosDe(hasta, ajustes ?? {});
   const bloque = bloquePorNumero(estadoCarrera?.bloque ?? 1);
   const actual = pesos.filter((p) => p.fecha <= hasta).at(-1) ?? null;
 

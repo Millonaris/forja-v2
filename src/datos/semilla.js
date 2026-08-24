@@ -17,7 +17,7 @@ import { FASES } from "./planNutricion.js";
 import { PROTOCOLOS } from "./protocolos.js";
 import { hoyISO } from "../logica/fechas.js";
 
-export const VERSION_PLAN = 5;
+export const VERSION_PLAN = 6;
 
 export async function sembrar() {
   const ajustes = await db.ajustes.get(1);
@@ -77,8 +77,18 @@ export async function sembrar() {
         creada: previo.creada ?? hoyISO(),
         // El onboarding de instalación limpia (§54) aún no se ha hecho.
         calibrada: previo.calibrada ?? false,
-        // Escalón de volumen: 0 = ~2500 kcal, 1 = ~2550.
-        escalonVolumen: previo.escalonVolumen ?? 0,
+        /*
+         * Plan anual (versión 6). El mantenimiento real lo pone la
+         * calibración de septiembre; hasta entonces las fases dinámicas usan
+         * la hipótesis de 2.600. `ajusteKcal` acumula los ±100–150 de las
+         * revisiones mensuales, y `faseManual` es la fase confirmada a mano
+         * (definición, mantenimiento post, recomposición) o null.
+         */
+        mantenimientoReal: previo.mantenimientoReal ?? null,
+        ajusteKcal: previo.ajusteKcal ?? 0,
+        faseManual: previo.faseManual ?? null,
+        faseManualDesde: previo.faseManualDesde ?? null,
+        ultimaRevision: previo.ultimaRevision ?? null,
         // Variante agresiva de la rutina: una serie más en seis ejercicios.
         // Se empieza SIEMPRE en la conservadora (§ del informe).
         rutinaAgresiva: previo.rutinaAgresiva ?? false,

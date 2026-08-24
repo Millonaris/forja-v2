@@ -9,12 +9,15 @@
 
 import { useRef, useState } from "react";
 
+import DialogoNumero from "../componentes/DialogoNumero.jsx";
 import Hoja from "../componentes/Hoja.jsx";
 import { guardarAjustes } from "../datos/db.js";
 import { BLOQUES, describirSesion } from "../datos/planCarrera.js";
+import { MANTENIMIENTO_HIPOTESIS } from "../datos/planNutricion.js";
 import { RUTINAS } from "../datos/rutinas.js";
 import { useAjustes, useEstadoCarrera, useEstadoFuerza } from "../ganchos/useDatos.js";
-import { corregirEstadoCarrera, corregirEstadoFuerza } from "../logica/acciones.js";
+import { corregirEstadoCarrera, corregirEstadoFuerza, guardarMantenimiento } from "../logica/acciones.js";
+import { miles } from "../logica/formato.js";
 import { haceCuanto } from "../logica/fechas.js";
 import { estadoPermiso, pedirPermiso } from "../utiles/avisos.js";
 import { exportar, importar, inventario } from "../utiles/copiaSeguridad.js";
@@ -77,15 +80,7 @@ export default function Ajustes({ abierto, alCerrar }) {
             alCambiar={(v) => guardarAjustes({ rutinaAgresiva: v === "1" })}
           />
 
-          <Selector
-            etiqueta="Escalón de volumen"
-            valor={ajustes.escalonVolumen ?? 0}
-            opciones={[
-              { valor: 0, texto: "~2.500 kcal" },
-              { valor: 1, texto: "~2.550 kcal" },
-            ]}
-            alCambiar={(v) => guardarAjustes({ escalonVolumen: Number(v) })}
-          />
+          <Mantenimiento ajustes={ajustes} />
         </Seccion>
 
         {/* ---------- Avisos ---------- */}
@@ -191,6 +186,52 @@ function Seccion({ titulo, children }) {
       <div className="rotulo">{titulo}</div>
       {children}
     </section>
+  );
+}
+
+/*
+ * El mantenimiento real es EL número del plan anual: de él salen las kcal de
+ * hipertrofia, definición y todo lo demás. Normalmente lo pone la calibración
+ * de septiembre; aquí solo se corrige si hizo falta.
+ */
+function Mantenimiento({ ajustes }) {
+  const [editando, setEditando] = useState(false);
+  const valor = ajustes.mantenimientoReal;
+
+  return (
+    <>
+      <button
+        onClick={() => setEditando(true)}
+        className="entre"
+        style={{
+          width: "100%", background: "var(--superficie)", border: "1px solid var(--borde)",
+          borderRadius: 12, padding: "12px 14px", color: "var(--texto)", fontSize: 14, cursor: "pointer",
+        }}
+      >
+        <span style={{ color: "var(--texto-medio)", fontSize: 13 }}>Mantenimiento real</span>
+        <span style={{ fontWeight: 700 }}>
+          {valor == null ? `Sin calibrar (${miles(MANTENIMIENTO_HIPOTESIS)})` : `${miles(valor)} kcal`}
+          {(ajustes.ajusteKcal ?? 0) !== 0 && (
+            <span style={{ color: "var(--texto-tenue)", fontWeight: 600 }}>
+              {" "}{ajustes.ajusteKcal > 0 ? "+" : "−"}{Math.abs(ajustes.ajusteKcal)}
+            </span>
+          )}
+        </span>
+      </button>
+
+      <DialogoNumero
+        abierto={editando}
+        alCerrar={() => setEditando(false)}
+        titulo="Mantenimiento real"
+        subtitulo="Las kcal con las que tu peso se queda quieto. Lo mide la calibración de septiembre; corrígelo solo si sabes lo que haces."
+        unidad="kcal"
+        marcador="2600"
+        valorInicial={{ valor: valor ?? MANTENIMIENTO_HIPOTESIS }}
+        min={1500}
+        max={4000}
+        alGuardar={({ valor: v }) => guardarMantenimiento(v)}
+      />
+    </>
   );
 }
 

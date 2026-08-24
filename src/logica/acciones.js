@@ -382,3 +382,46 @@ export async function borrarSesion(sesionId) {
   await db.series.where("sesionId").equals(sesionId).delete();
   await db.sesionesFuerza.delete(sesionId);
 }
+
+/* ------------------------------------------------------------------ */
+/* Plan anual: mantenimiento real, revisiones y cambio de fase         */
+/* ------------------------------------------------------------------ */
+
+/** Guardar el mantenimiento real que sale de la calibración (o corregirlo). */
+export async function guardarMantenimiento(kcal) {
+  await db.ajustes.update(1, { mantenimientoReal: Math.round(Number(kcal)) });
+}
+
+/**
+ * Cerrar la revisión mensual. `delta` es lo que se suma a las kcal (0 si la
+ * decisión fue mantener). El reloj de 28 días se reinicia siempre.
+ */
+export async function aplicarRevision(delta = 0, fecha = hoyISO()) {
+  const ajustes = await db.ajustes.get(1);
+  await db.ajustes.update(1, {
+    ajusteKcal: (ajustes?.ajusteKcal ?? 0) + Math.round(Number(delta) || 0),
+    ultimaRevision: fecha,
+  });
+}
+
+/**
+ * Confirmar una fase manual del plan anual (definición, mantenimiento,
+ * recomposición). El plan manda: sus kcal parten del mantenimiento real DE
+ * ESE MOMENTO, así que se guarda el que Jose confirma en el diálogo, y el
+ * ajuste arranca en el punto inicial de la fase (p. ej. −450 en definición).
+ */
+export async function empezarFase(faseId, { mantenimiento, ajusteInicial = 0 }, fecha = hoyISO()) {
+  await db.ajustes.update(1, {
+    faseManual: faseId,
+    faseManualDesde: fecha,
+    mantenimientoReal: Math.round(Number(mantenimiento)),
+    ajusteKcal: Math.round(Number(ajusteInicial) || 0),
+    // El reloj de revisiones empieza de cero con la fase nueva.
+    ultimaRevision: fecha,
+  });
+}
+
+/** Deshacer la fase manual y volver a la hipertrofia por fechas. */
+export async function quitarFaseManual() {
+  await db.ajustes.update(1, { faseManual: null, faseManualDesde: null, ajusteKcal: 0 });
+}

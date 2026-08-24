@@ -14,8 +14,12 @@ import assert from "node:assert/strict";
 import * as fuerza from "../src/logica/motorFuerza.js";
 import * as carrera from "../src/logica/motorCarrera.js";
 import {
-  DIAS_ESPECIALES, calendarioDelTramo, diaEspecialDe, faseDe, kcalDe, objetivosDe, porQueDe,
+  DIAS_ESPECIALES, FASES_MANUALES, MANTENIMIENTO_HIPOTESIS,
+  calendarioDelTramo, diaEspecialDe, faseDe, kcalDe, objetivosDe, porQueDe,
 } from "../src/datos/planNutricion.js";
+import { TEMPORADAS, estadoTemporada } from "../src/datos/planAnual.js";
+import { estadoCalibracion } from "../src/logica/calibracion.js";
+import { revisar, revisionPendiente, semaforoPeso } from "../src/logica/revision.js";
 import { seriesDeHoy, rirDeHoy } from "../src/datos/rampa.js";
 import { RUTINAS, seriesTotales } from "../src/datos/rutinas.js";
 import { CORE_CASA } from "../src/datos/rutinaPostural.js";
@@ -141,8 +145,10 @@ test("§42 · la nutrición va por fecha y no la mueve el entrenamiento", () => 
   // hidratos: son dos calendarios distintos a propósito.
   assert.equal(faseDe("2026-09-01").id, "recorte-fuerte");
   assert.equal(faseDe("2026-09-02").id, "recorte-moderado");
-  assert.equal(faseDe("2026-09-09").id, "mantenimiento");
-  assert.equal(faseDe("2026-10-30").id, "volumen", "la fase de volumen es abierta");
+  assert.equal(faseDe("2026-09-09").id, "calibracion");
+  assert.equal(faseDe("2026-09-22").id, "calibracion", "la calibración dura hasta el 22");
+  assert.equal(faseDe("2026-09-23").id, "hipertrofia");
+  assert.equal(faseDe("2027-01-30").id, "hipertrofia", "la hipertrofia es abierta");
 });
 
 test("los días de recarga y visual mandan sobre su fase", () => {
@@ -164,16 +170,19 @@ test("las kcal de cada día cuadran con sus macros (4/4/9)", () => {
   }
 });
 
-test("el calendario del tramo va del 26 de agosto al 8 de septiembre", () => {
+test("el calendario del tramo va del 26 de agosto al 22 de septiembre", () => {
   const dias = calendarioDelTramo();
-  assert.equal(dias.length, 14);
+  assert.equal(dias.length, 28, "mini-cut (14) + calibración (14)");
   assert.equal(dias[0].fecha, "2026-08-26");
-  assert.equal(dias.at(-1).fecha, "2026-09-08");
+  assert.equal(dias.at(-1).fecha, "2026-09-22");
+  // Los 14 días de calibración, todos planos a 2.600.
+  assert.equal(dias.filter((d) => d.kcal === 2600).length, 14);
 
   // Siete días de recorte fuerte antes de empezar a subir.
   assert.equal(dias.filter((d) => d.kcal === 1700).length, 7);
-  // Y el pico está en la recarga, no en el día visual.
-  const pico = dias.reduce((a, b) => (a.kcal >= b.kcal ? a : b));
+  // Y dentro del mini-cut el pico está en la recarga, no en el día visual.
+  const miniCut = dias.filter((d) => d.fecha <= "2026-09-08");
+  const pico = miniCut.reduce((a, b) => (a.kcal >= b.kcal ? a : b));
   assert.equal(pico.fecha, "2026-09-03");
 });
 
@@ -196,20 +205,169 @@ test("la recarga es la que más hidrato lleva, y de largo", () => {
 });
 
 test("las macros por comida suman el total de la fase (§21)", () => {
-  for (const escalon of [0, 1]) {
-    const o = objetivosDe("2026-09-20", escalon);
-    const suma = (k) => o.comidas.reduce((t, c) => t + c[k], 0);
-    assert.equal(suma("p"), o.p, `proteína del escalón ${escalon}`);
-    assert.equal(suma("hc"), o.hc, `hidratos del escalón ${escalon}`);
-    assert.equal(suma("g"), o.g, `grasas del escalón ${escalon}`);
-  }
-
-  for (const fecha of ["2026-08-27", "2026-09-03", "2026-09-10"]) {
+  for (const fecha of ["2026-08-27", "2026-09-03", "2026-09-10", "2026-10-15"]) {
     const o = objetivosDe(fecha);
     assert.equal(o.comidas.reduce((t, c) => t + c.p, 0), o.p, `proteína el ${fecha}`);
     assert.equal(o.comidas.reduce((t, c) => t + c.hc, 0), o.hc, `hidratos el ${fecha}`);
     assert.equal(o.comidas.reduce((t, c) => t + c.g, 0), o.g, `grasas el ${fecha}`);
   }
+});
+
+/* ------------------------------------------------------------------ */
+/* Plan maestro anual · fases dinámicas, calibración y revisión        */
+/* ------------------------------------------------------------------ */
+
+test("las fases dinámicas calculan sus kcal con el mantenimiento real", () => {
+  // Sin calibrar: hipótesis de 2.600 y aviso de que lo es.
+  const sinCalibrar = objetivosDe("2026-10-15", {});
+  assert.equal(sinCalibrar.esHipotesis, true);
+  assert.ok(Math.abs(sinCalibrar.kcal - MANTENIMIENTO_HIPOTESIS) <= 2);
+  assert.equal(sinCalibrar.kcal, kcalDe(sinCalibrar), "las kcal cuadran 4/4/9");
+
+  // Calibrado a 2.500 y con +150 de una revisión → ~2.650.
+  const o = objetivosDe("2026-10-15", { mantenimientoReal: 2500, ajusteKcal: 150 });
+  assert.equal(o.esHipotesis, false);
+  assert.ok(Math.abs(o.kcal - 2650) <= 2, `kcal ≈ 2.650, salen ${o.kcal}`);
+  assert.equal(o.p, 190);
+  // Y las comidas generadas siempre suman el total.
+  assert.equal(o.comidas.reduce((t, c) => t + c.p, 0), o.p);
+  assert.equal(o.comidas.reduce((t, c) => t + c.hc, 0), o.hc);
+  assert.equal(o.comidas.reduce((t, c) => t + c.g, 0), o.g);
+});
+
+test("la definición manda cuando está confirmada, y no antes", () => {
+  assert.equal(FASES_MANUALES.definicion.ajusteInicial, -450, "arranca ~450 bajo mantenimiento");
+
+  const ajustes = { mantenimientoReal: 2700, ajusteKcal: -450, faseManual: "definicion", faseManualDesde: "2027-02-01" };
+  assert.equal(faseDe("2027-01-20", ajustes).id, "hipertrofia", "antes de su fecha sigue la hipertrofia");
+
+  const o = objetivosDe("2027-02-10", ajustes);
+  assert.equal(o.fase.id, "definicion");
+  assert.ok(Math.abs(o.kcal - 2250) <= 2, `2.700 − 450 ≈ 2.250, salen ${o.kcal}`);
+  assert.equal(o.p, 200, "en definición la proteína sube");
+});
+
+test("la calibración compara las dos semanas y propone el mantenimiento", () => {
+  const pesos = [];
+  for (let i = 0; i < 7; i += 1) pesos.push({ fecha: sumarDias("2026-09-09", i), kg: 95.0 });
+  for (let i = 7; i < 14; i += 1) pesos.push({ fecha: sumarDias("2026-09-09", i), kg: 95.35 });
+
+  // +0,35 kg/semana comiendo 2.600 ≈ 400 kcal/día de exceso, pero la
+  // corrección se limita a ±250 (tras un mini-cut parte de esa subida es agua
+  // y glucógeno): mantenimiento propuesto 2.350.
+  const e = estadoCalibracion(pesos, {}, "2026-09-23");
+  assert.equal(e.fase, "lista");
+  assert.equal(e.mantenimiento, 2350);
+  assert.equal(e.recortado, true, "avisa de que aplicó el tope");
+
+  // Peso plano → 2.600 ES el mantenimiento real.
+  const plano = estadoCalibracion(pesos.map((p) => ({ ...p, kg: 95 })), {}, "2026-09-23");
+  assert.equal(plano.mantenimiento, 2600);
+
+  // Con pocos pesajes no se inventa un número fiable.
+  const pocos = estadoCalibracion(pesos.slice(0, 3), {}, "2026-09-23");
+  assert.equal(pocos.fase, "incompleta");
+
+  // Durante los 14 días se informa, no se juzga.
+  assert.equal(estadoCalibracion(pesos, {}, "2026-09-15").fase, "en-curso");
+  // Y guardado el número, la tarjeta desaparece.
+  assert.equal(estadoCalibracion(pesos, { mantenimientoReal: 2550 }, "2026-09-23").fase, "guardada");
+});
+
+test("§66 · la revisión mensual aplica el algoritmo del plan", () => {
+  const hoy = "2026-11-20";
+  const pesosPlanos = [];
+  for (let i = 0; i < 28; i += 1) pesosPlanos.push({ fecha: sumarDias(hoy, -i), kg: 96 });
+
+  const sesiones = [];
+  const carreras = [];
+  for (let i = 0; i < 12; i += 1) {
+    sesiones.push({ id: i + 1, fecha: sumarDias(hoy, -1 - i * 2), estado: "completada" });
+    carreras.push({ fecha: sumarDias(hoy, -2 - i * 2), estado: "completada" });
+  }
+
+  // Peso plano + progresión parada + todo cumplido → el caso exacto de subir.
+  const estancadas = [
+    { sesionId: 12, ejercicioId: "e1", kg: 60, reps: 10, hecha: true },
+    { sesionId: 1, ejercicioId: "e1", kg: 60, reps: 10, hecha: true },
+  ];
+  const r1 = revisar({ pesos: pesosPlanos, sesiones, carreras, series: estancadas }, "hipertrofia", hoy);
+  assert.equal(r1.accion, "subir");
+
+  // Lo mismo pero progresando → mantener: puede haber recomposición.
+  const mejorando = [
+    { sesionId: 12, ejercicioId: "e1", kg: 60, reps: 10, hecha: true },
+    { sesionId: 1, ejercicioId: "e1", kg: 65, reps: 10, hecha: true },
+  ];
+  const r2 = revisar({ pesos: pesosPlanos, sesiones, carreras, series: mejorando }, "hipertrofia", hoy);
+  assert.equal(r2.accion, "mantener");
+
+  // Peso subiendo demasiado rápido → bajar, aunque el gimnasio progrese.
+  const pesosRapidos = [];
+  for (let i = 0; i < 28; i += 1) pesosRapidos.push({ fecha: sumarDias(hoy, -i), kg: 96 - i * 0.08 });
+  const r3 = revisar({ pesos: pesosRapidos, sesiones, carreras, series: mejorando }, "hipertrofia", hoy);
+  assert.equal(r3.accion, "bajar");
+
+  // Cumplimiento bajo → el plan no se toca (paso 1 del algoritmo).
+  const r4 = revisar(
+    { pesos: pesosPlanos, sesiones: sesiones.slice(0, 4), carreras: carreras.slice(0, 4), series: [] },
+    "hipertrofia",
+    hoy,
+  );
+  assert.equal(r4.accion, "cumplir");
+
+  // En definición, perder dentro del 0,4–0,9 % semanal es mantener.
+  const bajando = [];
+  for (let i = 0; i < 28; i += 1) bajando.push({ fecha: sumarDias(hoy, -i), kg: 90 + i * 0.08 });
+  const r5 = revisar({ pesos: bajando, sesiones, carreras, series: mejorando }, "definicion", hoy);
+  assert.equal(r5.accion, "mantener");
+});
+
+test("la revisión aparece cada 4 semanas, no antes", () => {
+  // La primera cuenta desde el arranque de la hipertrofia (23 sep + 28 días).
+  assert.equal(revisionPendiente("hipertrofia", {}, "2026-10-20"), false);
+  assert.equal(revisionPendiente("hipertrofia", {}, "2026-10-21"), true);
+  // Cerrada una, el reloj se reinicia.
+  assert.equal(revisionPendiente("hipertrofia", { ultimaRevision: "2026-10-21" }, "2026-11-17"), false);
+  assert.equal(revisionPendiente("hipertrofia", { ultimaRevision: "2026-10-21" }, "2026-11-18"), true);
+  // En calibración y mini-cut no hay nada que revisar: las kcal están escritas.
+  assert.equal(revisionPendiente("calibracion", {}, "2026-12-01"), false);
+});
+
+test("el semáforo del peso habla el idioma de la fase", () => {
+  const hoy = "2026-11-20";
+
+  const despacio = [];
+  for (let i = 0; i < 28; i += 1) despacio.push({ fecha: sumarDias(hoy, -i), kg: 96 - i * 0.02 });
+  assert.equal(semaforoPeso(despacio, "hipertrofia", hoy).estado, "verde", "subir ~0,14 kg/sem es el objetivo");
+
+  const rapido = [];
+  for (let i = 0; i < 28; i += 1) rapido.push({ fecha: sumarDias(hoy, -i), kg: 96 - i * 0.08 });
+  assert.equal(semaforoPeso(rapido, "hipertrofia", hoy).estado, "rojo", "subir ~0,56 kg/sem es grasa");
+
+  const bajando = [];
+  for (let i = 0; i < 28; i += 1) bajando.push({ fecha: sumarDias(hoy, -i), kg: 90 + i * 0.08 });
+  assert.equal(semaforoPeso(bajando, "definicion", hoy).estado, "verde", "perder ~0,6 %/sem es el rango");
+
+  assert.equal(semaforoPeso([], "hipertrofia", hoy), null, "sin báscula no hay veredicto");
+});
+
+test("las temporadas del AÑO saben cuál es la actual", () => {
+  assert.equal(TEMPORADAS.length, 7);
+  const t = (id) => TEMPORADAS.find((x) => x.id === id);
+
+  assert.equal(estadoTemporada(t("mini-cut"), "2026-08-30", {}), "actual");
+  assert.equal(estadoTemporada(t("hipertrofia"), "2026-08-30", {}), "futura");
+  assert.equal(estadoTemporada(t("hipertrofia"), "2026-10-15", {}), "actual");
+  assert.equal(estadoTemporada(t("definicion"), "2026-10-15", {}), "futura", "definición no entra por fecha");
+
+  // Confirmada la definición, la hipertrofia queda atrás.
+  const conDef = { faseManual: "definicion", faseManualDesde: "2027-02-01" };
+  assert.equal(estadoTemporada(t("definicion"), "2027-02-10", conDef), "actual");
+  assert.equal(estadoTemporada(t("hipertrofia"), "2027-02-10", conDef), "pasada");
+
+  // Y el porqué de un día de calibración cuenta lo que toca.
+  assert.ok(porQueDe("2026-09-15").includes("calibración"));
 });
 
 test("§10 · la rampa recorta series sin crear una rutina aparte", () => {
