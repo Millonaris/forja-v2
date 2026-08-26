@@ -40,7 +40,7 @@ export function media(pesos, dias = 7, hasta = hoyISO()) {
 
 /**
  * Cambio entre la media de esta semana y la de la anterior.
- * Negativo = bajando. En mini-cut eso es lo que se busca.
+ * Negativo = bajando. En déficit eso es lo que se busca.
  */
 export function cambioSemanal(pesos, hasta = hoyISO()) {
   const ahora = media(pesos, 7, hasta);

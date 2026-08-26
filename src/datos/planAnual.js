@@ -25,17 +25,17 @@ export const TEMPORADAS = [
     ],
   },
   {
-    id: "mini-cut",
-    nombre: "Mini-cut",
+    id: "puesta-a-punto",
+    nombre: "Puesta a punto",
     rango: "26 agosto – 8 septiembre",
     desde: "2026-08-26",
     hasta: "2026-09-08",
-    kcalTexto: "1.700 → 1.850",
-    objetivo: "Bajar algo de grasa y retención en dos semanas, con recarga y día visual.",
+    kcalTexto: "2.150 → 2.500",
+    objetivo: "Perder algo de grasa y llegar al 4–5 de septiembre grande, lleno y relativamente definido.",
     detalle: [
-      "Fase corta y deliberadamente dura: no se pretende mantener estas calorías durante meses.",
-      "Incluye la recarga controlada del 3 (2.200 kcal de hidratos conocidos) y el día visual del 4 (2.050 kcal). El día a día completo está en las pestañas HOY y CALENDARIO.",
-      "En el gimnasio, rampa de vuelta: hasta el 1 de septiembre ~75–80 % del volumen con RIR 3; del 2 al 8, 90–100 % con RIR 2. Nada de fallo ni de récords.",
+      "Se cancela el mini-cut de 1.700: con tan poco hidrato llegarías algo más ligero pero plano, vacío y entrenando peor. Nueva referencia de partida: 96,9 kg (26 de agosto).",
+      "Del 26 al 1: déficit moderado de 2.150 kcal con la proteína en 190 g. Del 2 al 5, llenado: 2.300 → 2.500 subiendo solo hidratos, con la recarga y descanso del 3 y los dos días visuales del 4 y 5 a ~2.450. Del 6 al 8, transición a 2.500. El día a día completo está en HOY y CALENDARIO.",
+      "En el gimnasio, rampa de vuelta: hasta el 1 de septiembre ~75–80 % del volumen con RIR 3; después 90–100 % con RIR 2, sin fallo ni récords. La última sesión completa recomendable es el 2; el 3 no hay sesión dura y el 4–5 solo pump corto opcional.",
     ],
   },
   {
@@ -47,7 +47,7 @@ export const TEMPORADAS = [
     kcalTexto: "2.600 fijas",
     objetivo: "Descubrir tu mantenimiento REAL en 14 días. El número más importante del año.",
     detalle: [
-      "El mantenimiento no se da por sabido: 2.600 kcal es una hipótesis, no una verdad. Durante 14 días se come prácticamente lo mismo cada día, se registra con precisión en Fitia y te pesas todas las mañanas (después del baño, antes de desayunar).",
+      "El mantenimiento no se da por sabido: se estima entre 2.550 y 2.700, y las 2.600 kcal del test son una hipótesis, no una verdad. Durante 14 días se come prácticamente lo mismo cada día, se registra con precisión en Fitia y te pesas todas las mañanas (después del baño, antes de desayunar).",
       "Al final se compara la media de peso de los días 1–7 con la de los días 8–14. Si el peso está estable, 2.600 ES tu mantenimiento. Si sube o baja con claridad, se corrige. FORJA hace la cuenta sola con tus pesos y te propone el número.",
       "No hace falta precisión de 20 kcal: hace falta un valor suficientemente bueno para tomar decisiones. Si la tendencia no queda clara, se amplía una semana.",
       "Desde el 9 de septiembre se entrena ya a volumen completo con el RIR habitual 1–2.",
@@ -65,7 +65,7 @@ export const TEMPORADAS = [
       "Se empieza comiendo el mantenimiento real. Si con eso suben cargas, repeticiones y medidas con la cintura estable, no hay obligación de añadir calorías: todavía puede haber recomposición.",
       "Solo si durante 3–4 semanas el peso está completamente plano, el entreno bien hecho y la progresión parada, se añaden +100–150 kcal. Y no se vuelve a subir hasta observar otras 3–4 semanas. La revisión mensual de FORJA aplica exactamente esta regla.",
       "Velocidad objetivo: 0–0,20 kg/semana DE MEDIA, evaluada en bloques de 4–6 semanas. Una semana suelta no significa nada.",
-      "Macros: 185–195 g de proteína, 70–80 g de grasa, el resto hidratos. La fase puede ser excelente aunque la báscula solo suba 1–3 kg: lo que se busca es hombro, dorsal, espalda alta y glúteo.",
+      "Macros: 185–195 g de proteína (190 como valor simple), ~70–75 g de grasa, el resto hidratos: el hidrato es la variable que ajusta el superávit. La fase puede ser excelente aunque la báscula solo suba 1–3 kg: lo que se busca es hombro, dorsal, espalda alta y glúteo.",
     ],
   },
   {

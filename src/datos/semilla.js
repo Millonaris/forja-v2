@@ -17,7 +17,12 @@ import { FASES } from "./planNutricion.js";
 import { PROTOCOLOS } from "./protocolos.js";
 import { hoyISO } from "../logica/fechas.js";
 
-export const VERSION_PLAN = 6;
+/*
+ * v7: entra el contexto maestro de septiembre 2026 — se cancela el mini-cut
+ * de 1.700 y el tramo 26 ago → 22 sep pasa a déficit moderado (2.150),
+ * llenado (2.300–2.500), dos días visuales a ~2.450 y transición (2.500).
+ */
+export const VERSION_PLAN = 7;
 
 export async function sembrar() {
   const ajustes = await db.ajustes.get(1);
@@ -63,6 +68,11 @@ export async function sembrar() {
       }
 
       /* --- Nutrición y protocolos con fecha --- */
+      // Son PLAN, no registro: se limpian antes de resembrar para que las
+      // fases de una versión anterior (p. ej. el mini-cut cancelado) no se
+      // queden como filas fantasma en la base y en las copias de seguridad.
+      await db.fasesNutricion.clear();
+      await db.protocolos.clear();
       for (const f of FASES) await db.fasesNutricion.put(f);
       for (const p of PROTOCOLOS) await db.protocolos.put(p);
 

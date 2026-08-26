@@ -272,14 +272,20 @@ export function semaforoPeso(pesos, faseId, hoy = hoyISO()) {
   if (peso == null) return null;
   const v = peso.porSemana;
 
-  if (faseId === "recorte-fuerte" || faseId === "recorte-moderado") {
-    if (v < -1.4) return rojo(v, "Muy rápido incluso para un mini-cut: vigila fuerza y descanso.");
-    if (v < 0) return verde(v, "Bajando, que es lo que toca en el mini-cut.");
-    return ambar(v, "El mini-cut aún no se nota en la media. Paciencia: la media manda.");
+  if (faseId === "deficit-moderado") {
+    if (v < -1.2) return rojo(v, "Muy rápido incluso para este déficit: vigila fuerza y descanso.");
+    if (v < 0) return verde(v, "Bajando, que es lo que toca en el déficit moderado.");
+    return ambar(v, "El déficit aún no se nota en la media. Paciencia: la media manda.");
+  }
+
+  if (faseId === "llenado" || faseId === "transicion") {
+    // Días de más hidrato: el peso puede subir por glucógeno y agua aunque se
+    // esté perdiendo grasa. Aquí no se emiten alertas de grasa (§31 del contexto).
+    return info(v, "Con más hidratos el peso puede subir por glucógeno y agua: no es grasa. Nada que juzgar estos días.");
   }
 
   if (faseId === "calibracion") {
-    return info(v, "Semanas de medir, no de juzgar: come las 2.600 planas y deja que la media hable.");
+    return info(v, "Semanas de medir, no de juzgar: come las ~2.600 planas y deja que la media hable.");
   }
 
   if (faseId === "definicion") {

@@ -10,10 +10,10 @@
  * kg/semana × 7.700 ÷ 7 es el superávit (o déficit) DIARIO que había sobre
  * las 2.600. Mantenimiento real ≈ 2.600 − ese exceso, redondeado a 50.
  *
- * El ajuste se limita a ±250 kcal a propósito: tras un mini-cut la primera
- * semana arrastra rebote de glucógeno y agua, y una corrección mayor que eso
- * casi seguro está midiendo agua, no comida. El plan lo dice igual: "no
- * necesitamos precisión de 20 kcal, necesitamos un valor suficientemente
+ * El ajuste se limita a ±250 kcal a propósito: en dos semanas el peso también
+ * se mueve por glucógeno, agua y contenido digestivo, y una corrección mayor
+ * que eso casi seguro está midiendo agua, no comida. El plan lo dice igual:
+ * "no necesitamos precisión de 20 kcal, necesitamos un valor suficientemente
  * bueno para tomar decisiones".
  */
 

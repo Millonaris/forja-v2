@@ -18,7 +18,7 @@ producto**: tiene un solo usuario y se optimiza para él.
 ## Comandos
 
 ```bash
-npm test              # 71 tests de aceptación (node --test pruebas/)
+npm test              # 72 tests de aceptación (node --test pruebas/)
 npx oxlint src pruebas
 npx vite build
 npm run publicar      # tests + iconos + build + force-push de dist/ a gh-pages
@@ -51,7 +51,9 @@ solo se usa para los atajos del manifest (#entrenar, #peso, #postura).
    (TORSO A → PIERNA A → TORSO B → PIERNA B) y los bloques de carrera avanzan
    SOLO al completar sesiones, nunca por calendario. No se reinician los lunes.
 2. **La nutrición es lo único con fecha** — y solo hasta el 22-sep-2026
-   (mini-cut + calibración). Desde el 23-sep las kcal se calculan:
+   (puesta a punto + calibración; el protocolo vigente de ese tramo es
+   `docs/contexto-maestro-septiembre-2026.md`, que canceló el mini-cut de
+   1.700). Desde el 23-sep las kcal se calculan:
    `mantenimientoReal + ajusteKcal` (campos de `ajustes`). Las fases de 2027
    (definición, mantenimiento, recomposición) NO entran por fecha: las confirma
    Jose desde DIETA → AÑO (`ajustes.faseManual`).

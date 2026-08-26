@@ -1,12 +1,17 @@
 /*
- * Nutrición según el PLAN MAESTRO ANUAL (23 de agosto de 2026).
+ * Nutrición según el CONTEXTO MAESTRO DE SEPTIEMBRE 2026
+ * (docs/contexto-maestro-septiembre-2026.md, 26 de agosto), que sustituye al
+ * protocolo del plan anual para el tramo 26 ago → 22 sep: el mini-cut de
+ * 1.700 kcal queda CANCELADO. El objetivo ya no es pesar lo mínimo el 4–5 de
+ * septiembre, sino llegar con algo menos de grasa y el músculo LLENO.
  *
  * OJO: esto es lo ÚNICO de FORJA que va por fecha de verdad… hasta el 22 de
  * septiembre. A partir de ahí el propio plan maestro manda otra cosa: "los
  * datos reales mandan sobre el calendario" y "no fijar hoy las calorías de
  * febrero". Por eso hay dos clases de fases:
  *
- *   · CON FECHA   — mini-cut y calibración. Días contados, kcal escritas.
+ *   · CON FECHA   — déficit moderado, llenado, transición y calibración.
+ *     Días contados, kcal escritas.
  *   · DINÁMICAS   — hipertrofia, definición, mantenimiento y recomposición.
  *     Sus kcal no están escritas aquí: se calculan con el mantenimiento REAL
  *     que sale de la calibración (ajustes.mantenimientoReal) más el ajuste
@@ -29,6 +34,16 @@ export function kcalDe({ p, hc, g }) {
 
 /** Si la calibración no ha dado todavía un número, esta es la hipótesis del plan. */
 export const MANTENIMIENTO_HIPOTESIS = 2600;
+
+/*
+ * El mantenimiento NO se conoce todavía: 2.550–2.700 es la horquilla estimada
+ * y 2.600 el punto central de trabajo. Hasta que la calibración de septiembre
+ * dé el número real, la app dice "estimado", nunca "confirmado".
+ */
+export const MANTENIMIENTO_ESTIMADO = { min: 2550, medio: 2600, max: 2700 };
+
+/** La referencia de partida del protocolo. No borra históricos: solo es el punto de partida. */
+export const PESO_REFERENCIA = { kg: 96.9, fecha: "2026-08-26" };
 
 /* ------------------------------------------------------------------ */
 /* Reparto automático de comidas                                       */
@@ -82,62 +97,103 @@ function macrosDinamicos(fase, ajustes = {}) {
 
 export const FASES = [
   {
-    id: "recorte-fuerte",
-    nombre: "Recorte fuerte",
-    resumen: "Perder grasa y quitar la hinchazón de las vacaciones.",
+    /*
+     * Déficit moderado, NO el mini-cut de 1.700 que había antes: con tan poco
+     * hidrato se llega más ligero pero plano y entrenando peor, y la grasa
+     * extra perdida en tan pocos días no compensa. Unas 400–550 kcal por
+     * debajo del mantenimiento estimado.
+     */
+    id: "deficit-moderado",
+    nombre: "Déficit moderado",
+    resumen: "Perder algo de grasa sin vaciar el músculo antes de los días visuales.",
     desde: "2026-08-26",
     hasta: "2026-09-01",
-    kcal: 1700,
-    p: 195,
-    hc: 104,
-    g: 56,
+    kcal: 2150,
+    p: 190,
+    hc: 208,
+    g: 62,
     comidas: [
-      comida("09:00", "Desayuno", 45, 40, 15),
-      comida("13:00", "Comida (post-entreno)", 55, 44, 10),
-      comida("17:30", "Merienda", 40, 10, 10),
-      comida("21:00", "Cena", 55, 10, 21),
-    ],
-  },
-  {
-    id: "recorte-moderado",
-    nombre: "Recorte moderado",
-    resumen: "Se devuelve algo de hidrato al músculo sin salir del déficit.",
-    desde: "2026-09-02",
-    hasta: "2026-09-08",
-    kcal: 1850,
-    p: 195,
-    hc: 137,
-    g: 58,
-    comidas: [
-      comida("09:00", "Desayuno", 45, 45, 15),
-      comida("13:00", "Comida (post-entreno)", 55, 62, 10),
-      comida("17:30", "Merienda", 40, 10, 10),
-      comida("21:00", "Cena", 55, 20, 23),
+      comida("09:00", "Desayuno", 45, 60, 12),
+      comida("13:00", "Comida (post-entreno)", 55, 70, 15),
+      comida("17:30", "Merienda", 35, 35, 10),
+      comida("21:00", "Cena", 55, 43, 25),
     ],
   },
   {
     /*
-     * Los 14 días que valen un año: comer PLANO a 2.600 y pesarse cada mañana.
-     * La media de los días 1–7 contra la de los 8–14 dice si 2.600 es tu
-     * mantenimiento real o hay que corregirlo. Ese número es la base de TODAS
-     * las fases que vienen después.
+     * El llenado hacia los días visuales: la proteína se queda en 190 y TODO
+     * lo que sube es hidrato. Los días 3, 4 y 5 mandan sobre esta base con su
+     * reparto propio (DIAS_ESPECIALES).
+     */
+    id: "llenado",
+    nombre: "Llenado",
+    resumen: "Suben los hidratos con las calorías controladas para recuperar plenitud muscular.",
+    desde: "2026-09-02",
+    hasta: "2026-09-05",
+    kcal: 2300,
+    p: 190,
+    hc: 250,
+    g: 60,
+    comidas: [
+      comida("09:00", "Desayuno", 45, 70, 10),
+      comida("13:00", "Comida (post-entreno)", 55, 90, 12),
+      comida("17:30", "Merienda", 35, 40, 10),
+      comida("21:00", "Cena", 55, 50, 28),
+    ],
+  },
+  {
+    /*
+     * Después de los días visuales NO se vuelve a un déficit agresivo: se
+     * estabiliza glucógeno y rendimiento para llegar limpio al test del 9.
+     */
+    id: "transicion",
+    nombre: "Transición",
+    resumen: "Estabilizar después de los días visuales y preparar el test de mantenimiento.",
+    desde: "2026-09-06",
+    hasta: "2026-09-08",
+    kcal: 2500,
+    p: 190,
+    hc: 300,
+    g: 60,
+    comidas: [
+      comida("09:00", "Desayuno", 45, 85, 10),
+      comida("13:00", "Comida (post-entreno)", 55, 110, 12),
+      comida("17:30", "Merienda", 35, 50, 10),
+      comida("21:00", "Cena", 55, 55, 28),
+    ],
+  },
+  {
+    /*
+     * Los 14 días que valen un año: comer PLANO a ~2.600 y pesarse cada
+     * mañana. La media de los días 1–7 contra la de los 8–14 dice si 2.600 es
+     * tu mantenimiento real o hay que corregirlo. Ese número es la base de
+     * TODAS las fases que vienen después.
+     *
+     * Los macros del contexto maestro (190/309/67) suman 2.599 exactas; la
+     * kcal de menos es irrelevante y el objetivo se sigue contando como 2.600.
      */
     id: "calibracion",
     nombre: "Calibración",
-    resumen: "14 días a 2.600 kcal clavadas para descubrir tu mantenimiento real.",
+    resumen: "14 días a ~2.600 kcal clavadas para descubrir tu mantenimiento real.",
     desde: "2026-09-09",
     hasta: "2026-09-22",
-    kcal: 2600,
+    kcal: 2599,
     p: 190,
-    hc: 289,
-    g: 76,
-    comidas: repartirComidas(190, 289, 76),
+    hc: 309,
+    g: 67,
+    comidas: [
+      comida("09:00", "Desayuno", 45, 85, 12),
+      comida("13:00", "Comida (post-entreno)", 55, 110, 15),
+      comida("17:30", "Merienda", 35, 50, 10),
+      comida("21:00", "Cena", 55, 64, 30),
+    ],
   },
   {
     /*
      * Fase abierta y DINÁMICA: `kcal/hc/comidas` de aquí son la hipótesis de
      * 2.600; lo que se enseña de verdad lo calcula `objetivosDe` con el
-     * mantenimiento real + el ajuste de las revisiones mensuales.
+     * mantenimiento real + el ajuste de las revisiones mensuales. Proteína
+     * ~190 y grasa ~70–75: el hidrato es la variable que ajusta el superávit.
      */
     id: "hipertrofia",
     nombre: "Hipertrofia",
@@ -147,9 +203,9 @@ export const FASES = [
     dinamica: true,
     kcal: 2600,
     p: 190,
-    hc: 289,
-    g: 76,
-    comidas: repartirComidas(190, 289, 76),
+    hc: 298,
+    g: 72,
+    comidas: repartirComidas(190, 298, 72),
   },
 ];
 
@@ -192,72 +248,101 @@ export const FASES_MANUALES = {
 /* ------------------------------------------------------------------ */
 
 /*
- * Estos dos días se salen de su fase y mandan sobre ella. Son el motivo de
- * todo el mini-cut: sin ellos, el día 4 llegaría seco pero plano.
+ * Estos tres días se salen de su fase y mandan sobre ella. Son el motivo de
+ * toda la puesta a punto: sin ellos, el 4 y el 5 llegarían secos pero planos.
  */
+
+// El pump de los días visuales: congestión visual en 10–15 min, NO una sesión
+// de hipertrofia. Con calendario flexible no se puede dar por hecho que ese
+// día toque torso: si toca, sirve de pump; si no, este pump corto aparte.
+const PUMP_VISUAL = [
+  "Elevaciones laterales 2–3×15–20",
+  "Pullover o jalón ligero 2×12–15",
+  "Press ligero o flexiones 2×12–15",
+  "Bíceps 1–2×12–15",
+  "Tríceps 1–2×12–15",
+];
+const PUMP_NOTA =
+  "20–60 min antes de vestirse. RIR 2–3, unos 10–15 min: buena congestión sin destrozarse ni llegar al fallo.";
+
+// Los dos días visuales comparten reparto: 190 P / 288 C / 60 G ≈ 2.450 kcal.
+const COMIDAS_VISUAL = [
+  comida("09:00", "Desayuno", 45, 80, 10),
+  comida("13:00", "Comida", 55, 100, 12),
+  comida("17:30", "Merienda (previa al momento)", 35, 55, 10),
+  comida("21:00", "Cena", 55, 53, 28),
+];
+
 export const DIAS_ESPECIALES = {
   "2026-09-03": {
     id: "recarga",
-    nombre: "Recarga controlada",
-    resumen: "Rellenar el glucógeno del músculo. NO es un día libre.",
-    kcal: 2200,
+    nombre: "Recarga + descanso",
+    resumen: "Rellenar glucógeno y llegar fresco al 4–5. NO es un día libre.",
+    kcal: 2500,
     p: 190,
-    hc: 225,
+    hc: 300,
     g: 60,
     comidas: [
-      comida("09:00", "Desayuno", 45, 70, 15),
-      comida("13:00", "Comida (post-entreno)", 50, 80, 15),
-      comida("17:30", "Merienda", 40, 45, 10),
-      comida("21:00", "Cena", 55, 30, 20),
+      comida("09:00", "Desayuno", 45, 85, 10),
+      comida("13:00", "Comida", 55, 110, 12),
+      comida("17:30", "Merienda", 35, 50, 10),
+      comida("21:00", "Cena", 55, 55, 28),
     ],
     // La subida viene de los hidratos, y de hidratos conocidos: se busca
     // glucógeno muscular, no barriga hinchada.
     si: ["Arroz", "Patata", "Avena", "Pan", "Pasta", "Fruta"],
     no: ["Pizza", "Hamburguesa", "Helado", "Alcohol", "Comida basura"],
     notas: [
+      "Hoy NO hay sesión dura de gimnasio: interesa reducir fatiga, evitar agujetas y dejar que el hidrato rellene el músculo.",
+      "Sí: caminar normal, movilidad, postura, core suave. No: HIIT, carrera intensa, pierna dura o torso al fallo.",
       "Agua normal. Sal normal.",
-      "Fibra moderada: ese día no hace falta una montaña de verduras.",
-      "2.200 kcal siguen estando alrededor o por debajo de tu mantenimiento real: un día así no borra la semana.",
+      "Fibra moderada, nada de atracones y nada de alimentos nuevos: glucógeno alto con el abdomen cómodo.",
     ],
   },
 
   "2026-09-04": {
-    id: "visual",
-    nombre: "Día visual principal",
-    resumen: "Llegas con el músculo lleno del día anterior. Hoy se mantiene.",
-    kcal: 2050,
+    id: "visual-1",
+    nombre: "Día visual 1",
+    resumen: "Llegas con el músculo lleno de ayer. Hoy se mantiene la plenitud.",
+    kcal: 2452,
     p: 190,
-    hc: 192,
-    g: 58,
-    comidas: [
-      comida("09:00", "Desayuno", 45, 65, 14),
-      comida("13:00", "Comida (post-entreno)", 55, 75, 12),
-      comida("17:30", "Merienda", 35, 35, 8),
-      comida("21:00", "Cena", 55, 17, 24),
-    ],
+    hc: 288,
+    g: 60,
+    comidas: COMIDAS_VISUAL,
     notas: [
-      "No cortar agua. No quitar sal.",
-      "La merienda de las 17:30 es la que más ayuda si quieres verte bien por la tarde-noche.",
-      "Evitar correr antes del momento importante.",
+      "No cortar agua. No quitar sal: el agua intramuscular es parte del aspecto lleno.",
+      "Comidas conocidas y de digestión fácil. Nada de atracones ni de alimentos nuevos.",
+      "Evitar el entrenamiento duro y el cardio intenso antes del momento importante.",
     ],
     // El truco del día: mover hidratos, no añadirlos.
     truco: {
       titulo: "Colocar hidrato antes del momento clave",
       texto:
-        "Si quieres verte especialmente bien a una hora concreta, pon 25–35 g de hidratos " +
-        "entre 60 y 120 minutos antes. Salen de los 192 g del día, no se suman: por ejemplo, " +
-        "55–60 g en la comida en vez de 75, y los 15–20 restantes justo antes.",
+        "Si el momento importante es por la tarde-noche, reserva 50–70 g de hidratos para las " +
+        "2–3 horas anteriores. Salen de los 288 g del día, no se suman. En esa comida: poca " +
+        "grasa, proteína moderada, sal normal y nada enorme.",
     },
-    // Con calendario flexible no se puede dar por hecho que ese día toque
-    // torso (§23): si toca, sirve de pump; si no, este pump corto aparte.
-    pump: [
-      "Elevaciones laterales 3×15–20",
-      "Pullover o jalón 2×12–15",
-      "Press o flexiones 2×12–15",
-      "Bíceps 2×12–15",
-      "Tríceps 2×12–15",
+    pump: PUMP_VISUAL,
+    pumpNota: PUMP_NOTA,
+  },
+
+  "2026-09-05": {
+    id: "visual-2",
+    nombre: "Día visual 2",
+    resumen: "Segundo día importante: mismo reparto que ayer si funcionó bien.",
+    kcal: 2452,
+    p: 190,
+    hc: 288,
+    g: 60,
+    comidas: COMIDAS_VISUAL,
+    notas: [
+      "NO volver a las 2.150 esta mañana: hoy también toca hidrato alto.",
+      "Agua y sal normales, comidas conocidas.",
+      "El pump es opcional: si ya te ves lleno, no hace falta. Sin fallo y sin acumular fatiga.",
+      "Después del momento importante, vuelta a la rotación normal de fuerza.",
     ],
-    pumpNota: "RIR 2–3. Buena técnica y buena congestión, sin destrozarse ni llegar al fallo.",
+    pump: PUMP_VISUAL,
+    pumpNota: PUMP_NOTA,
   },
 };
 
@@ -266,11 +351,12 @@ export const DIAS_ESPECIALES = {
 /** Reglas de fondo. Van plegadas: no compiten con las acciones (§22, §35). */
 export const REGLAS = [
   "Creatina: 5 g al día, todos los días.",
-  "Agua normal. Nunca cortarla para pesarse mejor.",
-  "Sal normal. Nada de deshidratarse.",
+  "Agua normal. Nunca cortarla para pesarse mejor. Nada de sauna ni de sudar para bajar peso.",
+  "Sal normal y consistente. Nada de protocolos raros de sodio.",
   "Lo que manda es la media de 7 días, no el peso de un día suelto.",
+  "Del 3 al 5 el peso puede subir por glucógeno y agua aunque estés perdiendo grasa: no es grasa y no hay que compensar.",
   "Cintura y fotos como control, no solo la báscula.",
-  "Después de la recarga no hay que compensar comiendo 1.300 kcal: se vuelve al plan y ya.",
+  "Después de los días visuales se pasa a la transición de 2.500, no a un déficit agresivo.",
   "Las calorías solo se tocan en la revisión de cada 4 semanas, en bloques de ±100–150.",
   "No hay que clavar los hidratos al gramo: proteína primero, el resto es flexible.",
 ];
@@ -341,7 +427,8 @@ export function objetivosDe(iso, ajustes = {}) {
 
 /**
  * El calendario día a día del tramo que tiene fecha (26 ago → 22 sep):
- * mini-cut completo más los 14 días de calibración.
+ * déficit moderado, llenado con los días visuales, transición y los 14 días
+ * de calibración.
  *
  * Se genera, no se escribe a mano: así no puede desincronizarse de las fases y
  * de los días especiales, que es la fuente de verdad.
@@ -380,7 +467,7 @@ export function porQueDe(iso, ajustes = {}) {
   if (!planEnMarcha(iso)) {
     return (
       "El plan arranca el 26 de agosto. Hasta entonces esto es solo la referencia de lo que " +
-      "tocará el primer día: 1.700 kcal con la proteína muy alta."
+      "tocará el primer día: 2.150 kcal de déficit moderado con la proteína en 190 g."
     );
   }
 
@@ -388,50 +475,56 @@ export function porQueDe(iso, ajustes = {}) {
 
   if (especial?.id === "recarga") {
     return (
-      "Este es el día que hace que el 4 funcione. Los 225 g de hidratos rellenan el glucógeno " +
-      "del músculo, que es lo que llena hombros, dorsal, pecho y brazos. Toda la subida viene " +
-      "del hidrato: la proteína y la grasa apenas se mueven. Por eso no es un día libre."
+      "Este es el día que hace que el 4 y el 5 funcionen. Los 300 g de hidratos rellenan el " +
+      "glucógeno del músculo, que es lo que llena hombros, dorsal, pecho y brazos, y por eso " +
+      "hoy NO hay sesión dura: reducir fatiga y llegar fresco vale más que otro entreno. " +
+      "Toda la subida viene del hidrato. No es un día libre."
     );
   }
 
-  if (especial?.id === "visual") {
+  if (especial?.id === "visual-1") {
     return (
-      "El día. Llegas con el músculo lleno de ayer, así que hoy solo hay que mantenerlo: 192 g " +
-      "de hidratos repartidos hacia la primera mitad del día. Se entrena buscando congestión, " +
-      "sin destrozarse y sin llegar al fallo."
+      "El primer día importante. Llegas con el músculo lleno de ayer y hoy se mantiene: hidrato " +
+      "alto (~288 g), agua y sal normales, y 50–70 g de hidratos reservados para 2–3 horas antes " +
+      "del momento clave. Pump corto opcional para la congestión: nada de entrenar al fallo."
+    );
+  }
+
+  if (especial?.id === "visual-2") {
+    return (
+      "El segundo día importante. Se repite el reparto de ayer si funcionó bien: nada de volver " +
+      "a las 2.150 esta mañana. El pump es opcional (solo si te ves menos lleno) y después del " +
+      "momento importante se vuelve a la rotación normal de fuerza."
     );
   }
 
   switch (iso) {
     case "2026-08-26":
       return (
-        "Primer día del recorte. Empieza el déficit fuerte con la proteína muy alta, que es lo " +
-        "que protege el músculo mientras se va la grasa y la hinchazón de las vacaciones."
-      );
-    case "2026-08-29":
-      return (
-        "Día visual de ensayo, no el importante. No se toca nada: mismas kcal, agua y sal " +
-        "normales. Sirve para ver cómo respondes con una semana de antelación."
+        "Primer día del plan, con nueva referencia de partida: 96,9 kg. Se cancela el mini-cut " +
+        "de 1.700: un déficit tan grande te dejaría plano y entrenando peor. En su lugar, déficit " +
+        "moderado (unas 400–550 kcal bajo el mantenimiento estimado) con la proteína en 190 g."
       );
     case "2026-09-01":
-      return "Último día a 1.700. A partir de mañana empiezan a subir los hidratos.";
+      return "Último día a 2.150. A partir de mañana empieza el llenado: suben los hidratos.";
     case "2026-09-02":
       return (
-        "Primer escalón hacia arriba: los hidratos pasan de 104 a 137 g y la proteína se queda " +
-        "donde estaba. El músculo empieza a recuperar glucógeno, todavía en déficit."
+        "Empieza el llenado: los hidratos pasan de 208 a 250 g con la proteína quieta. Además es " +
+        "el último día recomendable para una sesión completa de gimnasio antes de los días " +
+        "visuales: la que toque por rotación, con buena técnica y RIR ~2, sin fallo ni récords."
       );
-    case "2026-09-05":
+    case "2026-09-06":
       return (
-        "Vuelta al mini-cut sin compensar nada. No hay que comer de menos para pagar la recarga " +
-        "de anteayer: se retoma el plan y ya está."
+        "Pasaron los días visuales y NO se vuelve a un déficit agresivo: 2.500 kcal para " +
+        "estabilizar glucógeno y rendimiento y preparar el test de mantenimiento del día 9."
       );
     case "2026-09-08":
-      return "Último día del mini-cut. Toca medir: peso, cintura y foto de perfil. Mañana, a 2.600.";
+      return "Último día de transición. Toca medir: peso, cintura y foto de perfil. Mañana empieza el test.";
     case "2026-09-09":
       return (
-        "Empieza la calibración: 14 días comiendo 2.600 kcal clavadas y pesándote cada mañana " +
-        "(después del baño, antes de desayunar). Tras el mini-cut, esta primera semana el peso " +
-        "puede subir por glucógeno y agua: es normal y no es grasa."
+        "Empieza la calibración: 14 días comiendo ~2.600 kcal clavadas y pesándote cada mañana " +
+        "(después del baño, antes de desayunar). Un día suelto de subida o bajada no cambia " +
+        "nada: durante el test las calorías no se tocan."
       );
     default:
       break;
@@ -439,22 +532,33 @@ export function porQueDe(iso, ajustes = {}) {
 
   const fase = faseDe(iso, ajustes);
 
-  if (fase.id === "recorte-fuerte") {
+  if (fase.id === "deficit-moderado") {
     const dia = diasDesde(fase.desde, iso) + 1;
     return (
-      `Día ${dia} de 7 de recorte fuerte. Sin cambios respecto a ayer, y es lo correcto: el ` +
-      "déficit funciona por acumulación, no por hacer algo distinto cada día."
+      `Día ${dia} de 7 de déficit moderado. Sin cambios respecto a ayer, y es lo correcto: el ` +
+      "déficit funciona por acumulación, no por hacer algo distinto cada día. El objetivo no es " +
+      "pesar lo mínimo el día 4: es perder algo de grasa sin vaciar el músculo."
     );
   }
 
-  if (fase.id === "recorte-moderado") {
-    return "Recorte moderado. Mismo reparto que el resto de la fase, con los hidratos a 137 g.";
+  if (fase.id === "llenado") {
+    return (
+      "Días de llenado: hidrato alto con las calorías controladas para recuperar plenitud " +
+      "muscular sin atracones. El peso puede subir por glucógeno y agua: no es grasa."
+    );
+  }
+
+  if (fase.id === "transicion") {
+    return (
+      "Transición a 2.500: mismo reparto que la recarga del 3. Entrenamiento normal, glucógeno " +
+      "estable y rendimiento recuperándose para empezar el test de mantenimiento el día 9."
+    );
   }
 
   if (fase.id === "calibracion") {
     const dia = diasDesde(fase.desde, iso) + 1;
     return (
-      `Día ${dia} de 14 de calibración. Lo importante no son las 2.600 de hoy sino que sean ` +
+      `Día ${dia} de 14 de calibración. Lo importante no son las ~2.600 de hoy sino que sean ` +
       "LAS MISMAS todos los días y que te peses cada mañana: al final, comparar la media de la " +
       "semana 1 con la de la semana 2 dirá cuál es tu mantenimiento real. FORJA hace esa cuenta sola."
     );
@@ -505,11 +609,10 @@ function diasDesde(a, b) {
 /** La etiqueta corta de la columna "Objetivo" del calendario. */
 function objetivoDelDia(iso, objetivos) {
   if (objetivos.especial) return objetivos.especial.nombre;
-  if (iso === "2026-08-29") return "Día visual 1";
-  if (iso === "2026-09-01") return "Último día fuerte";
-  if (iso === "2026-09-02") return "Subimos hidratos";
-  if (iso === "2026-09-05") return "Volver al mini-cut";
-  if (iso === "2026-09-08") return "Final del mini-cut";
+  if (iso === "2026-09-01") return "Último día a 2.150";
+  if (iso === "2026-09-02") return "Empieza el llenado";
+  if (iso === "2026-09-06") return "Empieza la transición";
+  if (iso === "2026-09-08") return "Medir antes del test";
   if (iso === "2026-09-09") return "Empieza la calibración";
   if (iso === "2026-09-22") return "Última medición";
   return objetivos.fase.nombre;

@@ -143,25 +143,45 @@ test("el plan termina en una tirada de 20 km", () => {
 test("§42 · la nutrición va por fecha y no la mueve el entrenamiento", () => {
   // Mover el gimnasio del 1 al 2 de septiembre no cambia que el 2 suba los
   // hidratos: son dos calendarios distintos a propósito.
-  assert.equal(faseDe("2026-09-01").id, "recorte-fuerte");
-  assert.equal(faseDe("2026-09-02").id, "recorte-moderado");
+  assert.equal(faseDe("2026-09-01").id, "deficit-moderado");
+  assert.equal(faseDe("2026-09-02").id, "llenado");
+  assert.equal(faseDe("2026-09-06").id, "transicion");
   assert.equal(faseDe("2026-09-09").id, "calibracion");
   assert.equal(faseDe("2026-09-22").id, "calibracion", "la calibración dura hasta el 22");
   assert.equal(faseDe("2026-09-23").id, "hipertrofia");
   assert.equal(faseDe("2027-01-30").id, "hipertrofia", "la hipertrofia es abierta");
 });
 
-test("los días de recarga y visual mandan sobre su fase", () => {
-  // El 3 y el 4 caen dentro del recorte moderado, pero tienen reparto propio:
+test("los días de recarga y visuales mandan sobre su fase", () => {
+  // El 3, el 4 y el 5 caen dentro del llenado, pero tienen reparto propio:
   // son justamente el motivo del plan.
-  assert.equal(faseDe("2026-09-03").id, "recorte-moderado");
-  assert.equal(objetivosDe("2026-09-03").kcal, 2200, "recarga");
-  assert.equal(objetivosDe("2026-09-04").kcal, 2050, "día visual");
+  assert.equal(faseDe("2026-09-03").id, "llenado");
+  assert.equal(objetivosDe("2026-09-03").kcal, 2500, "recarga + descanso");
+  assert.equal(objetivosDe("2026-09-04").kcal, 2452, "día visual 1, ~2.450");
+  assert.equal(objetivosDe("2026-09-05").kcal, 2452, "día visual 2, ~2.450");
+
+  // Los dos días visuales llevan el MISMO reparto: el 5 no vuelve a 2.150.
+  const v1 = objetivosDe("2026-09-04");
+  const v2 = objetivosDe("2026-09-05");
+  assert.deepEqual([v1.p, v1.hc, v1.g], [v2.p, v2.hc, v2.g]);
 
   // Y los días de alrededor siguen con las kcal de la fase.
-  assert.equal(objetivosDe("2026-09-02").kcal, 1850);
-  assert.equal(objetivosDe("2026-09-05").kcal, 1850);
-  assert.equal(diaEspecialDe("2026-09-05"), null);
+  assert.equal(objetivosDe("2026-09-02").kcal, 2300, "empieza el llenado");
+  assert.equal(objetivosDe("2026-09-06").kcal, 2500, "transición");
+  assert.equal(diaEspecialDe("2026-09-06"), null);
+});
+
+test("el protocolo de septiembre clava las kcal del contexto maestro", () => {
+  // El mini-cut de 1.700 está CANCELADO: el tramo 26 ago – 1 sep va a 2.150.
+  assert.equal(objetivosDe("2026-08-26").kcal, 2150);
+  assert.equal(objetivosDe("2026-08-26").hc, 208);
+  // La calibración usa los macros del contexto: 190/309/67 ≈ 2.600.
+  const cal = objetivosDe("2026-09-15");
+  assert.deepEqual([cal.p, cal.hc, cal.g], [190, 309, 67]);
+  // Y la proteína se queda en 190 g TODOS los días del tramo: no hace falta más.
+  for (const dia of calendarioDelTramo()) {
+    assert.equal(dia.p, 190, `proteína del ${dia.fecha}`);
+  }
 });
 
 test("las kcal de cada día cuadran con sus macros (4/4/9)", () => {
@@ -172,17 +192,18 @@ test("las kcal de cada día cuadran con sus macros (4/4/9)", () => {
 
 test("el calendario del tramo va del 26 de agosto al 22 de septiembre", () => {
   const dias = calendarioDelTramo();
-  assert.equal(dias.length, 28, "mini-cut (14) + calibración (14)");
+  assert.equal(dias.length, 28, "puesta a punto (14) + calibración (14)");
   assert.equal(dias[0].fecha, "2026-08-26");
   assert.equal(dias.at(-1).fecha, "2026-09-22");
-  // Los 14 días de calibración, todos planos a 2.600.
-  assert.equal(dias.filter((d) => d.kcal === 2600).length, 14);
+  // Los 14 días de calibración, todos planos a ~2.600 (2.599 exactas por macros).
+  assert.equal(dias.filter((d) => d.kcal === 2599).length, 14);
 
-  // Siete días de recorte fuerte antes de empezar a subir.
-  assert.equal(dias.filter((d) => d.kcal === 1700).length, 7);
-  // Y dentro del mini-cut el pico está en la recarga, no en el día visual.
-  const miniCut = dias.filter((d) => d.fecha <= "2026-09-08");
-  const pico = miniCut.reduce((a, b) => (a.kcal >= b.kcal ? a : b));
+  // Siete días de déficit moderado antes de empezar el llenado.
+  assert.equal(dias.filter((d) => d.kcal === 2150).length, 7);
+  // Y dentro de la puesta a punto el pico está en la recarga del 3, no en los
+  // días visuales: primero se llena, luego se mantiene.
+  const puestaAPunto = dias.filter((d) => d.fecha <= "2026-09-08");
+  const pico = puestaAPunto.reduce((a, b) => (a.kcal >= b.kcal ? a : b));
   assert.equal(pico.fecha, "2026-09-03");
 });
 
@@ -196,16 +217,17 @@ test("las comidas de los días especiales suman su total", () => {
   }
 });
 
-test("la recarga es la que más hidrato lleva, y de largo", () => {
+test("todo el llenado viene del hidrato, no de la grasa", () => {
   const recarga = objetivosDe("2026-09-03");
-  const recorte = objetivosDe("2026-08-27");
-  assert.ok(recarga.hc > recorte.hc * 2, "la recarga más que dobla el hidrato del recorte");
-  // La subida viene del hidrato: la grasa apenas se mueve.
-  assert.ok(Math.abs(recarga.g - recorte.g) <= 5, "la grasa se queda casi igual");
+  const deficit = objetivosDe("2026-08-27");
+  assert.ok(recarga.hc - deficit.hc >= 90, "la recarga sube el hidrato con fuerza (208 → 300)");
+  // La subida viene del hidrato: proteína y grasa apenas se mueven.
+  assert.equal(recarga.p, deficit.p, "la proteína se queda en 190");
+  assert.ok(Math.abs(recarga.g - deficit.g) <= 5, "la grasa se queda casi igual");
 });
 
 test("las macros por comida suman el total de la fase (§21)", () => {
-  for (const fecha of ["2026-08-27", "2026-09-03", "2026-09-10", "2026-10-15"]) {
+  for (const fecha of ["2026-08-27", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-07", "2026-09-10", "2026-10-15"]) {
     const o = objetivosDe(fecha);
     assert.equal(o.comidas.reduce((t, c) => t + c.p, 0), o.p, `proteína el ${fecha}`);
     assert.equal(o.comidas.reduce((t, c) => t + c.hc, 0), o.hc, `hidratos el ${fecha}`);
@@ -253,7 +275,7 @@ test("la calibración compara las dos semanas y propone el mantenimiento", () =>
   for (let i = 7; i < 14; i += 1) pesos.push({ fecha: sumarDias("2026-09-09", i), kg: 95.35 });
 
   // +0,35 kg/semana comiendo 2.600 ≈ 400 kcal/día de exceso, pero la
-  // corrección se limita a ±250 (tras un mini-cut parte de esa subida es agua
+  // corrección se limita a ±250 (en dos semanas parte de esa subida es agua
   // y glucógeno): mantenimiento propuesto 2.350.
   const e = estadoCalibracion(pesos, {}, "2026-09-23");
   assert.equal(e.fase, "lista");
@@ -330,7 +352,7 @@ test("la revisión aparece cada 4 semanas, no antes", () => {
   // Cerrada una, el reloj se reinicia.
   assert.equal(revisionPendiente("hipertrofia", { ultimaRevision: "2026-10-21" }, "2026-11-17"), false);
   assert.equal(revisionPendiente("hipertrofia", { ultimaRevision: "2026-10-21" }, "2026-11-18"), true);
-  // En calibración y mini-cut no hay nada que revisar: las kcal están escritas.
+  // En calibración y puesta a punto no hay nada que revisar: las kcal están escritas.
   assert.equal(revisionPendiente("calibracion", {}, "2026-12-01"), false);
 });
 
@@ -356,7 +378,7 @@ test("las temporadas del AÑO saben cuál es la actual", () => {
   assert.equal(TEMPORADAS.length, 7);
   const t = (id) => TEMPORADAS.find((x) => x.id === id);
 
-  assert.equal(estadoTemporada(t("mini-cut"), "2026-08-30", {}), "actual");
+  assert.equal(estadoTemporada(t("puesta-a-punto"), "2026-08-30", {}), "actual");
   assert.equal(estadoTemporada(t("hipertrofia"), "2026-08-30", {}), "futura");
   assert.equal(estadoTemporada(t("hipertrofia"), "2026-10-15", {}), "actual");
   assert.equal(estadoTemporada(t("definicion"), "2026-10-15", {}), "futura", "definición no entra por fecha");

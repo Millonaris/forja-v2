@@ -13,7 +13,7 @@
  *                Aquí aparecen solas la calibración y la revisión mensual.
  *   CALENDARIO · el tramo con fecha (26 ago → 22 sep), para ver a dónde vas.
  *   AÑO        · el plan maestro anual por temporadas, y las fichas.
- *   POR QUÉ    · la estrategia del mini-cut explicada. Se lee una vez.
+ *   POR QUÉ    · la estrategia de la puesta a punto explicada. Se lee una vez.
  *
  * La comida se registra en Fitia. Esto es la chuleta (§58).
  */
@@ -152,8 +152,8 @@ function DetalleDia({ fecha }) {
 
         {o.esHipotesis && (
           <div style={{ fontSize: 12.5, color: "var(--aviso)" }}>
-            Mantenimiento aún sin calibrar: estos números usan la hipótesis de{" "}
-            {miles(MANTENIMIENTO_HIPOTESIS)} kcal. Al guardar la calibración se recalculan solos.
+            Mantenimiento ESTIMADO, no confirmado: estos números usan {miles(MANTENIMIENTO_HIPOTESIS)} kcal
+            (horquilla 2.550–2.700). Al guardar la calibración se recalculan solos.
           </div>
         )}
       </div>
@@ -310,9 +310,9 @@ function Calendario() {
   return (
     <>
       <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.55 }}>
-        Del 26 de agosto al 22 de septiembre: mini-cut completo y los 14 días de calibración.
-        Toca cualquier día para ver sus comidas y por qué es así. Esto va por fecha: mover un
-        entreno no lo desplaza.
+        Del 26 de agosto al 22 de septiembre: déficit moderado, llenado con los días visuales
+        del 4 y 5, transición y los 14 días de calibración. Toca cualquier día para ver sus
+        comidas y por qué es así. Esto va por fecha: mover un entreno no lo desplaza.
       </p>
 
       <div className="tarjeta columna" style={{ gap: 2 }}>
@@ -420,23 +420,26 @@ function PorQue() {
       <div className="tarjeta">
         <div className="rotulo">La idea</div>
         <p style={{ margin: "10px 0 0", fontSize: 15, fontWeight: 600, lineHeight: 1.55 }}>
-          Llegar al 4 de septiembre más seco pero sin verte vacío.
+          Llegar al 4 y 5 de septiembre con algo menos de grasa pero con el músculo LLENO:
+          grande, musculado y relativamente definido con camiseta.
         </p>
         <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
-          Hacer 1.700 kcal seguidas del 26 al 4 te secaría igual, pero llegarías plano. Por eso
-          los tres días previos devuelven hidrato al músculo: es lo que llena hombros, dorsal,
-          pecho y brazos.
+          Por eso se cancela el mini-cut de 1.700: con tan poco hidrato perderías glucógeno y agua
+          intramuscular, entrenarías peor y llegarías plano y vacío dentro de la camiseta. La
+          grasa extra que se pierde en tan pocos días no compensa esa peor apariencia. El objetivo
+          NO es pesar lo mínimo. Referencia de partida: 96,9 kg (26 de agosto).
         </p>
       </div>
 
       <div className="tarjeta columna" style={{ gap: 0 }}>
-        <div className="rotulo" style={{ marginBottom: 12 }}>Las cinco etapas</div>
+        <div className="rotulo" style={{ marginBottom: 12 }}>Las seis etapas</div>
         {[
-          { dias: "26 ago – 1 sep", que: "Recorte fuerte", por: "Perder grasa y quitar la hinchazón de las vacaciones." },
-          { dias: "2 sep", que: "Subimos hidratos", por: "Empezar a devolver algo de hidrato al músculo." },
-          { dias: "3 sep", que: "Recarga controlada", por: "Rellenar el glucógeno muscular. La subida es de hidratos, no de grasa." },
-          { dias: "4 sep", que: "Día visual", por: "Mantener el hidrato alto y entrenar buscando congestión." },
-          { dias: "5 – 8 sep", que: "Vuelta al mini-cut", por: "Seguir con el recorte moderado hasta cerrar la fase." },
+          { dias: "26 ago – 1 sep", que: "Déficit moderado · 2.150", por: "Perder algo de grasa entrenando bien, sin vaciar el músculo." },
+          { dias: "2 sep", que: "Empieza el llenado · 2.300", por: "Suben los hidratos a 250 g. Última sesión completa recomendable." },
+          { dias: "3 sep", que: "Recarga + descanso · 2.500", por: "Rellenar el glucógeno muscular sin sesión dura. La subida es de hidratos, no de grasa." },
+          { dias: "4 – 5 sep", que: "Días visuales · ~2.450", por: "Mantener la plenitud: hidrato alto, agua y sal normales, pump corto opcional." },
+          { dias: "6 – 8 sep", que: "Transición · 2.500", por: "Nada de volver a un déficit agresivo: estabilizar y recuperar rendimiento." },
+          { dias: "9 – 22 sep", que: "Calibración · ~2.600", por: "Test real de mantenimiento: 14 días planos y báscula cada mañana." },
         ].map((e, i) => (
           <div
             key={e.dias}
@@ -467,9 +470,9 @@ function PorQue() {
       </div>
 
       <div className="tarjeta">
-        <div className="rotulo" style={{ color: "var(--exito)" }}>Qué se busca ver el día 4</div>
+        <div className="rotulo" style={{ color: "var(--exito)" }}>Qué se busca ver el 4 y el 5</div>
         <div className="fila" style={{ gap: 6, flexWrap: "wrap", marginTop: 12 }}>
-          {["Menos cintura", "Menos hinchazón", "Hombros más llenos", "Dorsal más lleno", "Pecho y brazos con volumen"].map((x) => (
+          {["Hombro lateral lleno", "Dorsal y espalda llenos", "Brazos llenos", "Pecho con volumen", "Cintura limpia", "Sin hinchazón abdominal"].map((x) => (
             <span key={x} className="chip" style={{ borderColor: "rgba(113,217,139,.35)", color: "var(--exito)" }}>
               {x}
             </span>
@@ -478,20 +481,28 @@ function PorQue() {
       </div>
 
       <div className="tarjeta">
-        <div className="rotulo" style={{ color: "var(--aviso)" }}>Dos malentendidos habituales</div>
+        <div className="rotulo" style={{ color: "var(--aviso)" }}>Tres malentendidos habituales</div>
         <div style={{ marginTop: 12 }} className="columna">
           <div>
             <div style={{ fontSize: 13.5, fontWeight: 700 }}>La recarga no es un día libre.</div>
             <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.5 }}>
-              Las 2.200 kcal del día 3 vienen de arroz, patata, avena, pan, pasta y fruta. Con
+              Las 2.500 kcal del día 3 vienen de arroz, patata, avena, pan, pasta y fruta. Con
               pizza y alcohol conseguirías lo contrario de lo que buscas.
             </p>
           </div>
           <div>
-            <div style={{ fontSize: 13.5, fontWeight: 700 }}>No hay que compensar al día siguiente.</div>
+            <div style={{ fontSize: 13.5, fontWeight: 700 }}>Si el peso sube del 3 al 5, no es grasa.</div>
             <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.5 }}>
-              El día 5 se vuelve a las 1.850 y ya está. Las 2.200 del día 3 seguramente estén
-              alrededor o por debajo de tu mantenimiento real: un día así no borra la semana.
+              Al subir los hidratos sube el glucógeno y el agua que lo acompaña. Puedes estar
+              perdiendo grasa toda la semana y aun así pesar algo más el 4 que el 2: es normal
+              y buscado. La báscula de 24–48 horas no juzga nada.
+            </p>
+          </div>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 700 }}>La grasa no se elige de dónde sale.</div>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.5 }}>
+              Esta estrategia baja la grasa global y mejora hombros, dorsal, brazos y cintura,
+              pero nadie puede prometer cuántos gramos salen de una zona concreta como el pecho.
             </p>
           </div>
         </div>
@@ -547,7 +558,7 @@ function Ano() {
         {fase.dinamica && (
           <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
             {ajustes?.mantenimientoReal == null
-              ? `Sobre la hipótesis de ${miles(MANTENIMIENTO_HIPOTESIS)} kcal, hasta que la calibración diga tu mantenimiento real.`
+              ? `Sobre el mantenimiento ESTIMADO de ${miles(MANTENIMIENTO_HIPOTESIS)} kcal (2.550–2.700), hasta que la calibración de septiembre diga el real.`
               : `Mantenimiento real ${miles(ajustes.mantenimientoReal)} kcal${(ajustes.ajusteKcal ?? 0) !== 0 ? ` ${ajustes.ajusteKcal > 0 ? "+" : "−"} ${Math.abs(ajustes.ajusteKcal)} de las revisiones` : ""}.`}
           </p>
         )}
@@ -784,7 +795,7 @@ function TarjetaCalibracion() {
                   : `Comiendo 2.600 el peso ${estado.porSemana > 0 ? "subió" : "bajó"}: tu mantenimiento real está ` +
                     `alrededor de ${miles(estado.mantenimiento)} kcal.`}
                 {estado.recortado &&
-                  " (La corrección se limita a ±250 kcal: parte del cambio tras el mini-cut es agua y glucógeno, no comida.)"}
+                  " (La corrección se limita a ±250 kcal: parte del cambio en dos semanas es agua y glucógeno, no comida.)"}
               </p>
             </>
           ) : (
