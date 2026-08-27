@@ -24,7 +24,7 @@ import {
 } from "../ganchos/useDatos.js";
 import { guardarNota } from "../logica/acciones.js";
 import { diasSinCopia } from "../utiles/copiaSeguridad.js";
-import { diasEntre, fechaLarga, haceCuanto, hoyISO } from "../logica/fechas.js";
+import { diasEntre, fechaLarga, haceCuanto, hoyISO, sumarDias } from "../logica/fechas.js";
 import { miles } from "../logica/formato.js";
 import * as motorCarrera from "../logica/motorCarrera.js";
 import * as motorFuerza from "../logica/motorFuerza.js";
@@ -276,6 +276,7 @@ export default function Hoy({ irA, alAbrirAjustes, alRetomarEntreno, pedirPeso, 
           alCerrarPeso?.();
         }}
         pesoActual={pesoDe(pesos, hoy)}
+        pesoAyer={pesoDe(pesos, sumarDias(hoy, -1))}
         ultimo={pesos.length ? pesos[pesos.length - 1].kg : null}
       />
 
