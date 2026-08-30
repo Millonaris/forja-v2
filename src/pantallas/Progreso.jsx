@@ -255,33 +255,108 @@ function Cintura() {
  * una app que tiene que abrir instantánea en el gimnasio.
  */
 function GraficaPeso({ puntos, medias }) {
+  // Antes de la primera pesada no hay nada que enseñar: se recortan esos días
+  // para que la gráfica no sea un hueco enorme con los puntos arrinconados.
+  const primero = puntos.findIndex((p) => p.kg != null);
+  if (primero > 0) {
+    puntos = puntos.slice(primero);
+    medias = medias.slice(primero);
+  }
+  if (primero === -1 || puntos.length < 2) {
+    return <Vacio texto="Faltan días para dibujar la tendencia." />;
+  }
+
   const valores = [...puntos, ...medias].map((p) => p.kg).filter((k) => k != null);
-  if (valores.length < 2) return <Vacio texto="Faltan días para dibujar la tendencia." />;
+  const min = Math.min(...valores) - 0.3;
+  const max = Math.max(...valores) + 0.3;
 
-  const min = Math.min(...valores) - 0.4;
-  const max = Math.max(...valores) + 0.4;
   const ancho = 320;
-  const alto = 120;
+  const alto = 132;
+  const izq = 32; // hueco para la escala de kg
+  const abajo = 17; // hueco para las fechas
 
-  const x = (i) => (i / (puntos.length - 1)) * ancho;
-  const y = (kg) => alto - ((kg - min) / (max - min)) * alto;
+  const x = (i) => izq + (i / (puntos.length - 1)) * (ancho - izq - 5);
+  const y = (kg) => 4 + ((max - kg) / (max - min)) * (alto - abajo - 4);
 
-  const camino = medias
-    .map((p, i) => (p.kg == null ? null : `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.kg).toFixed(1)}`))
-    .filter(Boolean)
-    .join(" ");
+  // Rayas horizontales en kg redondos, para que el ojo tenga escala.
+  const paso = max - min > 8 ? 2 : max - min > 4 ? 1 : 0.5;
+  const rayas = [];
+  for (let v = Math.ceil(min / paso) * paso; v <= max; v += paso) {
+    rayas.push(Math.round(v * 10) / 10);
+  }
+  const etiquetaKg = (v) => (v % 1 === 0 ? String(v) : v.toFixed(1).replace(".", ","));
+
+  // La línea de la media de 7 días. Cada tramo tras un hueco abre con "M":
+  // empezar con "L" es un camino inválido y el SVG no pinta nada.
+  let camino = "";
+  let cortado = true;
+  medias.forEach((p, i) => {
+    if (p.kg == null) {
+      cortado = true;
+      return;
+    }
+    camino += `${cortado ? "M" : "L"}${x(i).toFixed(1)},${y(p.kg).toFixed(1)} `;
+    cortado = false;
+  });
+
+  let iUltimo = puntos.length - 1;
+  while (puntos[iUltimo].kg == null) iUltimo -= 1;
 
   return (
-    <svg viewBox={`0 0 ${ancho} ${alto}`} style={{ width: "100%", height: "auto", overflow: "visible" }} role="img" aria-label="Evolución del peso">
-      <path d={camino} fill="none" stroke="var(--fuerza)" strokeWidth="2" strokeLinejoin="round" />
-      {puntos.map((p, i) =>
-        p.kg == null ? null : (
-          <circle key={p.fecha} cx={x(i)} cy={y(p.kg)} r="1.9" fill="var(--texto-tenue)" />
-        ),
-      )}
-      <text x="0" y={alto + 14} fill="var(--texto-tenue)" fontSize="9">{fechaCorta(puntos[0].fecha)}</text>
-      <text x={ancho} y={alto + 14} fill="var(--texto-tenue)" fontSize="9" textAnchor="end">hoy</text>
-    </svg>
+    <>
+      <svg
+        viewBox={`0 0 ${ancho} ${alto}`}
+        style={{ width: "100%", height: "auto" }}
+        role="img"
+        aria-label="Evolución del peso"
+      >
+        {rayas.map((v) => (
+          <g key={v}>
+            <line
+              x1={izq} x2={ancho} y1={y(v)} y2={y(v)}
+              stroke="var(--borde)" strokeDasharray="3 4"
+            />
+            <text x="0" y={y(v) + 3.5} fill="var(--texto-tenue)" fontSize="10">
+              {etiquetaKg(v)}
+            </text>
+          </g>
+        ))}
+
+        <path
+          d={camino} fill="none" stroke="var(--fuerza)"
+          strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"
+        />
+
+        {puntos.map((p, i) =>
+          p.kg == null ? null : (
+            <circle
+              key={p.fecha}
+              cx={x(i)} cy={y(p.kg)}
+              r={i === iUltimo ? 4 : 2.7}
+              fill={i === iUltimo ? "var(--texto)" : "var(--texto-tenue)"}
+            />
+          ),
+        )}
+
+        <text x={izq} y={alto - 2} fill="var(--texto-tenue)" fontSize="10">
+          {fechaCorta(puntos[0].fecha)}
+        </text>
+        <text x={ancho} y={alto - 2} fill="var(--texto-tenue)" fontSize="10" textAnchor="end">
+          hoy
+        </text>
+      </svg>
+
+      <div className="fila" style={{ gap: 16, marginTop: 10, fontSize: 11.5, color: "var(--texto-tenue)" }}>
+        <span className="fila" style={{ gap: 6 }}>
+          <span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--texto-tenue)", flexShrink: 0 }} />
+          Peso de cada día
+        </span>
+        <span className="fila" style={{ gap: 6 }}>
+          <span style={{ width: 16, height: 3, borderRadius: 2, background: "var(--fuerza)", flexShrink: 0 }} />
+          Media de 7 días
+        </span>
+      </div>
+    </>
   );
 }
 
