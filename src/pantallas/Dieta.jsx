@@ -40,7 +40,9 @@ import { miles } from "../logica/formato.js";
 const SECCIONES = [
   { id: "hoy", texto: "HOY" },
   { id: "calendario", texto: "CALENDARIO" },
-  { id: "recetas", texto: "RECETAS" },
+  // El recetario es lo único de DIETA que es SUYO (no del plan): va en verde
+  // para que se distinga de las pestañas de consulta.
+  { id: "recetas", texto: "RECETAS", color: "var(--exito)" },
   { id: "ano", texto: "AÑO" },
   { id: "porque", texto: "POR QUÉ" },
 ];
@@ -65,9 +67,9 @@ export default function Dieta({ sub, alVolver }) {
             style={{
               flexShrink: 0, borderRadius: 999, padding: "9px 14px",
               fontSize: 11.5, fontWeight: 800, letterSpacing: ".05em", cursor: "pointer",
-              background: s.id === activa ? "var(--texto)" : "transparent",
-              border: `1px solid ${s.id === activa ? "var(--texto)" : "var(--borde)"}`,
-              color: s.id === activa ? "var(--fondo)" : "var(--texto-tenue)",
+              background: s.id === activa ? (s.color ?? "var(--texto)") : "transparent",
+              border: `1px solid ${s.id === activa ? (s.color ?? "var(--texto)") : (s.color ?? "var(--borde)")}`,
+              color: s.id === activa ? "var(--fondo)" : (s.color ?? "var(--texto-tenue)"),
             }}
           >
             {s.texto}
