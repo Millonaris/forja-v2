@@ -21,8 +21,22 @@ import { hoyISO } from "../logica/fechas.js";
  * v7: entra el contexto maestro de septiembre 2026 — se cancela el mini-cut
  * de 1.700 y el tramo 26 ago → 22 sep pasa a déficit moderado (2.150),
  * llenado (2.300–2.500), dos días visuales a ~2.450 y transición (2.500).
+ * v8: las primeras recetas de Jose entran en el recetario (una sola vez).
  */
-export const VERSION_PLAN = 7;
+export const VERSION_PLAN = 8;
+
+/*
+ * Las comidas que Jose pidió tener de partida en DIETA → RECETAS. Solo el
+ * nombre: los ingredientes y la preparación los rellena él desde EDITAR.
+ */
+const RECETAS_INICIALES = [
+  "Contramuslo estofado con verduras",
+  "Ensalada de patata",
+  "Ensaladilla de atún",
+  "Macarrones con tomate y pollo",
+  "Espaguetis con leche evaporada y pollo",
+  "Pollo desmenuzado BBQ",
+];
 
 export async function sembrar() {
   const ajustes = await db.ajustes.get(1);
@@ -30,7 +44,7 @@ export async function sembrar() {
 
   await db.transaction(
     "rw",
-    [db.ajustes, db.plantillas, db.ejercicios, db.series, db.bloquesCarrera, db.fasesNutricion, db.protocolos],
+    [db.ajustes, db.plantillas, db.ejercicios, db.series, db.bloquesCarrera, db.fasesNutricion, db.protocolos, db.recetas],
     async () => {
       /* --- Rutinas de fuerza --- */
       for (const rutina of RUTINAS) {
@@ -76,6 +90,21 @@ export async function sembrar() {
       for (const f of FASES) await db.fasesNutricion.put(f);
       for (const p of PROTOCOLOS) await db.protocolos.put(p);
 
+      /* --- Recetario: las primeras recetas (v8) --- */
+      // A diferencia del plan, las recetas son contenido de Jose: se siembran
+      // UNA sola vez (flag en ajustes). Si edita o borra una, ninguna
+      // resiembra posterior la resucita.
+      //
+      // El flag se relee DENTRO de la transacción: `sembrar` puede entrar dos
+      // veces a la vez (StrictMode monta doble en desarrollo) y la lectura de
+      // fuera es vieja en la segunda — con `add` eso duplicaba las recetas.
+      const dentro = await db.ajustes.get(1);
+      if (!dentro?.recetasSembradas) {
+        for (const nombre of RECETAS_INICIALES) {
+          await db.recetas.add({ nombre, tipo: "comida", ingredientes: "", pasos: "", creada: hoyISO() });
+        }
+      }
+
       /* --- Ajustes --- */
       // Lo que ya hubiera manda; los `??` solo rellenan lo que falta. Así una
       // resiembra por versión de plan nueva no pisa las preferencias.
@@ -84,6 +113,7 @@ export async function sembrar() {
         ...previo,
         id: 1,
         versionPlan: VERSION_PLAN,
+        recetasSembradas: true,
         creada: previo.creada ?? hoyISO(),
         // El onboarding de instalación limpia (§54) aún no se ha hecho.
         calibrada: previo.calibrada ?? false,
