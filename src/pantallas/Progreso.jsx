@@ -26,7 +26,7 @@ import {
 } from "../logica/acciones.js";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../datos/db.js";
-import { diasEntre, fechaCorta, hoyISO, ultimosDias } from "../logica/fechas.js";
+import { diaCorto, diasDesde, diasEntre, fechaCorta, hoyISO, ultimosDias } from "../logica/fechas.js";
 import { cambioSemanal, formatear as formatearPeso, media, serie, serieMedia } from "../logica/peso.js";
 import { faseDe } from "../datos/planNutricion.js";
 import { semaforoPeso } from "../logica/revision.js";
@@ -164,6 +164,8 @@ function Cuerpo() {
         <GraficaPeso puntos={serie(pesos, dias)} medias={serieMedia(pesos, dias)} />
       </div>
 
+      <ListaPesos pesos={pesos} />
+
       <Cintura />
 
       <div className="tarjeta">
@@ -286,21 +288,35 @@ function GraficaPeso({ puntos, medias }) {
   }
   const etiquetaKg = (v) => (v % 1 === 0 ? String(v) : v.toFixed(1).replace(".", ","));
 
-  // La línea de la media de 7 días. Cada tramo tras un hueco abre con "M":
-  // empezar con "L" es un camino inválido y el SVG no pinta nada.
-  let camino = "";
-  let cortado = true;
+  // La línea de la media de 7 días, por tramos: cada hueco (más de una semana
+  // sin pesarse) corta la línea, y cada tramo abre con "M" — empezar con "L"
+  // es un camino inválido y el SVG no pintaría nada.
+  const tramos = [];
+  let tramo = [];
   medias.forEach((p, i) => {
     if (p.kg == null) {
-      cortado = true;
+      if (tramo.length) tramos.push(tramo);
+      tramo = [];
       return;
     }
-    camino += `${cortado ? "M" : "L"}${x(i).toFixed(1)},${y(p.kg).toFixed(1)} `;
-    cortado = false;
+    tramo.push([x(i), y(p.kg)]);
   });
+  if (tramo.length) tramos.push(tramo);
+
+  const dibujar = (t) =>
+    t.map(([px, py], j) => `${j ? "L" : "M"}${px.toFixed(1)},${py.toFixed(1)}`).join(" ");
+  const camino = tramos.map(dibujar).join(" ");
+
+  // Relleno suave bajo la línea: da cuerpo a la tendencia de un vistazo.
+  const base = alto - abajo;
+  const area = tramos
+    .filter((t) => t.length > 1)
+    .map((t) => `${dibujar(t)} L${t.at(-1)[0].toFixed(1)},${base} L${t[0][0].toFixed(1)},${base} Z`)
+    .join(" ");
 
   let iUltimo = puntos.length - 1;
   while (puntos[iUltimo].kg == null) iUltimo -= 1;
+  const yUltimo = y(puntos[iUltimo].kg);
 
   return (
     <>
@@ -310,6 +326,13 @@ function GraficaPeso({ puntos, medias }) {
         role="img"
         aria-label="Evolución del peso"
       >
+        <defs>
+          <linearGradient id="relleno-peso" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--fuerza)" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="var(--fuerza)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
         {rayas.map((v) => (
           <g key={v}>
             <line
@@ -322,6 +345,7 @@ function GraficaPeso({ puntos, medias }) {
           </g>
         ))}
 
+        {area && <path d={area} fill="url(#relleno-peso)" />}
         <path
           d={camino} fill="none" stroke="var(--fuerza)"
           strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"
@@ -337,6 +361,15 @@ function GraficaPeso({ puntos, medias }) {
             />
           ),
         )}
+
+        {/* El peso de la última pesada, pegado a su punto. */}
+        <text
+          x={x(iUltimo) - 8}
+          y={yUltimo < 18 ? yUltimo + 16 : yUltimo - 9}
+          fill="var(--texto)" fontSize="11.5" fontWeight="700" textAnchor="end"
+        >
+          {formatearPeso(puntos[iUltimo].kg)}
+        </text>
 
         <text x={izq} y={alto - 2} fill="var(--texto-tenue)" fontSize="10">
           {fechaCorta(puntos[0].fecha)}
@@ -357,6 +390,71 @@ function GraficaPeso({ puntos, medias }) {
         </span>
       </div>
     </>
+  );
+}
+
+/*
+ * La lista de pesadas, día a día. La gráfica da la foto general; esta lista
+ * responde "¿qué marqué el martes?" sin interpretar nada. El cambio compara
+ * cada pesada con la anterior: bailar unas décimas de un día a otro es agua
+ * y es normal — por eso la que manda sigue siendo la media de arriba.
+ */
+function ListaPesos({ pesos }) {
+  const [verTodos, setVerTodos] = useState(false);
+
+  // De la más reciente a la más antigua, con el cambio contra la anterior.
+  const filas = pesos
+    .map((p, i) => ({ ...p, cambio: i > 0 ? p.kg - pesos[i - 1].kg : null }))
+    .reverse();
+  const visibles = verTodos ? filas : filas.slice(0, 10);
+
+  const etiquetaDia = (fecha) => {
+    const d = diasDesde(fecha);
+    if (d === 0) return "Hoy";
+    if (d === 1) return "Ayer";
+    return `${diaCorto(fecha)} ${fechaCorta(fecha)}`;
+  };
+
+  return (
+    <div className="tarjeta columna" style={{ gap: 9 }}>
+      <div className="entre" style={{ marginBottom: 3 }}>
+        <div className="rotulo">Pesos por día</div>
+        <span style={{ fontSize: 12, color: "var(--texto-tenue)" }}>
+          {filas.length} {filas.length === 1 ? "pesada" : "pesadas"}
+        </span>
+      </div>
+
+      {visibles.map((p) => (
+        <div key={p.fecha} className="entre" style={{ fontSize: 13.5 }}>
+          <span style={{ color: "var(--texto-medio)" }}>{etiquetaDia(p.fecha)}</span>
+          <span className="fila" style={{ gap: 12 }}>
+            <span
+              style={{
+                fontSize: 12,
+                width: 42,
+                textAlign: "right",
+                color: p.cambio != null && p.cambio < 0 ? "var(--exito)" : "var(--texto-tenue)",
+              }}
+            >
+              {p.cambio == null ? "" : `${p.cambio > 0 ? "+" : ""}${formatearPeso(p.cambio)}`}
+            </span>
+            <span style={{ fontWeight: 700, width: 56, textAlign: "right" }}>
+              {formatearPeso(p.kg)} kg
+            </span>
+          </span>
+        </div>
+      ))}
+
+      {filas.length > 10 && (
+        <button
+          className="boton-texto"
+          onClick={() => setVerTodos((v) => !v)}
+          style={{ alignSelf: "center", marginTop: 4 }}
+        >
+          {verTodos ? "Ver menos" : `Ver las ${filas.length} pesadas`}
+        </button>
+      )}
+    </div>
   );
 }
 
