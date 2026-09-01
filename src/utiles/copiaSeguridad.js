@@ -21,7 +21,7 @@ const TABLAS = [
   "bloquesCarrera", "carreras", "estadoCarrera",
   "pesos", "mediciones", "fotos",
   "postura", "testsPared",
-  "fasesNutricion", "protocolos", "agenda", "diario",
+  "fasesNutricion", "protocolos", "agenda", "diario", "recetas",
 ];
 
 /** Construye el objeto de copia con todo lo que hay. */
@@ -68,7 +68,7 @@ export async function exportar() {
  * `series.sesionId` se remapea. Las tablas con clave natural (fecha) sí se
  * fusionan con bulkPut, que ahí es lo correcto.
  */
-const TABLAS_AUTONUMERICAS = ["sesionesFuerza", "series", "carreras", "fotos", "agenda"];
+const TABLAS_AUTONUMERICAS = ["sesionesFuerza", "series", "carreras", "fotos", "agenda", "recetas"];
 
 /**
  * Restaura una copia sobre lo que haya.

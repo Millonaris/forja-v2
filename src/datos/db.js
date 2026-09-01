@@ -67,6 +67,13 @@ db.version(1).stores({
   diario: "fecha",
 });
 
+// v2: el recetario. Ideas de comidas de Jose organizadas por tipo (desayuno,
+// comida, merienda, cena, snack). No registra lo comido — eso sigue en Fitia —,
+// es su libreta de recetas.
+db.version(2).stores({
+  recetas: "++id, tipo",
+});
+
 /** Lee los ajustes (siempre id = 1). */
 export async function leerAjustes() {
   return (await db.ajustes.get(1)) || null;

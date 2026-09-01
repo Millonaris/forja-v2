@@ -23,6 +23,7 @@ import { useEffect, useState } from "react";
 import Volver from "../componentes/Volver.jsx";
 
 import Hoja from "../componentes/Hoja.jsx";
+import Recetas from "./Recetas.jsx";
 import { db } from "../datos/db.js";
 import {
   DIAS_ESPECIALES, FASES_MANUALES, MANTENIMIENTO_HIPOTESIS, NOTA_PREENTRENO, REGLAS,
@@ -39,6 +40,7 @@ import { miles } from "../logica/formato.js";
 const SECCIONES = [
   { id: "hoy", texto: "HOY" },
   { id: "calendario", texto: "CALENDARIO" },
+  { id: "recetas", texto: "RECETAS" },
   { id: "ano", texto: "AÑO" },
   { id: "porque", texto: "POR QUÉ" },
 ];
@@ -53,14 +55,15 @@ export default function Dieta({ sub, alVolver }) {
         <h1 className="titulo">Dieta</h1>
       </div>
 
-      <div className="fila" style={{ gap: 6 }}>
+      {/* Con cinco secciones la fila se desplaza, como la de PROGRESO. */}
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
         {SECCIONES.map((s) => (
           <button
             key={s.id}
             onClick={() => setActiva(s.id)}
             aria-pressed={s.id === activa}
             style={{
-              flex: 1, borderRadius: 999, padding: "10px 6px",
+              flexShrink: 0, borderRadius: 999, padding: "9px 14px",
               fontSize: 11.5, fontWeight: 800, letterSpacing: ".05em", cursor: "pointer",
               background: s.id === activa ? "var(--texto)" : "transparent",
               border: `1px solid ${s.id === activa ? "var(--texto)" : "var(--borde)"}`,
@@ -74,6 +77,7 @@ export default function Dieta({ sub, alVolver }) {
 
       {activa === "hoy" && <Hoy />}
       {activa === "calendario" && <Calendario />}
+      {activa === "recetas" && <Recetas />}
       {activa === "ano" && <Ano />}
       {activa === "porque" && <PorQue />}
     </div>

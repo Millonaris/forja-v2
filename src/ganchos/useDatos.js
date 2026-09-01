@@ -172,6 +172,18 @@ export function useSesionesDeEjercicio(ejercicioId) {
   );
 }
 
+/** Todas las recetas, ordenadas por nombre. */
+export function useRecetas() {
+  return useLiveQuery(
+    async () => {
+      const lista = await db.recetas.toArray();
+      return lista.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+    },
+    [],
+    [],
+  );
+}
+
 /** Eventos fijados a mano en la agenda. */
 export function useAgenda() {
   return useLiveQuery(async () => (await db.agenda.toArray()) ?? [], [], []);

@@ -384,6 +384,36 @@ export async function borrarSesion(sesionId) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Recetario                                                           */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Las recetas son ideas de comidas, no registro: apuntarlas o borrarlas no
+ * toca ninguna kcal ni ningún motor. Lo comido de verdad sigue en Fitia.
+ */
+
+/** Guarda una receta nueva o actualiza una existente (si trae id). */
+export async function guardarReceta({ id, nombre, tipo, ingredientes, pasos } = {}) {
+  const fila = {
+    nombre: (nombre ?? "").trim(),
+    tipo: tipo ?? "comida",
+    ingredientes: (ingredientes ?? "").trim(),
+    pasos: (pasos ?? "").trim(),
+  };
+  if (!fila.nombre) return null;
+
+  if (id != null) {
+    await db.recetas.update(id, fila);
+    return id;
+  }
+  return db.recetas.add({ ...fila, creada: hoyISO() });
+}
+
+export async function borrarReceta(id) {
+  await db.recetas.delete(id);
+}
+
+/* ------------------------------------------------------------------ */
 /* Plan anual: mantenimiento real, revisiones y cambio de fase         */
 /* ------------------------------------------------------------------ */
 
