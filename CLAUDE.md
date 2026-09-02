@@ -42,21 +42,27 @@ solo se usa para los atajos del manifest (#entrenar, #peso, #postura).
 - `src/pantallas/` — HOY, ENTRENAR (SesionFuerza), PROGRESO, PLAN, DIETA,
   Ajustes, DetalleSesion, Informe.
 - `pruebas/aceptacion.test.js` — los casos que protegen las reglas de negocio.
-- `docs/` — especificación maestra, plan maestro anual y rutina definitiva
-  (los documentos fuente de verdad que Jose entregó).
+- `docs/` — especificación maestra, plan maestro anual, rutina definitiva y
+  contexto maestro de dieta (los documentos fuente de verdad que Jose entregó).
+  `contexto-maestro-septiembre-2026.md` está SUPERADO de su día 7 en adelante.
 
 ## Invariantes que NO se rompen
 
 1. **El estado manda, la fecha solo recomienda.** La rotación de fuerza
    (TORSO A → PIERNA A → TORSO B → PIERNA B) y los bloques de carrera avanzan
    SOLO al completar sesiones, nunca por calendario. No se reinician los lunes.
-2. **La nutrición es lo único con fecha** — y solo hasta el 22-sep-2026
-   (puesta a punto + calibración; el protocolo vigente de ese tramo es
-   `docs/contexto-maestro-septiembre-2026.md`, que canceló el mini-cut de
-   1.700). Desde el 23-sep las kcal se calculan:
-   `mantenimientoReal + ajusteKcal` (campos de `ajustes`). Las fases de 2027
-   (definición, mantenimiento, recomposición) NO entran por fecha: las confirma
-   Jose desde DIETA → AÑO (`ajustes.faseManual`).
+2. **La nutrición es lo único con fecha** — y solo hasta el 20-sep-2026
+   (puesta a punto + test de mantenimiento). El protocolo vigente es
+   `docs/contexto-maestro-dieta-02sep2026.md`, que sustituye al del 26 de
+   agosto a partir del día 7: el mantenimiento estimado sube a ~2.800 y el test
+   pasa a ser del 7 al 20 de septiembre. Desde el 21-sep manda la definición de
+   seis semanas, y sus kcal se calculan:
+   `mantenimientoReal + ajusteBase de la fase + ajusteKcal` (campos de
+   `ajustes`). Las fases posteriores (mantenimiento, ganancia limpia, cut de
+   primavera, verano 2027) NO entran por fecha: las confirma Jose desde
+   DIETA → AÑO (`ajustes.faseManual`). Regla maestra: las calorías futuras
+   nunca son cifras fijas, primero se mide el mantenimiento y después se le
+   suma o resta.
 3. **Ids de ejercicio estables**: `plantilla:clave` (p. ej. `torso-a:jalon-pecho`).
    Renombrar o reordenar no rompe el historial. Si se cambia una clave, añadir
    la migración en `CLAVES_ANTIGUAS` y subir `VERSION_PLAN` en `semilla.js`

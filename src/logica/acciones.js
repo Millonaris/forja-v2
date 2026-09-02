@@ -417,7 +417,7 @@ export async function borrarReceta(id) {
 /* Plan anual: mantenimiento real, revisiones y cambio de fase         */
 /* ------------------------------------------------------------------ */
 
-/** Guardar el mantenimiento real que sale de la calibración (o corregirlo). */
+/** Guardar el mantenimiento real que sale del test de mantenimiento (o corregirlo). */
 export async function guardarMantenimiento(kcal) {
   await db.ajustes.update(1, { mantenimientoReal: Math.round(Number(kcal)) });
 }
@@ -435,10 +435,11 @@ export async function aplicarRevision(delta = 0, fecha = hoyISO()) {
 }
 
 /**
- * Confirmar una fase manual del plan anual (definición, mantenimiento,
- * recomposición). El plan manda: sus kcal parten del mantenimiento real DE
- * ESE MOMENTO, así que se guarda el que Jose confirma en el diálogo, y el
- * ajuste arranca en el punto inicial de la fase (p. ej. −450 en definición).
+ * Confirmar una fase manual del plan anual (mantenimiento, ganancia limpia,
+ * cut de primavera, verano). La regla maestra manda: sus kcal parten del
+ * mantenimiento real DE ESE MOMENTO, no del de hace medio año, así que se
+ * guarda el que Jose confirma en el diálogo y el ajuste arranca en el punto
+ * inicial de la fase (p. ej. +125 en la ganancia limpia).
  */
 export async function empezarFase(faseId, { mantenimiento, ajusteInicial = 0 }, fecha = hoyISO()) {
   await db.ajustes.update(1, {
@@ -451,7 +452,7 @@ export async function empezarFase(faseId, { mantenimiento, ajusteInicial = 0 }, 
   });
 }
 
-/** Deshacer la fase manual y volver a la hipertrofia por fechas. */
+/** Deshacer la fase manual y volver al plan por fechas (la definición). */
 export async function quitarFaseManual() {
   await db.ajustes.update(1, { faseManual: null, faseManualDesde: null, ajusteKcal: 0 });
 }

@@ -1,28 +1,37 @@
 /*
- * Calibración del mantenimiento real (fase 2 del plan maestro, 9–22 sep).
+ * Test de mantenimiento (§11–14 del contexto maestro de dieta, 7–20 sep).
  *
- * El protocolo del plan, en números: 14 días comiendo 2.600 kcal planas y
- * pesándose cada mañana. Se compara la media de los días 1–7 con la de los
- * 8–14. Como los centros de las dos ventanas están a una semana, la
- * diferencia de medias ES la velocidad en kg/semana, sin más cuentas.
+ * El protocolo, en números: 14 días comiendo ~2.800 kcal planas y pesándose
+ * cada mañana. Se compara la media de los días 7–13 con la de los 14–20. Como
+ * los centros de las dos ventanas están a una semana, la diferencia de medias
+ * ES la velocidad en kg/semana, sin más cuentas.
  *
  * De ahí sale el mantenimiento: 1 kg de tejido son ~7.700 kcal, así que
  * kg/semana × 7.700 ÷ 7 es el superávit (o déficit) DIARIO que había sobre
- * las 2.600. Mantenimiento real ≈ 2.600 − ese exceso, redondeado a 50.
+ * las 2.800. Mantenimiento real ≈ 2.800 − ese exceso, redondeado a 50.
+ *
+ * Interpretación del §14, que es exactamente lo que hace la cuenta: medias
+ * parecidas → el mantenimiento ronda las 2.800; la segunda media baja → está
+ * por encima; sube → está por debajo.
  *
  * El ajuste se limita a ±250 kcal a propósito: en dos semanas el peso también
  * se mueve por glucógeno, agua y contenido digestivo, y una corrección mayor
- * que eso casi seguro está midiendo agua, no comida. El plan lo dice igual:
- * "no necesitamos precisión de 20 kcal, necesitamos un valor suficientemente
- * bueno para tomar decisiones".
+ * que eso casi seguro está midiendo agua, no comida. Además el test viene
+ * detrás de varios días a 2.300–2.500 con hidrato alto, así que la primera
+ * semana arrastra relleno de glucógeno.
+ *
+ * De este número salen las kcal de la definición de seis semanas: sin él, la
+ * app solo puede trabajar con la hipótesis.
  */
 
 import { MANTENIMIENTO_HIPOTESIS } from "../datos/planNutricion.js";
 import { diasEntre, hoyISO, sumarDias } from "./fechas.js";
 
 export const CALIBRACION = {
-  desde: "2026-09-09",
-  hasta: "2026-09-22",
+  desde: "2026-09-07",
+  hasta: "2026-09-20",
+  // El día de leer el resultado y fijar el déficit (§14).
+  revision: "2026-09-21",
   kcal: MANTENIMIENTO_HIPOTESIS,
   // Con menos de 4 pesajes por semana la media deja de ser fiable.
   minPesajes: 4,

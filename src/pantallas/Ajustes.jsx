@@ -191,8 +191,8 @@ function Seccion({ titulo, children }) {
 
 /*
  * El mantenimiento real es EL número del plan anual: de él salen las kcal de
- * hipertrofia, definición y todo lo demás. Normalmente lo pone la calibración
- * de septiembre; aquí solo se corrige si hizo falta.
+ * la definición, el mantenimiento posterior y la ganancia. Normalmente lo pone
+ * el test del 7 al 20 de septiembre; aquí solo se corrige si hizo falta.
  */
 function Mantenimiento({ ajustes }) {
   const [editando, setEditando] = useState(false);
@@ -210,7 +210,7 @@ function Mantenimiento({ ajustes }) {
       >
         <span style={{ color: "var(--texto-medio)", fontSize: 13 }}>Mantenimiento real</span>
         <span style={{ fontWeight: 700 }}>
-          {valor == null ? `Sin calibrar (${miles(MANTENIMIENTO_HIPOTESIS)})` : `${miles(valor)} kcal`}
+          {valor == null ? `Sin medir (${miles(MANTENIMIENTO_HIPOTESIS)})` : `${miles(valor)} kcal`}
           {(ajustes.ajusteKcal ?? 0) !== 0 && (
             <span style={{ color: "var(--texto-tenue)", fontWeight: 600 }}>
               {" "}{ajustes.ajusteKcal > 0 ? "+" : "−"}{Math.abs(ajustes.ajusteKcal)}
@@ -223,9 +223,9 @@ function Mantenimiento({ ajustes }) {
         abierto={editando}
         alCerrar={() => setEditando(false)}
         titulo="Mantenimiento real"
-        subtitulo="Las kcal con las que tu peso se queda quieto. Lo mide la calibración de septiembre; corrígelo solo si sabes lo que haces."
+        subtitulo="Las kcal con las que tu peso se queda quieto. Lo mide el test de mantenimiento del 7 al 20 de septiembre; corrígelo solo si sabes lo que haces."
         unidad="kcal"
-        marcador="2600"
+        marcador="2800"
         valorInicial={{ valor: valor ?? MANTENIMIENTO_HIPOTESIS }}
         min={1500}
         max={4000}

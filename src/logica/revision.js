@@ -13,12 +13,22 @@
 import { pesoDeTrabajo, repsTotales } from "./progresion.js";
 import { diasEntre, hoyISO, sumarDias } from "./fechas.js";
 
-/** La primera revisión cuenta desde el arranque de la hipertrofia. */
-export const INICIO_REVISIONES = "2026-09-23";
+/** La primera revisión cuenta desde el arranque de la definición. */
+export const INICIO_REVISIONES = "2026-09-21";
 const CADA_DIAS = 28;
 
 /* Fases en las que la revisión tiene sentido (las que tienen kcal ajustables). */
-const FASES_CON_REVISION = new Set(["hipertrofia", "definicion", "mantenimiento-post", "recomp"]);
+const FASES_CON_REVISION = new Set([
+  "definicion",
+  "mantenimiento-post",
+  "ganancia",
+  "definicion-primavera",
+  "mantenimiento-verano",
+]);
+
+/* Las dos fases de déficit se juzgan igual, y las dos de mantenimiento también. */
+const EN_DEFICIT = new Set(["definicion", "definicion-primavera"]);
+const ESTABLES = new Set(["mantenimiento-post", "mantenimiento-verano"]);
 
 /** ¿Toca ya la revisión mensual? */
 export function revisionPendiente(faseId, ajustes = {}, hoy = hoyISO()) {
@@ -140,15 +150,13 @@ export function revisar({ pesos = [], mediciones = [], sesiones = [], carreras =
     };
   }
 
-  if (faseId === "definicion") return { ...datos, ...revisarDefinicion(peso, progresion) };
-  if (faseId === "mantenimiento-post" || faseId === "recomp") {
-    return { ...datos, ...revisarEstable(peso) };
-  }
-  return { ...datos, ...revisarHipertrofia(peso, cintura, progresion) };
+  if (EN_DEFICIT.has(faseId)) return { ...datos, ...revisarDefinicion(peso, progresion) };
+  if (faseId === "ganancia") return { ...datos, ...revisarGanancia(peso, cintura, progresion) };
+  return { ...datos, ...revisarEstable(peso) };
 }
 
-/** Hipertrofia: ganar 0–0,20 kg/semana con la cintura quieta. */
-function revisarHipertrofia(peso, cintura, progresion) {
+/** Ganancia limpia: subir 0–0,20 kg/semana con la cintura quieta. */
+function revisarGanancia(peso, cintura, progresion) {
   if (peso == null) {
     return {
       accion: "mantener",
@@ -202,7 +210,7 @@ function revisarHipertrofia(peso, cintura, progresion) {
   };
 }
 
-/** Definición: perder ~0,5–0,75 % del peso a la semana. */
+/** Definición: perder ~0,5–0,7 % del peso a la semana (§16 del contexto). */
 function revisarDefinicion(peso, progresion) {
   if (peso == null) {
     return {
@@ -213,11 +221,11 @@ function revisarDefinicion(peso, progresion) {
 
   const pct = (peso.porSemana / peso.reciente) * 100;
 
-  if (pct <= -0.9) {
+  if (pct <= -0.85) {
     return {
       accion: "subir",
       motivo:
-        `Pierdes ${vel(-peso.porSemana)} (${pctTexto(-pct)} del peso corporal), más rápido que el objetivo de 0,5–0,75 %. ` +
+        `Pierdes ${vel(-peso.porSemana)} (${pctTexto(-pct)} del peso corporal), más rápido que el objetivo de 0,5–0,7 %. ` +
         "Demasiado déficit se come músculo y rendimiento: +100–150 kcal.",
     };
   }
@@ -226,14 +234,15 @@ function revisarDefinicion(peso, progresion) {
     return {
       accion: "bajar",
       motivo:
-        "El peso prácticamente no baja desde hace semanas con el plan cumplido. Toca profundizar el déficit: −100–150 kcal.",
+        "El peso medio y la cintura llevan semanas planos con el plan cumplido y la actividad parecida. " +
+        "Ese es el único caso en que se profundiza el déficit: −100 kcal.",
     };
   }
 
   return {
     accion: "mantener",
     motivo:
-      `Pierdes ${vel(-peso.porSemana)} (${pctTexto(-pct)}/semana), dentro del rango 0,4–0,9 %${progresion.progresa ? " y el gimnasio aguanta" : ""}. ` +
+      `Pierdes ${vel(-peso.porSemana)} (${pctTexto(-pct)}/semana), dentro del rango objetivo${progresion.progresa ? " y el gimnasio aguanta" : ""}. ` +
       "Justo lo que pide el plan: no se toca nada.",
   };
 }
@@ -285,23 +294,23 @@ export function semaforoPeso(pesos, faseId, hoy = hoyISO()) {
   }
 
   if (faseId === "calibracion") {
-    return info(v, "Semanas de medir, no de juzgar: come las ~2.600 planas y deja que la media hable.");
+    return info(v, "TEST DE MANTENIMIENTO: semanas de medir, no de juzgar. Come las ~2.800 planas y deja que la media hable.");
   }
 
-  if (faseId === "definicion") {
+  if (EN_DEFICIT.has(faseId)) {
     const pct = (v / peso.reciente) * 100;
-    if (pct <= -0.9) return ambar(v, "Más rápido que el 0,5–0,75 % semanal objetivo: cuidado con el músculo.");
-    if (pct <= -0.4) return verde(v, "Dentro del ritmo objetivo (0,5–0,75 %/semana).");
+    if (pct <= -0.85) return ambar(v, "Más rápido que el 0,5–0,7 % semanal objetivo: cuidado con el músculo.");
+    if (pct <= -0.4) return verde(v, "Dentro del ritmo objetivo (0,5–0,7 %/semana).");
     if (pct <= -0.15) return ambar(v, "Baja despacio. Si sigue así dos semanas, la revisión propondrá ajustar.");
-    return rojo(v, "El peso no baja. La revisión mensual dirá si toca −100–150 kcal.");
+    return rojo(v, "El peso no baja. La revisión mensual dirá si toca −100 kcal.");
   }
 
-  if (faseId === "mantenimiento-post" || faseId === "recomp") {
+  if (ESTABLES.has(faseId)) {
     if (Math.abs(v) <= 0.2) return verde(v, "Peso estable: el objetivo de la fase.");
     return ambar(v, v > 0 ? "Sube más de lo que pide la fase." : "Baja sin buscarlo.");
   }
 
-  // Hipertrofia: 0–0,20 kg/semana de media, evaluado en bloques largos.
+  // Ganancia limpia: 0–0,20 kg/semana de media, evaluado en bloques largos.
   if (v > 0.35) return rojo(v, "Demasiado rápido: a este ritmo se acumula grasa. La revisión propondrá bajar.");
   if (v > 0.2) return ambar(v, "Algo por encima del objetivo (0–0,20 kg/semana). Vigilar cintura.");
   if (v >= -0.1) return verde(v, "En el objetivo: 0–0,20 kg/semana. Construyendo sin engordar.");

@@ -22,8 +22,11 @@ import { hoyISO } from "../logica/fechas.js";
  * de 1.700 y el tramo 26 ago → 22 sep pasa a déficit moderado (2.150),
  * llenado (2.300–2.500), dos días visuales a ~2.450 y transición (2.500).
  * v8: las primeras recetas de Jose entran en el recetario (una sola vez).
+ * v9: entra el contexto maestro de DIETA del 2 de septiembre — el
+ * mantenimiento estimado sube a ~2.800, el test pasa a ser del 7 al 20 de
+ * septiembre y detrás viene una definición de seis semanas, no hipertrofia.
  */
-export const VERSION_PLAN = 8;
+export const VERSION_PLAN = 9;
 
 /*
  * Las comidas que Jose pidió tener de partida en DIETA → RECETAS. Solo el
@@ -118,11 +121,11 @@ export async function sembrar() {
         // El onboarding de instalación limpia (§54) aún no se ha hecho.
         calibrada: previo.calibrada ?? false,
         /*
-         * Plan anual (versión 6). El mantenimiento real lo pone la
-         * calibración de septiembre; hasta entonces las fases dinámicas usan
-         * la hipótesis de 2.600. `ajusteKcal` acumula los ±100–150 de las
-         * revisiones mensuales, y `faseManual` es la fase confirmada a mano
-         * (definición, mantenimiento post, recomposición) o null.
+         * Plan anual. El mantenimiento real lo mide el test del 7 al 20 de
+         * septiembre; hasta entonces las fases dinámicas usan la hipótesis de
+         * 2.800. `ajusteKcal` acumula los ±100–150 de las revisiones
+         * mensuales, y `faseManual` es la fase confirmada a mano
+         * (mantenimiento, ganancia, cut de primavera, verano) o null.
          */
         mantenimientoReal: previo.mantenimientoReal ?? null,
         ajusteKcal: previo.ajusteKcal ?? 0,

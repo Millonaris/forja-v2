@@ -1,25 +1,34 @@
 /*
- * Nutrición según el CONTEXTO MAESTRO DE SEPTIEMBRE 2026
- * (docs/contexto-maestro-septiembre-2026.md, 26 de agosto), que sustituye al
- * protocolo del plan anual para el tramo 26 ago → 22 sep: el mini-cut de
- * 1.700 kcal queda CANCELADO. El objetivo ya no es pesar lo mínimo el 4–5 de
- * septiembre, sino llegar con algo menos de grasa y el músculo LLENO.
+ * Nutrición según el CONTEXTO MAESTRO DE DIETA del 2 de septiembre de 2026
+ * (docs/contexto-maestro-dieta-02sep2026.md). Sustituye al contexto del 26 de
+ * agosto a partir del día 7: el tramo 26 ago → 6 sep (déficit moderado,
+ * llenado, días visuales y transición) se queda como estaba, y lo que venía
+ * detrás cambia entero.
  *
- * OJO: esto es lo ÚNICO de FORJA que va por fecha de verdad… hasta el 22 de
- * septiembre. A partir de ahí el propio plan maestro manda otra cosa: "los
- * datos reales mandan sobre el calendario" y "no fijar hoy las calorías de
- * febrero". Por eso hay dos clases de fases:
+ * Lo que cambia y por qué: el mantenimiento estimado sube. Con ~12.800 pasos
+ * de media (el running YA va dentro de esos pasos) más las sesiones de
+ * hipertrofia, la hipótesis honesta ya no es 2.600 sino 2.750–3.000, y el test
+ * se hace a ~2.800. Y detrás del test no viene una fase de construcción sino
+ * una DEFINICIÓN de seis semanas: primero se mide el mantenimiento, después se
+ * resta el déficit.
  *
- *   · CON FECHA   — déficit moderado, llenado, transición y calibración.
- *     Días contados, kcal escritas.
- *   · DINÁMICAS   — hipertrofia, definición, mantenimiento y recomposición.
- *     Sus kcal no están escritas aquí: se calculan con el mantenimiento REAL
- *     que sale de la calibración (ajustes.mantenimientoReal) más el ajuste
- *     acumulado de las revisiones mensuales (ajustes.ajusteKcal).
+ * OJO: esto es lo ÚNICO de FORJA que va por fecha de verdad… hasta el 20 de
+ * septiembre. A partir de ahí manda la regla maestra del contexto: "las
+ * calorías futuras no deben tratarse como cifras fijas". Por eso hay dos
+ * clases de fases:
  *
- * La hipertrofia empieza sola el 23 de septiembre (la calibración acaba el
- * 22). Las fases siguientes NO cambian solas por fecha: las confirma Jose
- * desde la vista AÑO (ajustes.faseManual) cuando los datos digan que toca.
+ *   · CON FECHA   — déficit moderado, llenado, transición y el test de
+ *     mantenimiento. Días contados, kcal escritas.
+ *   · DINÁMICAS   — definición, mantenimiento, ganancia limpia y el cut de
+ *     primavera. Sus kcal no están escritas aquí: se calculan con el
+ *     mantenimiento MEDIDO (ajustes.mantenimientoReal), el desfase propio de
+ *     la fase (`ajusteBase`) y el ajuste acumulado de las revisiones
+ *     mensuales (ajustes.ajusteKcal).
+ *
+ * La definición empieza sola el 21 de septiembre (el test acaba el 20 y ese
+ * mismo día se revisa). Las fases siguientes NO cambian solas por fecha: las
+ * confirma Jose desde la vista AÑO (ajustes.faseManual) cuando los datos lo
+ * pidan.
  *
  * La comida se registra en Fitia. FORJA solo enseña el objetivo del día y las
  * macros por comida: es una chuleta, no un segundo Fitia (§58).
@@ -32,15 +41,23 @@ export function kcalDe({ p, hc, g }) {
   return p * 4 + hc * 4 + g * 9;
 }
 
-/** Si la calibración no ha dado todavía un número, esta es la hipótesis del plan. */
-export const MANTENIMIENTO_HIPOTESIS = 2600;
+/** Si el test no ha dado todavía un número, esta es la hipótesis del plan. */
+export const MANTENIMIENTO_HIPOTESIS = 2800;
 
 /*
- * El mantenimiento NO se conoce todavía: 2.550–2.700 es la horquilla estimada
- * y 2.600 el punto central de trabajo. Hasta que la calibración de septiembre
- * dé el número real, la app dice "estimado", nunca "confirmado".
+ * El mantenimiento NO se conoce todavía: 2.750–3.000 es la horquilla estimada
+ * y 2.800 el punto de trabajo del test. Hasta que los 14 días den el número
+ * real, la app dice "estimado", nunca "confirmado".
+ *
+ * La estimación anterior de ~2.600 queda descartada: la primera semana de
+ * vuelta al entrenamiento salió casi plana comiendo 2.100–2.150, pero eso NO
+ * demuestra que ese fuera el mantenimiento (coinciden recuperación de
+ * glucógeno, agua intramuscular e inflamación después de tres semanas parado).
  */
-export const MANTENIMIENTO_ESTIMADO = { min: 2550, medio: 2600, max: 2700 };
+export const MANTENIMIENTO_ESTIMADO = { min: 2750, medio: 2800, max: 3000 };
+
+/** Horquilla del déficit de la definición sobre el mantenimiento medido. */
+export const DEFICIT_DEFINICION = { min: 450, max: 600 };
 
 /** La referencia de partida del protocolo. No borra históricos: solo es el punto de partida. */
 export const PESO_REFERENCIA = { kg: 96.9, fecha: "2026-08-26" };
@@ -49,9 +66,12 @@ export const PESO_REFERENCIA = { kg: 96.9, fecha: "2026-08-26" };
 /* Reparto automático de comidas                                       */
 /*                                                                     */
 /* Las fases dinámicas no pueden traer las comidas escritas a mano     */
-/* porque sus kcal dependen del mantenimiento real. El reparto sale    */
-/* de las proporciones del plan (§13): proteína en las cuatro comidas, */
-/* el grueso del hidrato alrededor del entreno, la grasa en la cena.   */
+/* porque sus kcal dependen del mantenimiento medido. El reparto sale  */
+/* de las proporciones del plan: proteína en las cuatro comidas, el    */
+/* grueso del hidrato alrededor del entreno, la grasa en la cena.      */
+/*                                                                     */
+/* Son objetivos ORIENTATIVOS (§27 del contexto): mover macros de una  */
+/* comida a otra no rompe nada, lo que manda es el total del día.      */
 /* ------------------------------------------------------------------ */
 
 const COMIDAS_BASE = [
@@ -84,9 +104,16 @@ export function repartirComidas(p, hc, g) {
   return COMIDAS_BASE.map((c, i) => comida(c.hora, c.nombre, ps[i], hcs[i], gs[i]));
 }
 
-/** Los macros completos de una fase dinámica con el estado actual de ajustes. */
+/**
+ * Los macros completos de una fase dinámica con el estado actual de ajustes.
+ *
+ * Orden de prioridad del contexto (§26): calorías totales primero, luego
+ * proteína, luego grasa mínima suficiente, y el hidrato se lleva el resto.
+ * Por eso el hidrato es lo único que se calcula: es la variable de ajuste.
+ */
 function macrosDinamicos(fase, ajustes = {}) {
-  const kcal = (ajustes.mantenimientoReal ?? MANTENIMIENTO_HIPOTESIS) + (ajustes.ajusteKcal ?? 0);
+  const kcal =
+    (ajustes.mantenimientoReal ?? MANTENIMIENTO_HIPOTESIS) + (fase.ajusteBase ?? 0) + (ajustes.ajusteKcal ?? 0);
   const hc = Math.max(0, Math.round((kcal - fase.p * 4 - fase.g * 9) / 4));
   return { kcal: fase.p * 4 + hc * 4 + fase.g * 9, p: fase.p, hc, g: fase.g, comidas: repartirComidas(fase.p, hc, fase.g) };
 }
@@ -100,8 +127,7 @@ export const FASES = [
     /*
      * Déficit moderado, NO el mini-cut de 1.700 que había antes: con tan poco
      * hidrato se llega más ligero pero plano y entrenando peor, y la grasa
-     * extra perdida en tan pocos días no compensa. Unas 400–550 kcal por
-     * debajo del mantenimiento estimado.
+     * extra perdida en tan pocos días no compensa.
      */
     id: "deficit-moderado",
     nombre: "Déficit moderado",
@@ -143,14 +169,14 @@ export const FASES = [
   },
   {
     /*
-     * Después de los días visuales NO se vuelve a un déficit agresivo: se
-     * estabiliza glucógeno y rendimiento para llegar limpio al test del 9.
+     * Un solo día de transición: después de los días visuales NO se vuelve a
+     * un déficit agresivo, se estabiliza y mañana ya empieza el test.
      */
     id: "transicion",
     nombre: "Transición",
-    resumen: "Estabilizar después de los días visuales y preparar el test de mantenimiento.",
+    resumen: "Estabilizar después de los días visuales y entrar en el test de mantenimiento.",
     desde: "2026-09-06",
-    hasta: "2026-09-08",
+    hasta: "2026-09-06",
     kcal: 2500,
     p: 190,
     hc: 300,
@@ -164,82 +190,105 @@ export const FASES = [
   },
   {
     /*
-     * Los 14 días que valen un año: comer PLANO a ~2.600 y pesarse cada
-     * mañana. La media de los días 1–7 contra la de los 8–14 dice si 2.600 es
-     * tu mantenimiento real o hay que corregirlo. Ese número es la base de
-     * TODAS las fases que vienen después.
+     * Los 14 días que valen un año: comer PLANO a ~2.800 y pesarse cada
+     * mañana. La media del 7–13 contra la del 14–20 dice si 2.800 es el
+     * mantenimiento real o hay que corregirlo. Ese número es la base de TODAS
+     * las fases que vienen después, empezando por el déficit de seis semanas.
      *
-     * Los macros del contexto maestro (190/309/67) suman 2.599 exactas; la
-     * kcal de menos es irrelevante y el objetivo se sigue contando como 2.600.
+     * La proteína BAJA de 190 a 180: los 190 de la semana visual eran parte de
+     * aquel protocolo, no una obligación permanente (§25 del contexto).
+     *
+     * Los macros del contexto (180/351/75) suman 2.799 exactas; la kcal de
+     * menos es irrelevante y el objetivo se sigue contando como 2.800.
      */
     id: "calibracion",
-    nombre: "Calibración",
-    resumen: "14 días a ~2.600 kcal clavadas para descubrir tu mantenimiento real.",
-    desde: "2026-09-09",
-    hasta: "2026-09-22",
-    kcal: 2599,
-    p: 190,
-    hc: 309,
-    g: 67,
+    nombre: "Test de mantenimiento",
+    resumen: "14 días a ~2.800 kcal clavadas para medir tu mantenimiento real.",
+    desde: "2026-09-07",
+    hasta: "2026-09-20",
+    kcal: 2799,
+    p: 180,
+    hc: 351,
+    g: 75,
     comidas: [
-      comida("09:00", "Desayuno", 45, 85, 12),
-      comida("13:00", "Comida (post-entreno)", 55, 110, 15),
-      comida("17:30", "Merienda", 35, 50, 10),
-      comida("21:00", "Cena", 55, 64, 30),
+      comida("09:00", "Desayuno", 40, 95, 15),
+      comida("13:00", "Comida (post-entreno)", 55, 130, 15),
+      comida("17:30", "Merienda", 35, 55, 10),
+      comida("21:00", "Cena", 50, 71, 35),
     ],
   },
   {
     /*
-     * Fase abierta y DINÁMICA: `kcal/hc/comidas` de aquí son la hipótesis de
-     * 2.600; lo que se enseña de verdad lo calcula `objetivosDe` con el
-     * mantenimiento real + el ajuste de las revisiones mensuales. Proteína
-     * ~190 y grasa ~70–75: el hidrato es la variable que ajusta el superávit.
+     * Fase abierta y DINÁMICA: `kcal/hc/comidas` de aquí son la hipótesis
+     * sobre 2.800; lo que se enseña de verdad lo calcula `objetivosDe` con el
+     * mantenimiento medido en el test.
+     *
+     * El déficit arranca en −500 (centro de la horquilla 450–600 del §16) y
+     * lo mueve la revisión mensual. Proteína 185 y grasa 65: el hidrato se
+     * lleva el resto y se mantiene alto para sostener hipertrofia y CaCo.
+     *
+     * Seis semanas previstas (21 sep → ~1 nov), pero el final no es una fecha
+     * dura: al terminarlas Jose confirma el mantenimiento desde la vista AÑO.
      */
-    id: "hipertrofia",
-    nombre: "Hipertrofia",
-    resumen: "La gran fase de construcción: 4–5 meses ganando músculo con la grasa controlada.",
-    desde: "2026-09-23",
+    id: "definicion",
+    nombre: "Definición",
+    resumen: "Seis semanas de déficit sobre el mantenimiento medido, perdiendo 0,5–0,7 % a la semana.",
+    desde: "2026-09-21",
     hasta: null,
+    hastaPrevisto: "2026-11-01",
     dinamica: true,
-    kcal: 2600,
-    p: 190,
-    hc: 298,
-    g: 72,
-    comidas: repartirComidas(190, 298, 72),
+    ajusteBase: -500,
+    kcal: 2301,
+    p: 185,
+    hc: 244,
+    g: 65,
+    comidas: repartirComidas(185, 244, 65),
   },
 ];
 
 /*
  * Fases que NO entran por fecha: las confirma Jose desde la vista AÑO cuando
  * los datos lo pidan (ajustes.faseManual). Todas son dinámicas.
+ *
+ * `ajusteInicial` es dónde arranca la fase respecto al mantenimiento que él
+ * confirma en ese momento; a partir de ahí lo mueven las revisiones.
  */
 export const FASES_MANUALES = {
-  definicion: {
-    id: "definicion",
-    nombre: "Definición",
-    resumen: "Bajar grasa despacio conservando el músculo construido.",
-    dinamica: true,
-    p: 200,
-    g: 68,
-    ajusteInicial: -450,
-  },
   "mantenimiento-post": {
     id: "mantenimiento-post",
     nombre: "Mantenimiento",
-    resumen: "3–6 semanas estabilizando el peso nuevo y recuperando rendimiento.",
+    resumen: "2–3 semanas estabilizando el peso nuevo y recuperando rendimiento.",
     dinamica: true,
-    p: 190,
-    g: 76,
+    p: 180,
+    g: 75,
     ajusteInicial: 0,
   },
-  recomp: {
-    id: "recomp",
-    nombre: "Recomposición",
-    resumen: "Mantener el físico magro y seguir progresando, con superávit mínimo o sin él.",
+  ganancia: {
+    id: "ganancia",
+    nombre: "Ganancia muscular limpia",
+    resumen: "Construir músculo con un superávit pequeño, nunca con uno grande.",
     dinamica: true,
-    p: 190,
-    g: 76,
-    ajusteInicial: 100,
+    p: 180,
+    g: 75,
+    ajusteInicial: 125,
+  },
+  "definicion-primavera": {
+    id: "definicion-primavera",
+    nombre: "Definición de primavera",
+    resumen: "Cut corto de primavera 2027, solo si la cintura y las fotos lo piden.",
+    dinamica: true,
+    p: 185,
+    g: 70,
+    ajusteInicial: -450,
+  },
+  "mantenimiento-verano": {
+    id: "mantenimiento-verano",
+    nombre: "Mantenimiento de verano",
+    resumen: "Verano 2027 comiendo el mantenimiento real de ese momento.",
+    dinamica: true,
+    p: 180,
+    g: 75,
+    ajusteInicial: 0,
   },
 };
 
@@ -350,15 +399,16 @@ export const DIAS_ESPECIALES = {
 
 /** Reglas de fondo. Van plegadas: no compiten con las acciones (§22, §35). */
 export const REGLAS = [
+  "Las decisiones se toman con la media de 7 días + cintura + adherencia + actividad. Nunca con una pesada, ni con dos, ni con tres.",
   "Creatina: 5 g al día, todos los días.",
-  "Agua normal. Nunca cortarla para pesarse mejor. Nada de sauna ni de sudar para bajar peso.",
-  "Sal normal y consistente. Nada de protocolos raros de sodio.",
-  "Lo que manda es la media de 7 días, no el peso de un día suelto.",
+  "Agua: unos 2–2,5 litros al día más lo que pidan el calor y el entreno. Nunca cortarla para pesarse mejor, nada de sauna ni de cargas extremas.",
+  "Sal normal y constante. Ni cortarla ni protocolos raros de sodio.",
   "Del 3 al 5 el peso puede subir por glucógeno y agua aunque estés perdiendo grasa: no es grasa y no hay que compensar.",
-  "Cintura y fotos como control, no solo la báscula.",
-  "Después de los días visuales se pasa a la transición de 2.500, no a un déficit agresivo.",
+  "Durante el test de mantenimiento no se ajusta nada por una pesada suelta: se come lo mismo los 14 días y punto.",
+  "Cintura y fotos como control, no solo la báscula. Cintura al menos una vez por semana.",
   "Las calorías solo se tocan en la revisión de cada 4 semanas, en bloques de ±100–150.",
-  "No hay que clavar los hidratos al gramo: proteína primero, el resto es flexible.",
+  "Prioridad de macros: calorías totales, proteína, grasa suficiente y el hidrato con el resto. No hay que clavar los hidratos al gramo.",
+  "Los macros por comida son orientativos: moverlos entre comidas no rompe nada, lo que manda es el total del día.",
 ];
 
 /*
@@ -399,7 +449,7 @@ export function planEnMarcha(iso) {
  * Los objetivos de un día concreto.
  *
  * Orden de prioridad: día especial > fase. En las fases dinámicas los números
- * se calculan con el mantenimiento real y el ajuste acumulado; en las que
+ * se calculan con el mantenimiento medido y el ajuste acumulado; en las que
  * tienen fecha, salen escritos del plan.
  */
 export function objetivosDe(iso, ajustes = {}) {
@@ -419,25 +469,27 @@ export function objetivosDe(iso, ajustes = {}) {
     especial: null,
     nombre: fase.nombre,
     resumen: fase.resumen,
-    // En dinámicas, sin calibración guardada esto es una hipótesis y se avisa.
+    // En dinámicas, sin el test guardado esto es una hipótesis y se avisa.
     esHipotesis: Boolean(fase.dinamica) && ajustes.mantenimientoReal == null,
     ...macros,
   };
 }
 
 /**
- * El calendario día a día del tramo que tiene fecha (26 ago → 22 sep):
+ * El calendario día a día del tramo que tiene fecha (26 ago → 20 sep):
  * déficit moderado, llenado con los días visuales, transición y los 14 días
- * de calibración.
+ * del test de mantenimiento.
  *
  * Se genera, no se escribe a mano: así no puede desincronizarse de las fases y
  * de los días especiales, que es la fuente de verdad.
  */
+export const TRAMO_CON_FECHA = { desde: "2026-08-26", hasta: "2026-09-20" };
+
 export function calendarioDelTramo() {
   const dias = [];
-  let iso = "2026-08-26";
+  let iso = TRAMO_CON_FECHA.desde;
 
-  while (iso <= "2026-09-22") {
+  while (iso <= TRAMO_CON_FECHA.hasta) {
     const o = objetivosDe(iso);
     dias.push({
       fecha: iso,
@@ -503,7 +555,7 @@ export function porQueDe(iso, ajustes = {}) {
       return (
         "Primer día del plan, con nueva referencia de partida: 96,9 kg. Se cancela el mini-cut " +
         "de 1.700: un déficit tan grande te dejaría plano y entrenando peor. En su lugar, déficit " +
-        "moderado (unas 400–550 kcal bajo el mantenimiento estimado) con la proteína en 190 g."
+        "moderado con la proteína en 190 g."
       );
     case "2026-09-01":
       return "Último día a 2.150. A partir de mañana empieza el llenado: suben los hidratos.";
@@ -516,15 +568,20 @@ export function porQueDe(iso, ajustes = {}) {
     case "2026-09-06":
       return (
         "Pasaron los días visuales y NO se vuelve a un déficit agresivo: 2.500 kcal para " +
-        "estabilizar glucógeno y rendimiento y preparar el test de mantenimiento del día 9."
+        "estabilizar glucógeno y rendimiento. Hoy toca medir peso, cintura y foto de perfil: " +
+        "mañana empieza el test de mantenimiento."
       );
-    case "2026-09-08":
-      return "Último día de transición. Toca medir: peso, cintura y foto de perfil. Mañana empieza el test.";
-    case "2026-09-09":
+    case "2026-09-07":
       return (
-        "Empieza la calibración: 14 días comiendo ~2.600 kcal clavadas y pesándote cada mañana " +
-        "(después del baño, antes de desayunar). Un día suelto de subida o bajada no cambia " +
-        "nada: durante el test las calorías no se tocan."
+        "Empieza el test: 14 días comiendo ~2.800 kcal clavadas y pesándote cada mañana " +
+        "(después del baño, antes de desayunar). Estos días la báscula puede subir por glucógeno " +
+        "y agua después de las 2.300–2.500 con hidrato alto: eso NO es grasa. Durante el test " +
+        "las calorías no se tocan pase lo que pase."
+      );
+    case "2026-09-20":
+      return (
+        "Último día del test. Mañana FORJA compara la media del 7–13 con la del 14–20 y sale tu " +
+        "mantenimiento real: solo entonces se fijan las calorías de la definición."
       );
     default:
       break;
@@ -551,47 +608,52 @@ export function porQueDe(iso, ajustes = {}) {
   if (fase.id === "transicion") {
     return (
       "Transición a 2.500: mismo reparto que la recarga del 3. Entrenamiento normal, glucógeno " +
-      "estable y rendimiento recuperándose para empezar el test de mantenimiento el día 9."
+      "estable y rendimiento recuperándose para empezar el test de mantenimiento mañana."
     );
   }
 
   if (fase.id === "calibracion") {
     const dia = diasDesde(fase.desde, iso) + 1;
     return (
-      `Día ${dia} de 14 de calibración. Lo importante no son las ~2.600 de hoy sino que sean ` +
-      "LAS MISMAS todos los días y que te peses cada mañana: al final, comparar la media de la " +
-      "semana 1 con la de la semana 2 dirá cuál es tu mantenimiento real. FORJA hace esa cuenta sola."
+      `Día ${dia} de 14 del test de mantenimiento. Lo importante no son las ~2.800 de hoy sino ` +
+      "que sean LAS MISMAS todos los días, con la misma proteína y unos pasos parecidos, y que " +
+      "te peses cada mañana. Al final se compara la media de la semana 1 con la de la semana 2 " +
+      "y sale tu mantenimiento real. No se ajusta nada por una pesada suelta."
     );
-  }
-
-  if (fase.id === "hipertrofia") {
-    return ajustes.mantenimientoReal == null
-      ? "Hipertrofia con el mantenimiento aún sin calibrar: se usa la hipótesis de 2.600 kcal. " +
-          "En cuanto guardes el resultado de la calibración, todos los números se recalculan solos."
-      : "La gran fase de construcción. Comes tu mantenimiento real y solo se suben +100–150 kcal " +
-          "si la revisión mensual ve el peso plano y la progresión parada. El objetivo es ganar " +
-          "como mucho 0,20 kg por semana de media: músculo, no grasa.";
   }
 
   if (fase.id === "definicion") {
+    const semana = Math.floor(diasDesde(fase.desde, iso) / 7) + 1;
+    const cabecera = semana <= 6 ? `Semana ${semana} de 6 de definición. ` : "Definición (ya pasadas las seis semanas previstas). ";
+    return ajustes.mantenimientoReal == null
+      ? cabecera +
+          "Todavía no hay mantenimiento guardado, así que estos números salen de la hipótesis de " +
+          "2.800 menos el déficit. En cuanto guardes el resultado del test se recalculan solos."
+      : cabecera +
+          "Comes tu mantenimiento medido menos el déficit, buscando perder 0,5–0,7 % del peso a " +
+          "la semana (unos 0,5–0,7 kg). Las calorías no se tocan mientras el peso medio y la " +
+          "cintura bajen a ritmo razonable: solo la revisión de cada 4 semanas decide.";
+  }
+
+  if (fase.id === "mantenimiento-post" || fase.id === "mantenimiento-verano") {
     return (
-      "Definición: déficit moderado partiendo de tu mantenimiento real, perdiendo un 0,5–0,75 % " +
-      "del peso a la semana. La proteína sube a ~200 g para proteger el músculo y el entreno no " +
-      "se ablanda: mismos pesos, misma intención."
+      "Mantenimiento: se come alrededor del mantenimiento real DE AHORA, que no es el de antes " +
+      "del cut (ha cambiado con el peso, la actividad y el running). Peso estable, rendimiento " +
+      "recuperándose y hambre normalizada es el éxito de la fase."
     );
   }
 
-  if (fase.id === "mantenimiento-post") {
+  if (fase.id === "ganancia") {
     return (
-      "Mantenimiento después de definir: 3–6 semanas estabilizando el peso nuevo, recuperando " +
-      "rendimiento y normalizando el hambre. No hace falta una reverse diet de meses."
+      "Ganancia muscular limpia: mantenimiento real + 100–150 kcal, nunca un superávit grande. " +
+      "La proteína se queda en 175–180 g y el hidrato alto sostiene el gimnasio y el running."
     );
   }
 
-  if (fase.id === "recomp") {
+  if (fase.id === "definicion-primavera") {
     return (
-      "Recomposición: mantener el físico magro conseguido y seguir progresando en el gimnasio, " +
-      "con el peso estable o subiendo muy despacio. La meta es pasar el año definido y fuerte."
+      "Cut corto de primavera: mantenimiento del momento menos 400–500 kcal. No entra por " +
+      "calendario, entra porque la cintura, las fotos y el nivel de definición lo piden."
     );
   }
 
@@ -611,10 +673,9 @@ function objetivoDelDia(iso, objetivos) {
   if (objetivos.especial) return objetivos.especial.nombre;
   if (iso === "2026-09-01") return "Último día a 2.150";
   if (iso === "2026-09-02") return "Empieza el llenado";
-  if (iso === "2026-09-06") return "Empieza la transición";
-  if (iso === "2026-09-08") return "Medir antes del test";
-  if (iso === "2026-09-09") return "Empieza la calibración";
-  if (iso === "2026-09-22") return "Última medición";
+  if (iso === "2026-09-06") return "Transición · medir antes del test";
+  if (iso === "2026-09-07") return "Empieza el test";
+  if (iso === "2026-09-20") return "Última pesada del test";
   return objetivos.fase.nombre;
 }
 

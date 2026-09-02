@@ -1,3 +1,11 @@
+> **SUPERADO — 2 de septiembre de 2026.**
+> La fuente de verdad de DIETA es ahora `contexto-maestro-dieta-02sep2026.md`.
+> De este documento solo sigue vigente el tramo 26 ago – 6 sep (déficit
+> moderado, llenado, días visuales y transición). Lo que decía a partir del
+> 7 de septiembre queda cancelado: el test de mantenimiento ya no es de
+> 2.600 kcal del 9 al 22, sino de ~2.800 kcal del 7 al 20, y detrás no viene
+> hipertrofia sino una definición de seis semanas.
+
 # FORJA — CONTEXTO MAESTRO SEPTIEMBRE 2026
 ## Déficit moderado + recuperación de volumen muscular + días visuales 4–5 septiembre + calibración de mantenimiento
 

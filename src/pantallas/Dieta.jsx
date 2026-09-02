@@ -10,8 +10,8 @@
  * después):
  *
  *   HOY        · qué comes hoy, comida por comida. Es el 95 % de los usos.
- *                Aquí aparecen solas la calibración y la revisión mensual.
- *   CALENDARIO · el tramo con fecha (26 ago → 22 sep), para ver a dónde vas.
+ *                Aquí aparecen solos el test de mantenimiento y la revisión.
+ *   CALENDARIO · el tramo con fecha (26 ago → 20 sep), para ver a dónde vas.
  *   AÑO        · el plan maestro anual por temporadas, y las fichas.
  *   POR QUÉ    · la estrategia de la puesta a punto explicada. Se lee una vez.
  *
@@ -26,7 +26,8 @@ import Hoja from "../componentes/Hoja.jsx";
 import Recetas from "./Recetas.jsx";
 import { db } from "../datos/db.js";
 import {
-  DIAS_ESPECIALES, FASES_MANUALES, MANTENIMIENTO_HIPOTESIS, NOTA_PREENTRENO, REGLAS,
+  DIAS_ESPECIALES, FASES_MANUALES, MANTENIMIENTO_ESTIMADO, MANTENIMIENTO_HIPOTESIS,
+  NOTA_PREENTRENO, REGLAS,
   calendarioDelTramo, faseDe, kcalDe, objetivosDe, planEnMarcha, porQueDe,
 } from "../datos/planNutricion.js";
 import { FICHAS, TEMPORADAS, estadoTemporada } from "../datos/planAnual.js";
@@ -158,8 +159,9 @@ function DetalleDia({ fecha }) {
 
         {o.esHipotesis && (
           <div style={{ fontSize: 12.5, color: "var(--aviso)" }}>
-            Mantenimiento ESTIMADO, no confirmado: estos números usan {miles(MANTENIMIENTO_HIPOTESIS)} kcal
-            (horquilla 2.550–2.700). Al guardar la calibración se recalculan solos.
+            Mantenimiento ESTIMADO, no medido: estos números parten de {miles(MANTENIMIENTO_HIPOTESIS)} kcal
+            (horquilla {miles(MANTENIMIENTO_ESTIMADO.min)}–{miles(MANTENIMIENTO_ESTIMADO.max)}). Al guardar el
+            resultado del test se recalculan solos.
           </div>
         )}
       </div>
@@ -316,9 +318,9 @@ function Calendario() {
   return (
     <>
       <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.55 }}>
-        Del 26 de agosto al 22 de septiembre: déficit moderado, llenado con los días visuales
-        del 4 y 5, transición y los 14 días de calibración. Toca cualquier día para ver sus
-        comidas y por qué es así. Esto va por fecha: mover un entreno no lo desplaza.
+        Del 26 de agosto al 20 de septiembre: déficit moderado, llenado con los días visuales
+        del 4 y 5, transición y los 14 días del test de mantenimiento. Toca cualquier día para
+        ver sus comidas y por qué es así. Esto va por fecha: mover un entreno no lo desplaza.
       </p>
 
       <div className="tarjeta columna" style={{ gap: 2 }}>
@@ -401,8 +403,9 @@ function Calendario() {
       </div>
 
       <p style={{ margin: 0, fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.55 }}>
-        Después del 22 de septiembre empieza la hipertrofia sobre tu mantenimiento real: ya no
-        hay calendario de kcal escrito, lo cuenta la pestaña AÑO.
+        El 21 de septiembre se lee el test y empieza la definición de seis semanas sobre tu
+        mantenimiento medido: a partir de ahí ya no hay calendario de kcal escrito, porque las
+        calorías futuras no son cifras fijas. Lo cuenta la pestaña AÑO.
       </p>
 
       <Hoja
@@ -438,14 +441,15 @@ function PorQue() {
       </div>
 
       <div className="tarjeta columna" style={{ gap: 0 }}>
-        <div className="rotulo" style={{ marginBottom: 12 }}>Las seis etapas</div>
+        <div className="rotulo" style={{ marginBottom: 12 }}>Las siete etapas</div>
         {[
           { dias: "26 ago – 1 sep", que: "Déficit moderado · 2.150", por: "Perder algo de grasa entrenando bien, sin vaciar el músculo." },
           { dias: "2 sep", que: "Empieza el llenado · 2.300", por: "Suben los hidratos a 250 g. Última sesión completa recomendable." },
           { dias: "3 sep", que: "Recarga + descanso · 2.500", por: "Rellenar el glucógeno muscular sin sesión dura. La subida es de hidratos, no de grasa." },
           { dias: "4 – 5 sep", que: "Días visuales · ~2.450", por: "Mantener la plenitud: hidrato alto, agua y sal normales, pump corto opcional." },
-          { dias: "6 – 8 sep", que: "Transición · 2.500", por: "Nada de volver a un déficit agresivo: estabilizar y recuperar rendimiento." },
-          { dias: "9 – 22 sep", que: "Calibración · ~2.600", por: "Test real de mantenimiento: 14 días planos y báscula cada mañana." },
+          { dias: "6 sep", que: "Transición · 2.500", por: "Nada de volver a un déficit agresivo: estabilizar y medir peso, cintura y foto." },
+          { dias: "7 – 20 sep", que: "Test de mantenimiento · ~2.800", por: "Medir el mantenimiento real: 14 días planos y báscula cada mañana. Nada de ajustar por una pesada." },
+          { dias: "21 sep – ~1 nov", que: "Definición · 6 semanas", por: "Mantenimiento medido − 450/600 kcal, perdiendo 0,5–0,7 % del peso a la semana." },
         ].map((e, i) => (
           <div
             key={e.dias}
@@ -564,7 +568,7 @@ function Ano() {
         {fase.dinamica && (
           <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
             {ajustes?.mantenimientoReal == null
-              ? `Sobre el mantenimiento ESTIMADO de ${miles(MANTENIMIENTO_HIPOTESIS)} kcal (2.550–2.700), hasta que la calibración de septiembre diga el real.`
+              ? `Sobre el mantenimiento ESTIMADO de ${miles(MANTENIMIENTO_HIPOTESIS)} kcal (${miles(MANTENIMIENTO_ESTIMADO.min)}–${miles(MANTENIMIENTO_ESTIMADO.max)}), hasta que el test del 7 al 20 de septiembre diga el real.`
               : `Mantenimiento real ${miles(ajustes.mantenimientoReal)} kcal${(ajustes.ajusteKcal ?? 0) !== 0 ? ` ${ajustes.ajusteKcal > 0 ? "+" : "−"} ${Math.abs(ajustes.ajusteKcal)} de las revisiones` : ""}.`}
           </p>
         )}
@@ -658,7 +662,12 @@ function DetalleTemporada({ temporada, ajustes, alCerrar }) {
   const faseActual = faseDe(hoy, ajustes);
 
   // Solo se ofrece empezar la fase manual SIGUIENTE a la actual.
-  const siguienteDe = { hipertrofia: "definicion", definicion: "mantenimiento-post", "mantenimiento-post": "recomp" };
+  const siguienteDe = {
+    definicion: "mantenimiento-post",
+    "mantenimiento-post": "ganancia",
+    ganancia: "definicion-primavera",
+    "definicion-primavera": "mantenimiento-verano",
+  };
   const puedeEmpezar = temporada.manual && estado === "futura" && siguienteDe[faseActual.id] === temporada.id;
   const esActualManual = temporada.manual && estado === "actual";
 
@@ -745,7 +754,7 @@ function DetalleTemporada({ temporada, ajustes, alCerrar }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Tarjeta de calibración (9–22 sep)                                   */
+/* Tarjeta del test de mantenimiento (7–20 sep)                        */
 /* ------------------------------------------------------------------ */
 
 function TarjetaCalibracion() {
@@ -759,7 +768,7 @@ function TarjetaCalibracion() {
     <div className="tarjeta columna" style={{ gap: 10, borderColor: "var(--carrera)" }}>
       <div className="entre">
         <div className="rotulo" style={{ color: "var(--carrera)" }}>
-          Calibración del mantenimiento
+          Test de mantenimiento
         </div>
         {estado.fase === "en-curso" && (
           <span className="chip">DÍA {Math.min(estado.dia, 14)} DE 14</span>
@@ -777,8 +786,9 @@ function TarjetaCalibracion() {
             />
           </div>
           <p style={{ margin: 0, fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.55 }}>
-            Come las 2.600 planas y pésate cada mañana (después del baño, antes de desayunar).
-            Al acabar los 14 días, FORJA compara las dos semanas y te propone tu mantenimiento real.
+            NO AJUSTAR POR PESADAS AISLADAS. Come las ~2.800 planas los 14 días, con la misma
+            proteína y unos pasos parecidos, y pésate cada mañana (después del baño, antes de
+            desayunar). Al acabar, FORJA compara las dos semanas y te propone tu mantenimiento real.
           </p>
         </>
       )}
@@ -797,8 +807,8 @@ function TarjetaCalibracion() {
               </div>
               <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
                 {estado.ajuste === 0
-                  ? "El peso se mantuvo estable comiendo 2.600: ese ES tu mantenimiento real."
-                  : `Comiendo 2.600 el peso ${estado.porSemana > 0 ? "subió" : "bajó"}: tu mantenimiento real está ` +
+                  ? `El peso se mantuvo estable comiendo ${miles(MANTENIMIENTO_HIPOTESIS)}: ese ES tu mantenimiento real.`
+                  : `Comiendo ${miles(MANTENIMIENTO_HIPOTESIS)} el peso ${estado.porSemana > 0 ? "subió" : "bajó"}: tu mantenimiento real está ` +
                     `alrededor de ${miles(estado.mantenimiento)} kcal.`}
                 {estado.recortado &&
                   " (La corrección se limita a ±250 kcal: parte del cambio en dos semanas es agua y glucógeno, no comida.)"}
@@ -806,9 +816,9 @@ function TarjetaCalibracion() {
             </>
           ) : (
             <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
-              La calibración terminó pero faltan pesajes ({estado.dias1}/7 y {estado.dias2}/7) para
-              una media fiable. Puedes seguir pesándote una semana más, o usar la hipótesis de
-              2.600 y afinarla con las revisiones mensuales.
+              El test terminó pero faltan pesajes ({estado.dias1}/7 y {estado.dias2}/7) para una
+              media fiable. Puedes seguir pesándote una semana más, o usar la hipótesis de
+              {" "}{miles(MANTENIMIENTO_HIPOTESIS)} y afinarla con las revisiones mensuales.
             </p>
           )}
 
@@ -816,8 +826,8 @@ function TarjetaCalibracion() {
             GUARDAR {miles(estado.mantenimiento)} KCAL COMO MANTENIMIENTO
           </button>
           <p style={{ margin: 0, fontSize: 12, color: "var(--texto-tenue)" }}>
-            Desde ese momento todas las fases calculan sus kcal sobre este número. Se puede
-            corregir en Ajustes.
+            Desde ese momento todas las fases calculan sus kcal sobre este número, empezando por
+            la definición: mantenimiento − 450/600. Se puede corregir en Ajustes.
           </p>
         </>
       )}
