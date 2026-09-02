@@ -1,52 +1,63 @@
 /*
- * DIETA.
+ * DIETA (v3).
  *
  * Es la quinta pestaña, y sí, la spec pedía cuatro (§5). Se añade a petición
- * expresa: hasta el 8 de septiembre la dieta es lo único del plan que tiene
- * fecha límite y lo que más veces al día se mira, así que esconderla dentro de
- * PLAN la dejaba a dos toques de distancia varias veces cada día.
+ * expresa: es lo que más veces al día se mira.
  *
- * Cuatro partes, y en este orden a propósito (§35: acción primero, explicación
- * después):
+ * Con el plan v3 esta pantalla cambia de naturaleza. Antes era un calendario
+ * de kcal escrito día a día; ahora es un panel de control de UN objetivo que
+ * solo cambia cuando la tendencia de varias semanas lo justifica. Por eso lo
+ * que manda arriba no son las comidas, son las MÉTRICAS: media de 7 días,
+ * cintura, adherencia y el gasto que FORJA va deduciendo.
  *
- *   HOY        · qué comes hoy, comida por comida. Es el 95 % de los usos.
- *                Aquí aparecen solos el test de mantenimiento y la revisión.
- *   CALENDARIO · el tramo con fecha (26 ago → 20 sep), para ver a dónde vas.
- *   AÑO        · el plan maestro anual por temporadas, y las fichas.
- *   POR QUÉ    · la estrategia de la puesta a punto explicada. Se lee una vez.
+ * Cinco partes, en este orden a propósito (§35: acción primero):
  *
- * La comida se registra en Fitia. Esto es la chuleta (§58).
+ *   HOY      · qué comes hoy y cómo va la tendencia. El 95 % de los usos.
+ *              Aquí aparecen solas la revisión y los avisos de fin de fase.
+ *   BLOQUES  · el mapa del cut y las variantes de kcal.
+ *   RECETAS  · sus ideas de comidas.
+ *   AÑO      · las cuatro fases y las fichas de consulta.
+ *   POR QUÉ  · cómo funciona el sistema. Se lee una vez.
+ *
+ * La comida se registra en Fitia. Aquí solo se copia el total del día.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Volver from "../componentes/Volver.jsx";
-
 import Hoja from "../componentes/Hoja.jsx";
 import Recetas from "./Recetas.jsx";
 import { db } from "../datos/db.js";
 import {
-  DIAS_ESPECIALES, FASES_MANUALES, MANTENIMIENTO_ESTIMADO, MANTENIMIENTO_HIPOTESIS,
-  NOTA_PREENTRENO, REGLAS,
-  calendarioDelTramo, faseDe, kcalDe, objetivosDe, planEnMarcha, porQueDe,
+  ADAPTACION, BLOQUES_CUT, NOTA_PREENTRENO, NUNCA, NUTRICION_CFG, ORDEN_FASES, REGLAS,
+  TOPE_CUT, VARIANTES_CUT,
+  bloqueDe, estadoNutricion, kcalDe, objetivosDe, planEnMarcha, porQueDe,
 } from "../datos/planNutricion.js";
 import { FICHAS, TEMPORADAS, estadoTemporada } from "../datos/planAnual.js";
-import { useAjustes, useCarreras, useMediciones, usePesos, useSesionesFuerza } from "../ganchos/useDatos.js";
-import { aplicarRevision, empezarFase, guardarMantenimiento, quitarFaseManual } from "../logica/acciones.js";
-import { estadoCalibracion } from "../logica/calibracion.js";
-import { revisar, revisionPendiente } from "../logica/revision.js";
-import { diaCorto, fechaCorta, fechaLarga, hoyISO } from "../logica/fechas.js";
+import { useAjustes, useCarreras, useDiario, useMediciones, usePesos, useSesionesFuerza } from "../ganchos/useDatos.js";
+import {
+  aplicarRevision, bloqueDeMantenimiento, cerrarCut, confirmarMantenimiento, empezarGanancia,
+  empezarVerano, fijarObjetivo, guardarCierreDia, guardarTdee,
+} from "../logica/acciones.js";
+import {
+  TDEE_ESTIMADO_INICIAL, adherencia, balanceSemanal, estadoTdee, media7, registrosDiarios,
+  tendenciaSemanal,
+} from "../logica/nutricion.js";
+import { proximaRevision, revisar, revisionPendiente, salidaDelCut, semaforo, tendenciaCintura } from "../logica/revision.js";
+import { diasEntre, fechaCorta, hoyISO } from "../logica/fechas.js";
 import { miles } from "../logica/formato.js";
 
 const SECCIONES = [
   { id: "hoy", texto: "HOY" },
-  { id: "calendario", texto: "CALENDARIO" },
+  { id: "bloques", texto: "BLOQUES" },
   // El recetario es lo único de DIETA que es SUYO (no del plan): va en verde
   // para que se distinga de las pestañas de consulta.
   { id: "recetas", texto: "RECETAS", color: "var(--exito)" },
   { id: "ano", texto: "AÑO" },
   { id: "porque", texto: "POR QUÉ" },
 ];
+
+const COLOR_SEMAFORO = { verde: "var(--exito)", amarillo: "var(--aviso)", rojo: "var(--error, #e5484d)" };
 
 export default function Dieta({ sub, alVolver }) {
   const [activa, setActiva] = useState(sub ?? "hoy");
@@ -79,7 +90,7 @@ export default function Dieta({ sub, alVolver }) {
       </div>
 
       {activa === "hoy" && <Hoy />}
-      {activa === "calendario" && <Calendario />}
+      {activa === "bloques" && <Bloques />}
       {activa === "recetas" && <Recetas />}
       {activa === "ano" && <Ano />}
       {activa === "porque" && <PorQue />}
@@ -88,15 +99,94 @@ export default function Dieta({ sub, alVolver }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* El gancho que reúne TODO lo que la dieta necesita saber             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Un solo sitio donde se cruzan báscula, diario, cintura y gimnasio. Si cada
+ * tarjeta hiciera sus propias cuentas acabaría habiendo dos versiones de "la
+ * media de 7 días" que no coinciden, que es exactamente el fallo que la spec
+ * prohíbe (§4: una sola fuente de verdad por dato).
+ */
+function useNutricion() {
+  const hoy = hoyISO();
+  const ajustes = useAjustes();
+  const pesos = usePesos(180);
+  const diario = useDiario(180);
+  const mediciones = useMediciones();
+  const sesiones = useSesionesFuerza(80);
+  const carreras = useCarreras(80);
+  const [series, setSeries] = useState([]);
+
+  useEffect(() => {
+    if (!sesiones.length) return;
+    let vivo = true;
+    const ids = sesiones.filter((s) => s.estado === "completada").map((s) => s.id);
+    db.series.where("sesionId").anyOf(ids).toArray().then((filas) => { if (vivo) setSeries(filas); });
+    return () => { vivo = false; };
+  }, [sesiones]);
+
+  return useMemo(() => {
+    const aj = ajustes ?? {};
+    const estado = estadoNutricion(aj);
+    const objetivos = objetivosDe(aj, hoy);
+    const registros = registrosDiarios({ pesos, diario, desde: estado.faseDesde, hasta: hoy });
+    const diasDesdeCambio = diasEntre(estado.ultimoCambioKcal, hoy);
+
+    const datos = { registros, mediciones, sesiones, series, carreras };
+
+    return {
+      hoy,
+      ajustes: aj,
+      estado,
+      objetivos,
+      registros,
+      diario,
+      pesos,
+      mediciones,
+      datos,
+      diasDesdeCambio,
+      diasEnFase: diasEntre(estado.faseDesde, hoy),
+      tendencia: tendenciaSemanal(registros),
+      media7: media7(registros, "weightKg"),
+      mediaAnterior: media7(registros, "weightKg", 7),
+      pasos7: media7(registros, "steps"),
+      adherencia: adherencia(registros, estado.kcal, 14),
+      cintura: tendenciaCintura(mediciones, hoy),
+      tdee: estadoTdee({ registros, kcalObjetivo: estado.kcal, diasDesdeCambio, ajustes: aj }),
+      semaforo: semaforo(datos, aj, hoy),
+      balance: balanceSemanal(registros, estado.kcal),
+      proximaRevision: proximaRevision(aj),
+      pendiente: revisionPendiente(aj, hoy),
+      salidas: estado.faseId === "cut" ? salidaDelCut(datos, aj, hoy) : [],
+    };
+  }, [ajustes, pesos, diario, mediciones, sesiones, series, carreras, hoy]);
+}
+
+/* ------------------------------------------------------------------ */
 /* HOY                                                                 */
 /* ------------------------------------------------------------------ */
 
 function Hoy() {
+  const n = useNutricion();
+
   return (
     <>
-      <TarjetaCalibracion />
-      <TarjetaRevision />
-      <DetalleDia fecha={hoyISO()} />
+      <Banner n={n} />
+      <Objetivo n={n} />
+      <Metricas n={n} />
+      <TarjetaRevision n={n} />
+      <TarjetaSalida n={n} />
+      <CierreDelDia n={n} />
+      <BalanceSemana n={n} />
+      <Comidas n={n} />
+
+      <div className="tarjeta">
+        <div className="rotulo">Por qué esto es así</div>
+        <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
+          {porQueDe(n.ajustes, n.hoy)}
+        </p>
+      </div>
 
       <Plegable titulo="Reglas de fondo">
         <Lista items={REGLAS} />
@@ -111,480 +201,688 @@ function Hoy() {
   );
 }
 
+/** El banner de la fase (§56): lo primero que se lee, y siempre el mismo aviso. */
+function Banner({ n }) {
+  const color = COLOR_SEMAFORO[n.semaforo.estado] ?? "var(--texto-medio)";
+  return (
+    <div
+      className="tarjeta columna"
+      style={{ gap: 8, borderColor: color, background: "var(--superficie)" }}
+    >
+      <div className="fila" style={{ gap: 9, alignItems: "center" }}>
+        <span style={{ width: 9, height: 9, borderRadius: 999, background: color, flexShrink: 0 }} />
+        <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: ".04em", lineHeight: 1.35 }}>
+          {n.objetivos.banner}
+        </div>
+      </div>
+      <p style={{ margin: 0, fontSize: 12.5, color: "var(--texto-medio)", lineHeight: 1.5 }}>
+        {n.semaforo.texto}
+        {n.proximaRevision && !n.pendiente && ` Próxima revisión: ${fechaCorta(n.proximaRevision)}.`}
+      </p>
+    </div>
+  );
+}
+
+/** El objetivo del día: fase, kcal y macros. Lo que se mira de un vistazo. */
+function Objetivo({ n }) {
+  const o = n.objetivos;
+  return (
+    <div className="tarjeta columna" style={{ gap: 10 }}>
+      <div className="entre" style={{ alignItems: "flex-start" }}>
+        <div>
+          <div className="rotulo">Fase</div>
+          <div style={{ fontSize: 21, fontWeight: 800, marginTop: 5 }}>{o.nombre}</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{miles(o.kcal)}</div>
+          <div style={{ fontSize: 11, color: "var(--texto-tenue)", marginTop: 3 }}>kcal / día</div>
+        </div>
+      </div>
+
+      <div className="fila" style={{ gap: 8 }}>
+        <Macro etiqueta="Proteína" valor={o.p} color="var(--fuerza)" />
+        <Macro etiqueta="Hidratos" valor={o.hc} color="var(--carrera)" />
+        <Macro etiqueta="Grasas" valor={o.g} color="var(--postura)" />
+      </div>
+
+      {!planEnMarcha(n.hoy) && (
+        <div style={{ fontSize: 12.5, color: "var(--aviso)" }}>
+          La definición empieza el 2 de septiembre. Esto es lo que tocará entonces.
+        </div>
+      )}
+
+      <p style={{ margin: 0, fontSize: 12, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
+        Mismas kcal todos los días: entrenes pierna, torso, corras o descanses. Los hidratos sí se
+        pueden mover entre comidas.
+      </p>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
-/* Detalle de un día                                                   */
+/* Métricas (§37)                                                      */
+/* ------------------------------------------------------------------ */
+
+function Metricas({ n }) {
+  const [abierto, setAbierto] = useState(false);
+  const delta = n.media7 != null && n.mediaAnterior != null ? n.media7 - n.mediaAnterior : null;
+
+  return (
+    <>
+      <div className="tarjeta columna" style={{ gap: 12 }}>
+        <div className="entre">
+          <div className="rotulo">Cómo va</div>
+          <button className="boton-texto" onClick={() => setAbierto(true)}>Qué significa</button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+          <Cifrita etiqueta="Media 7 días" valor={n.media7 != null ? `${kg(n.media7)} kg` : "—"} />
+          <Cifrita
+            etiqueta="vs semana anterior"
+            valor={delta != null ? `${delta > 0 ? "+" : "−"}${kg(Math.abs(delta))} kg` : "—"}
+            color={delta == null ? undefined : COLOR_SEMAFORO[n.semaforo.estado]}
+          />
+          <Cifrita
+            etiqueta="Cintura"
+            valor={n.cintura ? `${kg(n.cintura.ultima.cintura)} cm` : "—"}
+          />
+          <Cifrita
+            etiqueta="Cintura 2 sem."
+            valor={n.cintura ? `${n.cintura.delta > 0 ? "+" : "−"}${kg(Math.abs(n.cintura.delta))} cm` : "—"}
+            color={n.cintura && n.cintura.delta < 0 ? "var(--exito)" : undefined}
+          />
+          <Cifrita etiqueta="Pasos 7 días" valor={n.pasos7 ? miles(Math.round(n.pasos7)) : "—"} />
+          <Cifrita
+            etiqueta="Adherencia"
+            valor={n.adherencia == null ? "—" : `${Math.round(n.adherencia * 100)} %`}
+            color={n.adherencia != null && n.adherencia < NUTRICION_CFG.adherencia.min ? "var(--aviso)" : undefined}
+          />
+        </div>
+
+        {/* El gasto, con su etiqueta honesta: es el número que manda el año. */}
+        <div style={{ background: "var(--superficie-3)", borderRadius: 12, padding: "12px 14px" }}>
+          <div className="entre" style={{ alignItems: "baseline" }}>
+            <div>
+              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: ".08em", color: "var(--texto-tenue)" }}>
+                TU GASTO (TDEE)
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 800, marginTop: 3 }}>
+                {miles(n.tdee.valor)}
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--texto-tenue)" }}> kcal</span>
+              </div>
+            </div>
+            <span
+              className="chip"
+              style={{
+                borderColor: n.tdee.etiqueta === "ESTIMADO" ? "var(--borde-fuerte)" : "rgba(113,217,139,.4)",
+                color: n.tdee.etiqueta === "ESTIMADO" ? "var(--texto-tenue)" : "var(--exito)",
+              }}
+            >
+              {n.tdee.etiqueta}
+            </span>
+          </div>
+          <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
+            {n.tdee.etiqueta === "ESTIMADO"
+              ? `Horquilla ${miles(TDEE_ESTIMADO_INICIAL.min)}–${miles(TDEE_ESTIMADO_INICIAL.max)} por fórmula. ${n.tdee.motivo ?? ""}`
+              : n.tdee.etiqueta === "DEDUCIDO"
+                ? `Sale de tus datos reales${n.tdee.muestras > 1 ? `, suavizado con las ${n.tdee.muestras} últimas estimaciones` : ""}: lo que comes y cómo se mueve tu peso medio.`
+                : `Medido y confirmado con confianza ${n.tdee.confianza === "high" ? "alta" : "media"}.`}
+          </p>
+          {n.tdee.etiqueta === "DEDUCIDO" && n.tdee.ultimo != null && n.ajustes.tdeeDeducido !== n.tdee.ultimo && (
+            <button
+              className="boton-texto"
+              style={{ marginTop: 8 }}
+              onClick={() => guardarTdee(n.tdee.ultimo)}
+            >
+              Guardar {miles(n.tdee.ultimo)} como gasto deducido
+            </button>
+          )}
+        </div>
+      </div>
+
+      <Hoja abierta={abierto} alCerrar={() => setAbierto(false)} titulo="Qué significa cada número">
+        <div className="columna">
+          <Explica titulo="Media de 7 días">
+            El peso de un día no dice nada: puede moverse 400 g por agua, sal o lo que tengas dentro.
+            La media de siete días sí. Es el número que se mira, siempre.
+          </Explica>
+          <Explica titulo="vs semana anterior">
+            La media de esta semana menos la de la anterior. Eso ES tu velocidad en kg por semana.
+            En definición se busca 0,4–0,8 kg de bajada.
+          </Explica>
+          <Explica titulo="Cintura">
+            Cuando la báscula se atasca, la cintura es la que dice si hay progreso. Una vez por
+            semana, en ayunas, relajado, a la altura del ombligo, al final de una espiración normal.
+          </Explica>
+          <Explica titulo="Pasos">
+            No sirven para convertir cada paso en calorías: sirven para saber si esta semana te has
+            movido parecido a la anterior. Si la actividad cambia mucho, los números no son comparables.
+          </Explica>
+          <Explica titulo="Adherencia">
+            Días dentro de ±150 kcal del objetivo. No mide virtud, mide si los datos SIRVEN: por
+            debajo del 85 % es imposible saber si el plan funciona o si lo que falla es el registro.
+          </Explica>
+          <Explica titulo="TDEE (tu gasto)">
+            ESTIMADO es una fórmula. DEDUCIDO sale de semanas de datos tuyos: si comes 2.400 y bajas
+            0,55 kg/semana, gastabas unas 3.005. CONFIRMADO es el que se ha medido y validado en la
+            fase de mantenimiento, y es el que habilita la ganancia muscular.
+          </Explica>
+        </div>
+      </Hoja>
+    </>
+  );
+}
+
+function Explica({ titulo, children }) {
+  return (
+    <div>
+      <div style={{ fontSize: 13.5, fontWeight: 700 }}>{titulo}</div>
+      <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.55 }}>{children}</p>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Cierre del día                                                      */
 /* ------------------------------------------------------------------ */
 
 /*
- * Lo mismo sirve para HOY y para cualquier día que abras desde el calendario:
- * un solo componente, así no puede haber dos versiones de la misma tabla que
- * se desincronicen.
+ * Dos números copiados de Fitia y del Garmin. Sin esto no hay adherencia ni
+ * gasto deducido, y sin gasto deducido el año entero va a ciegas.
  */
-function DetalleDia({ fecha }) {
-  const ajustes = useAjustes();
-  const o = objetivosDe(fecha, ajustes ?? {});
-  const esHoy = fecha === hoyISO();
+function CierreDelDia({ n }) {
+  const deHoy = n.diario.find((d) => d.fecha === n.hoy) ?? null;
+  const [abierto, setAbierto] = useState(false);
+  const puesto = deHoy?.kcal != null;
 
   return (
     <>
-      {/* Objetivo del día */}
-      <div
-        className="tarjeta columna"
-        style={{ gap: 10, borderColor: o.especial ? "var(--aviso)" : undefined }}
+      <button
+        onClick={() => setAbierto(true)}
+        className="tarjeta entre"
+        style={{
+          width: "100%", textAlign: "left", cursor: "pointer",
+          borderColor: puesto ? undefined : "var(--aviso)",
+        }}
       >
-        <div className="entre" style={{ alignItems: "flex-start" }}>
-          <div>
-            <div className="rotulo" style={{ color: o.especial ? "var(--aviso)" : undefined }}>
-              {esHoy ? "Hoy" : o.especial ? `Excepción dentro de ${o.fase.nombre}` : "Objetivo del día"}
+        <div>
+          <div className="rotulo" style={{ color: puesto ? undefined : "var(--aviso)" }}>
+            Cierre del día
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, marginTop: 4 }}>
+            {puesto
+              ? `${miles(deHoy.kcal)} kcal${deHoy.p != null ? ` · ${deHoy.p} P` : ""}${deHoy.pasos != null ? ` · ${miles(deHoy.pasos)} pasos` : ""}`
+              : "Apunta lo comido y los pasos"}
+          </div>
+          {!puesto && (
+            <div style={{ fontSize: 12, color: "var(--texto-tenue)", marginTop: 3 }}>
+              El total de Fitia y los pasos del Garmin. Nada más.
             </div>
-            <div style={{ fontSize: 21, fontWeight: 800, marginTop: 5 }}>{o.nombre}</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{miles(o.kcal)}</div>
-            <div style={{ fontSize: 11, color: "var(--texto-tenue)", marginTop: 3 }}>kcal</div>
-          </div>
+          )}
         </div>
+        <span style={{ color: "var(--texto-tenue)" }}>›</span>
+      </button>
 
-        <div className="fila" style={{ gap: 8 }}>
-          <Macro etiqueta="Proteína" valor={o.p} color="var(--fuerza)" />
-          <Macro etiqueta="Hidratos" valor={o.hc} color="var(--carrera)" />
-          <Macro etiqueta="Grasas" valor={o.g} color="var(--postura)" />
-        </div>
-
-        {!planEnMarcha(fecha) && (
-          <div style={{ fontSize: 12.5, color: "var(--aviso)" }}>
-            El plan empieza el 26 de agosto. Esto es lo que tocará entonces.
-          </div>
-        )}
-
-        {o.esHipotesis && (
-          <div style={{ fontSize: 12.5, color: "var(--aviso)" }}>
-            Mantenimiento ESTIMADO, no medido: estos números parten de {miles(MANTENIMIENTO_HIPOTESIS)} kcal
-            (horquilla {miles(MANTENIMIENTO_ESTIMADO.min)}–{miles(MANTENIMIENTO_ESTIMADO.max)}). Al guardar el
-            resultado del test se recalculan solos.
-          </div>
-        )}
-      </div>
-
-      {/* Por qué este día es como es */}
-      <div className="tarjeta">
-        <div className="rotulo" style={{ color: o.especial ? "var(--aviso)" : undefined }}>
-          Por qué este día
-        </div>
-        <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
-          {porQueDe(fecha, ajustes ?? {})}
-        </p>
-      </div>
-
-      {/* Comidas */}
-      <div className="tarjeta">
-        <div className="rotulo" style={{ marginBottom: 12 }}>Comida por comida</div>
-        <div className="columna" style={{ gap: 0 }}>
-          {o.comidas.map((c, i) => (
-            <div
-              key={c.nombre}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr auto",
-                gap: 4,
-                padding: "12px 0",
-                borderTop: i === 0 ? "none" : "1px solid var(--borde)",
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 14.5, fontWeight: 700 }}>{c.nombre}</div>
-                <div style={{ fontSize: 12, color: "var(--texto-tenue)", marginTop: 2 }}>{c.hora}</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap" }}>
-                  <span style={{ color: "var(--fuerza)" }}>{c.p}P</span>
-                  {" · "}
-                  <span style={{ color: "var(--carrera)" }}>{c.hc}HC</span>
-                  {" · "}
-                  <span style={{ color: "var(--postura)" }}>{c.g}G</span>
-                </div>
-                <div style={{ fontSize: 11.5, color: "var(--texto-tenue)", marginTop: 3 }}>
-                  ≈ {kcalDe(c)} kcal
-                </div>
-              </div>
-            </div>
-          ))}
-
-          <div
-            className="entre"
-            style={{ paddingTop: 12, borderTop: "1px solid var(--borde-fuerte)", fontSize: 14, fontWeight: 800 }}
-          >
-            <span>TOTAL</span>
-            <span style={{ whiteSpace: "nowrap" }}>
-              {o.p}P · {o.hc}HC · {o.g}G
-            </span>
-          </div>
-        </div>
-
-        <p style={{ margin: "14px 0 0", fontSize: 12, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
-          Fitia puede enseñar pequeñas diferencias por redondeos y fibra. Es normal.
-        </p>
-      </div>
-
-      {/* Lo específico de un día especial */}
-      {o.especial && <DetalleEspecial dia={o.especial} />}
+      <HojaCierre abierta={abierto} alCerrar={() => setAbierto(false)} dia={deHoy} objetivo={n.objetivos} />
     </>
   );
 }
 
-/** Lo que solo aplica a la recarga o al día visual. */
-function DetalleEspecial({ dia }) {
-  return (
-    <>
-      {dia.si && (
-        <div className="tarjeta columna" style={{ gap: 12 }}>
-          <div className="rotulo" style={{ color: "var(--aviso)" }}>De dónde salen los hidratos</div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--exito)", marginBottom: 7 }}>
-              SÍ
-            </div>
-            <div className="fila" style={{ gap: 6, flexWrap: "wrap" }}>
-              {dia.si.map((x) => (
-                <span key={x} className="chip" style={{ borderColor: "rgba(113,217,139,.4)", color: "var(--exito)" }}>
-                  {x}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--texto-tenue)", marginBottom: 7 }}>
-              NO
-            </div>
-            <div className="fila" style={{ gap: 6, flexWrap: "wrap" }}>
-              {dia.no.map((x) => (
-                <span
-                  key={x}
-                  className="chip"
-                  style={{ color: "var(--texto-tenue)", textDecoration: "line-through" }}
-                >
-                  {x}
-                </span>
-              ))}
-            </div>
-          </div>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.5 }}>
-            Queremos glucógeno muscular, no barriga hinchada.
-          </p>
-        </div>
-      )}
+function HojaCierre({ abierta, alCerrar, dia, objetivo }) {
+  const [v, setV] = useState({});
 
-      {dia.truco && (
-        <div className="tarjeta">
-          <div className="rotulo" style={{ color: "var(--carrera)" }}>{dia.truco.titulo}</div>
-          <p style={{ margin: "9px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.55 }}>
-            {dia.truco.texto}
-          </p>
-        </div>
-      )}
+  useEffect(() => {
+    if (!abierta) return;
+    setV({
+      kcal: dia?.kcal != null ? String(dia.kcal) : "",
+      p: dia?.p != null ? String(dia.p) : "",
+      hc: dia?.hc != null ? String(dia.hc) : "",
+      g: dia?.g != null ? String(dia.g) : "",
+      pasos: dia?.pasos != null ? String(dia.pasos) : "",
+    });
+  }, [abierta, dia?.kcal, dia?.p, dia?.hc, dia?.g, dia?.pasos]);
 
-      {dia.pump && (
-        <div className="tarjeta columna" style={{ gap: 8 }}>
-          <div className="rotulo" style={{ color: "var(--fuerza)" }}>Pump corto</div>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.5 }}>
-            Si según la rotación te toca torso, haces torso. Si no, esto:
-          </p>
-          <Lista items={dia.pump} />
-          <p style={{ margin: 0, fontSize: 12.5, color: "var(--texto-tenue)" }}>{dia.pumpNota}</p>
-        </div>
-      )}
+  async function guardar(e) {
+    e.preventDefault();
+    await guardarCierreDia(v);
+    alCerrar();
+  }
 
-      {dia.notas && (
-        <div className="tarjeta">
-          <div className="rotulo">A tener en cuenta</div>
-          <div style={{ marginTop: 10 }}>
-            <Lista items={dia.notas} />
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* CALENDARIO                                                          */
-/* ------------------------------------------------------------------ */
-
-function Calendario() {
-  const [abierto, setAbierto] = useState(null);
-  const dias = calendarioDelTramo();
-  const hoy = hoyISO();
-  const maxKcal = Math.max(...dias.map((d) => d.kcal));
+  const campos = [
+    { id: "kcal", etiqueta: "Calorías", marcador: String(objetivo.kcal), ancho: 2 },
+    { id: "pasos", etiqueta: "Pasos", marcador: "12800", ancho: 2 },
+    { id: "p", etiqueta: "Proteína (g)", marcador: String(objetivo.p) },
+    { id: "hc", etiqueta: "Hidratos (g)", marcador: String(objetivo.hc) },
+    { id: "g", etiqueta: "Grasas (g)", marcador: String(objetivo.g) },
+  ];
 
   return (
-    <>
-      <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.55 }}>
-        Del 26 de agosto al 20 de septiembre: déficit moderado, llenado con los días visuales
-        del 4 y 5, transición y los 14 días del test de mantenimiento. Toca cualquier día para
-        ver sus comidas y por qué es así. Esto va por fecha: mover un entreno no lo desplaza.
-      </p>
+    <Hoja abierta={abierta} alCerrar={alCerrar} titulo="Cierre del día">
+      <form onSubmit={guardar} className="columna">
+        <p style={{ margin: 0, fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.55 }}>
+          Copia el total del día de Fitia y los pasos del Garmin. Las calorías y los pasos son los
+          que de verdad hacen falta; los macros, si te apetece. No hace falta clavar nada.
+        </p>
 
-      <div className="tarjeta columna" style={{ gap: 2 }}>
-        {dias.map((d) => {
-          const esHoy = d.fecha === hoy;
-          const pasado = d.fecha < hoy;
-          return (
-            <button
-              key={d.fecha}
-              onClick={() => setAbierto(d.fecha)}
-              aria-label={`Ver el ${d.fecha}`}
-              style={{
-                display: "block",
-                width: "calc(100% + 20px)",
-                textAlign: "left",
-                border: "none",
-                cursor: "pointer",
-                color: "var(--texto)",
-                padding: "9px 10px",
-                margin: "0 -10px",
-                borderRadius: 10,
-                opacity: pasado ? 0.4 : 1,
-                background: esHoy
-                  ? "rgba(244,244,239,.07)"
-                  : d.especial
-                    ? "rgba(255,194,75,.08)"
-                    : "transparent",
-              }}
-            >
-              <div className="entre" style={{ gap: 10 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: esHoy || d.especial ? 800 : 600 }}>
-                    {diaCorto(d.fecha)} {fechaCorta(d.fecha)}
-                    {esHoy && <span style={{ color: "var(--texto-tenue)", fontWeight: 400 }}> · hoy</span>}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      marginTop: 2,
-                      color: d.especial ? "var(--aviso)" : "var(--texto-tenue)",
-                    }}
-                  >
-                    {d.objetivo}
-                  </div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 800 }}>
-                    {miles(d.kcal)}
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--texto-tenue)", marginTop: 2, whiteSpace: "nowrap" }}>
-                    {d.p}P · {d.hc}HC · {d.g}G
-                  </div>
-                </div>
-                <span style={{ color: "var(--texto-tenue)", fontSize: 15, flexShrink: 0 }}>›</span>
-              </div>
-
-              {/* Barra proporcional: la forma del plan se ve de un vistazo, sin
-                  tener que comparar catorce números a mano. */}
-              <div
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {campos.map((c) => (
+            <label key={c.id} style={{ display: "block", gridColumn: c.ancho === 2 ? "span 2" : undefined }}>
+              <span style={{ display: "block", fontSize: 12, color: "var(--texto-medio)", marginBottom: 5 }}>
+                {c.etiqueta}
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={v[c.id] ?? ""}
+                placeholder={c.marcador}
+                onChange={(e) => setV({ ...v, [c.id]: e.target.value.replace(/[^0-9]/g, "") })}
                 style={{
-                  marginTop: 7,
-                  height: 4,
-                  borderRadius: 999,
-                  background: "var(--borde-fuerte)",
-                  overflow: "hidden",
+                  width: "100%", padding: "12px 14px", fontSize: 17, fontWeight: 700,
+                  background: "var(--superficie-3)", border: "1px solid var(--borde-fuerte)",
+                  borderRadius: 12, color: "var(--texto)",
                 }}
-              >
-                <div
-                  style={{
-                    width: `${(d.kcal / maxKcal) * 100}%`,
-                    height: "100%",
-                    borderRadius: 999,
-                    background: d.especial ? "var(--aviso)" : "var(--texto-medio)",
-                  }}
-                />
-              </div>
-            </button>
-          );
-        })}
+              />
+            </label>
+          ))}
+        </div>
+
+        <button className="boton boton-primario" type="submit">GUARDAR</button>
+        <p style={{ margin: 0, fontSize: 12, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
+          Un día suelto no cambia nada, pero catorce seguidos son los que dejan a FORJA deducir
+          cuánto gastas de verdad. Los días que dejes en blanco cuentan como no adherentes: si no
+          fuera así, bastaría con no apuntar los días malos.
+        </p>
+      </form>
+    </Hoja>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Balance de la semana (§35, §53)                                     */
+/* ------------------------------------------------------------------ */
+
+function BalanceSemana({ n }) {
+  const b = n.balance;
+  if (!b || b.dias < 3 || Math.abs(b.diferencia) < 200) return null;
+
+  const pasado = b.diferencia > 0;
+  return (
+    <div className="tarjeta columna" style={{ gap: 8 }}>
+      <div className="rotulo">La semana</div>
+      <div style={{ fontSize: 16, fontWeight: 800 }}>
+        {pasado ? "+" : "−"}{miles(Math.abs(b.diferencia))} kcal sobre el objetivo
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--texto-tenue)" }}> · {b.dias} días apuntados</span>
+      </div>
+      <p style={{ margin: 0, fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.55 }}>
+        {pasado
+          ? `Ni destruye la semana ni desaparece. Dos opciones válidas: aceptarlo (esa semana pierdes algo menos) o repartir unas ${Math.abs(b.repartoSugerido)} kcal menos durante seis días. Lo que NO se hace es ayunar mañana ni castigarse con cardio.`
+          : "Vas por debajo del objetivo. Si no era buscado, come: un déficit accidental más grande no acelera nada y sí se lleva por delante fuerza y recuperación."}
+      </p>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Revisión                                                            */
+/* ------------------------------------------------------------------ */
+
+function TarjetaRevision({ n }) {
+  const [abierta, setAbierta] = useState(false);
+  if (!n.pendiente) return null;
+
+  const r = revisar(n.datos, n.ajustes, n.hoy);
+
+  const ACCIONES = {
+    hold: { titulo: "Mantener las calorías", color: "var(--exito)" },
+    audit: { titulo: "Revisar el registro antes de tocar nada", color: "var(--aviso)" },
+    decrease: { titulo: `Bajar ${r.kcal ?? 100} kcal`, color: "var(--aviso)" },
+    increase: { titulo: `Subir ${r.kcal ?? 100} kcal`, color: "var(--aviso)" },
+    confirm: { titulo: "Confirmar tu mantenimiento", color: "var(--exito)" },
+    maintenanceBlock: { titulo: "Volver a mantenimiento 2–3 semanas", color: "var(--aviso)" },
+  };
+  const info = ACCIONES[r.accion] ?? ACCIONES.hold;
+
+  return (
+    <div className="tarjeta columna" style={{ gap: 10, borderColor: info.color }}>
+      <div className="entre">
+        <div className="rotulo" style={{ color: info.color }}>Revisión</div>
+        <span className="chip">{n.diasDesdeCambio} DÍAS SIN TOCAR NADA</span>
       </div>
 
-      <p style={{ margin: 0, fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.55 }}>
-        El 21 de septiembre se lee el test y empieza la definición de seis semanas sobre tu
-        mantenimiento medido: a partir de ahí ya no hay calendario de kcal escrito, porque las
-        calorías futuras no son cifras fijas. Lo cuenta la pestaña AÑO.
-      </p>
+      <div style={{ fontSize: 16, fontWeight: 800, color: info.color }}>{info.titulo}</div>
+      <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>{r.motivo}</p>
 
-      <Hoja
-        abierta={Boolean(abierto)}
-        alCerrar={() => setAbierto(null)}
-        titulo={abierto ? fechaLarga(abierto) : ""}
+      {(r.accion === "decrease" || r.accion === "increase") && (
+        <div className="fila" style={{ gap: 8 }}>
+          {NUTRICION_CFG.cut.ajusteKcal.map((k) => {
+            const delta = r.accion === "increase" ? k : -k;
+            return (
+              <button
+                key={k}
+                className="boton boton-primario"
+                style={{ flex: 1 }}
+                onClick={() => aplicarRevision(delta)}
+              >
+                {delta > 0 ? "+" : "−"}{k} → {miles(n.estado.kcal + delta)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {r.accion === "confirm" && (
+        <button
+          className="boton boton-primario"
+          onClick={() => confirmarMantenimiento(r.kcal, r.confianza)}
+        >
+          CONFIRMAR {miles(r.kcal)} KCAL COMO MANTENIMIENTO
+        </button>
+      )}
+
+      {r.accion === "maintenanceBlock" && (
+        <button className="boton boton-primario" onClick={() => bloqueDeMantenimiento()}>
+          PASAR A MANTENIMIENTO 2–3 SEMANAS
+        </button>
+      )}
+
+      <button
+        onClick={() => aplicarRevision(0)}
+        style={{
+          background: r.accion === "hold" ? "var(--texto)" : "none",
+          color: r.accion === "hold" ? "var(--fondo)" : "var(--texto-tenue)",
+          border: "1px solid var(--borde-fuerte)", borderRadius: 12,
+          padding: "12px", fontSize: 13, fontWeight: 800, cursor: "pointer",
+        }}
       >
-        <div className="columna">{abierto && <DetalleDia fecha={abierto} />}</div>
+        {r.accion === "hold" ? "VISTO · SEGUIR IGUAL" : "PREFIERO MANTENER"}
+      </button>
+
+      <button className="boton-texto" onClick={() => setAbierta(true)}>Ver los números</button>
+
+      <Hoja abierta={abierta} alCerrar={() => setAbierta(false)} titulo="Los números de la revisión">
+        <div className="columna">
+          <Lista
+            items={[
+              `Tendencia del peso: ${r.tendencia == null ? "sin datos" : `${r.tendencia > 0 ? "+" : "−"}${kg(Math.abs(r.tendencia))} kg/semana`}.`,
+              `Adherencia: ${r.adherencia == null ? "sin datos" : `${Math.round(r.adherencia * 100)} %`} (hace falta 85 %).`,
+              `Actividad comparable con la semana anterior: ${r.pasosComparables ? "sí" : "no"}.`,
+              `Cintura: ${r.cintura ? `${r.cintura.delta > 0 ? "+" : "−"}${kg(Math.abs(r.cintura.delta))} cm` : "sin medición reciente"}.`,
+              `Gimnasio: ${r.progresion.total ? `${r.progresion.mejoran} de ${r.progresion.total} ejercicios mejoran` : "sin datos suficientes"}.`,
+              `Días desde el último cambio de calorías: ${r.diasDesdeCambio ?? "—"}.`,
+            ]}
+          />
+          <p style={{ margin: 0, fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.55 }}>
+            Cuando estas seis respuestas no apuntan claramente en la misma dirección, la decisión
+            correcta es mantener.
+          </p>
+        </div>
+      </Hoja>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Fin de fase                                                         */
+/* ------------------------------------------------------------------ */
+
+function TarjetaSalida({ n }) {
+  const [abierta, setAbierta] = useState(false);
+  if (n.estado.faseId !== "cut" || !n.salidas.length) return null;
+
+  const tdeeValido = n.tdee.etiqueta !== "ESTIMADO" ? n.tdee.valor : null;
+
+  return (
+    <>
+      <div className="tarjeta columna" style={{ gap: 10, borderColor: "var(--aviso)" }}>
+        <div className="rotulo" style={{ color: "var(--aviso)" }}>¿Cerramos la definición?</div>
+        <Lista items={n.salidas.map((s) => s.texto)} />
+        <button className="boton boton-primario" onClick={() => setAbierta(true)}>
+          VER CÓMO PASAR A MANTENIMIENTO
+        </button>
+      </div>
+
+      <Hoja abierta={abierta} alCerrar={() => setAbierta(false)} titulo="Cerrar la definición">
+        <div className="columna">
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
+            Al mantenimiento se entra con tu último gasto deducido válido, redondeado a 50. NO se le
+            restan 100 kcal: ese número ya se calculó con tu peso y tu actividad de AHORA, así que
+            quitarle algo sería inventarse un ajuste.
+          </p>
+          {tdeeValido ? (
+            <>
+              <div className="tarjeta" style={{ margin: 0 }}>
+                <div className="rotulo">Entrarías en</div>
+                <div style={{ fontSize: 24, fontWeight: 800, marginTop: 6 }}>
+                  {miles(Math.round(tdeeValido / 50) * 50)} kcal
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--texto-tenue)", marginTop: 4 }}>
+                  175 g de proteína, 80 g de grasa y el resto hidratos.
+                </div>
+              </div>
+              {Math.abs(tdeeValido - n.estado.kcal) > 400 && (
+                <p style={{ margin: 0, fontSize: 12.5, color: "var(--aviso)", lineHeight: 1.55 }}>
+                  El salto pasa de 400 kcal. Puedes subir en dos pasos durante una semana para
+                  reducir el ruido de agua y glucógeno, pero no es obligatorio: subir a mantenimiento
+                  no produce grasa automáticamente.
+                </p>
+              )}
+              <button className="boton boton-primario" onClick={() => cerrarCut(tdeeValido)}>
+                CERRAR EL CUT Y PASAR A MANTENIMIENTO
+              </button>
+            </>
+          ) : (
+            <p style={{ margin: 0, fontSize: 13.5, color: "var(--aviso)", lineHeight: 1.6 }}>
+              Todavía no hay un gasto deducido válido con el que entrar. {n.tdee.motivo} Apunta kcal
+              y pasos unos días más y la app propondrá el número sola.
+            </p>
+          )}
+        </div>
       </Hoja>
     </>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* POR QUÉ                                                             */
+/* Comidas                                                             */
 /* ------------------------------------------------------------------ */
 
-function PorQue() {
+function Comidas({ n }) {
+  const o = n.objetivos;
   return (
-    <>
-      <div className="tarjeta">
-        <div className="rotulo">La idea</div>
-        <p style={{ margin: "10px 0 0", fontSize: 15, fontWeight: 600, lineHeight: 1.55 }}>
-          Llegar al 4 y 5 de septiembre con algo menos de grasa pero con el músculo LLENO:
-          grande, musculado y relativamente definido con camiseta.
-        </p>
-        <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
-          Por eso se cancela el mini-cut de 1.700: con tan poco hidrato perderías glucógeno y agua
-          intramuscular, entrenarías peor y llegarías plano y vacío dentro de la camiseta. La
-          grasa extra que se pierde en tan pocos días no compensa esa peor apariencia. El objetivo
-          NO es pesar lo mínimo. Referencia de partida: 96,9 kg (26 de agosto).
-        </p>
-      </div>
-
-      <div className="tarjeta columna" style={{ gap: 0 }}>
-        <div className="rotulo" style={{ marginBottom: 12 }}>Las siete etapas</div>
-        {[
-          { dias: "26 ago – 1 sep", que: "Déficit moderado · 2.150", por: "Perder algo de grasa entrenando bien, sin vaciar el músculo." },
-          { dias: "2 sep", que: "Empieza el llenado · 2.300", por: "Suben los hidratos a 250 g. Última sesión completa recomendable." },
-          { dias: "3 sep", que: "Recarga + descanso · 2.500", por: "Rellenar el glucógeno muscular sin sesión dura. La subida es de hidratos, no de grasa." },
-          { dias: "4 – 5 sep", que: "Días visuales · ~2.450", por: "Mantener la plenitud: hidrato alto, agua y sal normales, pump corto opcional." },
-          { dias: "6 sep", que: "Transición · 2.500", por: "Nada de volver a un déficit agresivo: estabilizar y medir peso, cintura y foto." },
-          { dias: "7 – 20 sep", que: "Test de mantenimiento · ~2.800", por: "Medir el mantenimiento real: 14 días planos y báscula cada mañana. Nada de ajustar por una pesada." },
-          { dias: "21 sep – ~1 nov", que: "Definición · 6 semanas", por: "Mantenimiento medido − 450/600 kcal, perdiendo 0,5–0,7 % del peso a la semana." },
-        ].map((e, i) => (
+    <div className="tarjeta">
+      <div className="rotulo" style={{ marginBottom: 12 }}>Comida por comida</div>
+      <div className="columna" style={{ gap: 0 }}>
+        {o.comidas.map((c, i) => (
           <div
-            key={e.dias}
-            className="fila"
-            style={{ gap: 12, alignItems: "flex-start", padding: "12px 0", borderTop: i === 0 ? "none" : "1px solid var(--borde)" }}
+            key={c.nombre}
+            style={{
+              display: "grid", gridTemplateColumns: "1fr auto", gap: 4, padding: "12px 0",
+              borderTop: i === 0 ? "none" : "1px solid var(--borde)",
+            }}
           >
-            <span
-              style={{
-                width: 22, height: 22, borderRadius: 999, flexShrink: 0,
-                display: "grid", placeItems: "center",
-                background: "var(--superficie-3)", color: "var(--texto-medio)",
-                fontSize: 11, fontWeight: 800,
-              }}
-            >
-              {i + 1}
-            </span>
-            <span style={{ flex: 1 }}>
-              <span style={{ display: "block", fontSize: 14.5, fontWeight: 700 }}>{e.que}</span>
-              <span style={{ display: "block", fontSize: 11.5, color: "var(--texto-tenue)", margin: "2px 0 5px", letterSpacing: ".04em" }}>
-                {e.dias.toUpperCase()}
-              </span>
-              <span style={{ display: "block", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.5 }}>
-                {e.por}
-              </span>
-            </span>
+            <div>
+              <div style={{ fontSize: 14.5, fontWeight: 700 }}>{c.nombre}</div>
+              <div style={{ fontSize: 12, color: "var(--texto-tenue)", marginTop: 2 }}>{c.hora}</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap" }}>
+                <span style={{ color: "var(--fuerza)" }}>{c.p}P</span>
+                {" · "}
+                <span style={{ color: "var(--carrera)" }}>{c.hc}HC</span>
+                {" · "}
+                <span style={{ color: "var(--postura)" }}>{c.g}G</span>
+              </div>
+              <div style={{ fontSize: 11.5, color: "var(--texto-tenue)", marginTop: 3 }}>
+                ≈ {kcalDe(c)} kcal
+              </div>
+            </div>
           </div>
         ))}
-      </div>
 
-      <div className="tarjeta">
-        <div className="rotulo" style={{ color: "var(--exito)" }}>Qué se busca ver el 4 y el 5</div>
-        <div className="fila" style={{ gap: 6, flexWrap: "wrap", marginTop: 12 }}>
-          {["Hombro lateral lleno", "Dorsal y espalda llenos", "Brazos llenos", "Pecho con volumen", "Cintura limpia", "Sin hinchazón abdominal"].map((x) => (
-            <span key={x} className="chip" style={{ borderColor: "rgba(113,217,139,.35)", color: "var(--exito)" }}>
-              {x}
-            </span>
-          ))}
+        <div
+          className="entre"
+          style={{ paddingTop: 12, borderTop: "1px solid var(--borde-fuerte)", fontSize: 14, fontWeight: 800 }}
+        >
+          <span>TOTAL</span>
+          <span style={{ whiteSpace: "nowrap" }}>{o.p}P · {o.hc}HC · {o.g}G</span>
         </div>
       </div>
 
-      <div className="tarjeta">
-        <div className="rotulo" style={{ color: "var(--aviso)" }}>Tres malentendidos habituales</div>
-        <div style={{ marginTop: 12 }} className="columna">
-          <div>
-            <div style={{ fontSize: 13.5, fontWeight: 700 }}>La recarga no es un día libre.</div>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.5 }}>
-              Las 2.500 kcal del día 3 vienen de arroz, patata, avena, pan, pasta y fruta. Con
-              pizza y alcohol conseguirías lo contrario de lo que buscas.
-            </p>
-          </div>
-          <div>
-            <div style={{ fontSize: 13.5, fontWeight: 700 }}>Si el peso sube del 3 al 5, no es grasa.</div>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.5 }}>
-              Al subir los hidratos sube el glucógeno y el agua que lo acompaña. Puedes estar
-              perdiendo grasa toda la semana y aun así pesar algo más el 4 que el 2: es normal
-              y buscado. La báscula de 24–48 horas no juzga nada.
-            </p>
-          </div>
-          <div>
-            <div style={{ fontSize: 13.5, fontWeight: 700 }}>La grasa no se elige de dónde sale.</div>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.5 }}>
-              Esta estrategia baja la grasa global y mejora hombros, dorsal, brazos y cintura,
-              pero nadie puede prometer cuántos gramos salen de una zona concreta como el pecho.
-            </p>
-          </div>
-        </div>
-      </div>
+      <p style={{ margin: "14px 0 0", fontSize: 12, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
+        Los macros por comida son guía: si desayunas 55 de hidratos en vez de 70, súmalos a la
+        comida. Lo que manda es el total del día. Fitia puede enseñar pequeñas diferencias por
+        redondeos y fibra: es normal.
+      </p>
+    </div>
+  );
+}
 
-      <div className="tarjeta">
-        <div className="rotulo">Los días clave</div>
-        <div className="columna" style={{ gap: 10, marginTop: 12 }}>
-          {Object.entries(DIAS_ESPECIALES).map(([fecha, dia]) => (
-            <div key={fecha} className="entre" style={{ fontSize: 13.5 }}>
-              <span>{dia.nombre}</span>
-              <span style={{ color: "var(--aviso)", fontWeight: 700 }}>
-                {fechaCorta(fecha)} · {miles(dia.kcal)} kcal
-              </span>
+/* ------------------------------------------------------------------ */
+/* BLOQUES                                                             */
+/* ------------------------------------------------------------------ */
+
+function Bloques() {
+  const n = useNutricion();
+  const bloqueHoy = bloqueDe(n.hoy);
+
+  return (
+    <>
+      <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.55 }}>
+        Ya no hay un calendario de calorías escrito día a día: hay UN objetivo que solo cambia
+        cuando la tendencia lo justifica. Los bloques son el mapa del cut — sirven para saber
+        cuándo toca mirar los datos con calma, no para obligar a nada.
+      </p>
+
+      <div className="tarjeta columna" style={{ gap: 0 }}>
+        <div className="rotulo" style={{ marginBottom: 10 }}>Los bloques de la definición</div>
+        {BLOQUES_CUT.map((b, i) => {
+          const pasado = n.hoy > b.hasta;
+          const actual = bloqueHoy?.id === b.id;
+          return (
+            <div
+              key={b.id}
+              className="entre"
+              style={{
+                gap: 10, padding: "11px 10px", margin: "0 -10px", borderRadius: 10,
+                borderTop: i === 0 ? "none" : "1px solid var(--borde)",
+                background: actual ? "rgba(244,244,239,.07)" : "transparent",
+                opacity: pasado ? 0.45 : 1,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14.5, fontWeight: actual ? 800 : 700 }}>
+                  {b.nombre}
+                  {actual && <span style={{ color: "var(--exito)", fontWeight: 700 }}> · ahora</span>}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--texto-tenue)", marginTop: 2 }}>
+                  {fechaCorta(b.desde)} – {fechaCorta(b.hasta)}
+                  {b.noEvaluar && " · no se evalúa"}
+                  {b.opcional && " · opcional"}
+                </div>
+              </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
+        <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.55 }}>
+          Tope orientativo: ~14 semanas, hasta el {fechaCorta(TOPE_CUT)}. No hay ninguna obligación
+          de agotarlo, y tampoco existe un peso final obligatorio.
+        </p>
+      </div>
+
+      <VariantesCut n={n} />
+
+      <div className="tarjeta">
+        <div className="rotulo">La semana de adaptación</div>
+        <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
+          Del {fechaCorta(ADAPTACION.desde)} al {fechaCorta(ADAPTACION.hasta)}. Vienes de 2.100–2.150 y
+          subes a 2.400: el peso puede subir 0,3–0,8 kg por hidratos, glucógeno, el agua que los
+          acompaña y el contenido del intestino. Podrías pasar de 96,8 a 97,2 y pensar «estoy
+          engordando». No lo estás. Estos días no se evalúan y no se toca nada.
+        </p>
       </div>
     </>
   );
 }
 
+/** Las variantes de kcal del cut (§13), con la zona de revisión bien marcada. */
+function VariantesCut({ n }) {
+  return (
+    <div className="tarjeta columna" style={{ gap: 0 }}>
+      <div className="rotulo" style={{ marginBottom: 10 }}>Variantes del cut</div>
+      {VARIANTES_CUT.map((v, i) => {
+        const actual = v.kcal === n.estado.kcal;
+        return (
+          <button
+            key={v.kcal}
+            onClick={() => fijarObjetivo(v)}
+            aria-label={`Fijar ${v.kcal} kcal`}
+            style={{
+              display: "block", width: "calc(100% + 20px)", margin: "0 -10px", textAlign: "left",
+              border: "none", cursor: "pointer", color: "var(--texto)", padding: "11px 10px",
+              borderRadius: 10, background: actual ? "rgba(244,244,239,.07)" : "transparent",
+              borderTop: i === 0 ? "none" : "1px solid var(--borde)",
+            }}
+          >
+            <div className="entre" style={{ gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: actual ? 800 : 700 }}>
+                  {miles(v.kcal)} kcal
+                  {actual && <span style={{ color: "var(--exito)", fontWeight: 700 }}> · actual</span>}
+                </div>
+                <div style={{ fontSize: 12, color: v.zonaRevision ? "var(--aviso)" : "var(--texto-tenue)", marginTop: 2 }}>
+                  {v.p}P · {v.hc}HC · {v.g}G{v.zonaRevision && " · zona de revisión"}
+                </div>
+              </div>
+              <span style={{ color: "var(--texto-tenue)", fontSize: 15 }}>›</span>
+            </div>
+          </button>
+        );
+      })}
+      <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.55 }}>
+        Los ajustes van principalmente a hidratos. Las 2.150 son ZONA DE REVISIÓN, no una ley: si
+        llegas ahí sin progreso, FORJA para y avisa en vez de seguir bajando. Y ojo, cambiar de aquí
+        a mano reinicia el reloj de 14 días.
+      </p>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
-/* AÑO — el plan maestro por temporadas                                */
+/* AÑO                                                                 */
 /* ------------------------------------------------------------------ */
 
-/*
- * La línea del año entero. Las fases con fecha (hasta la hipertrofia) entran
- * solas; definición, mantenimiento y recomposición las confirma Jose desde su
- * ficha, porque el plan maestro manda: los datos reales deciden, no febrero.
- */
 function Ano() {
-  const ajustes = useAjustes();
+  const n = useNutricion();
   const [abierta, setAbierta] = useState(null);
   const [ficha, setFicha] = useState(null);
-  const hoy = hoyISO();
 
-  const fase = faseDe(hoy, ajustes ?? {});
-  const o = objetivosDe(hoy, ajustes ?? {});
   const temporada = abierta ? TEMPORADAS.find((t) => t.id === abierta) : null;
 
   return (
     <>
-      {/* Dónde estás ahora mismo */}
       <div className="tarjeta">
         <div className="rotulo">Ahora mismo</div>
         <div className="entre" style={{ marginTop: 8, alignItems: "baseline" }}>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>{fase.nombre}</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>{n.objetivos.nombre}</div>
           <div style={{ fontSize: 20, fontWeight: 800 }}>
-            {miles(o.kcal)} <span style={{ fontSize: 12, fontWeight: 600, color: "var(--texto-tenue)" }}>kcal</span>
+            {miles(n.objetivos.kcal)} <span style={{ fontSize: 12, fontWeight: 600, color: "var(--texto-tenue)" }}>kcal</span>
           </div>
         </div>
-        {fase.dinamica && (
-          <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
-            {ajustes?.mantenimientoReal == null
-              ? `Sobre el mantenimiento ESTIMADO de ${miles(MANTENIMIENTO_HIPOTESIS)} kcal (${miles(MANTENIMIENTO_ESTIMADO.min)}–${miles(MANTENIMIENTO_ESTIMADO.max)}), hasta que el test del 7 al 20 de septiembre diga el real.`
-              : `Mantenimiento real ${miles(ajustes.mantenimientoReal)} kcal${(ajustes.ajusteKcal ?? 0) !== 0 ? ` ${ajustes.ajusteKcal > 0 ? "+" : "−"} ${Math.abs(ajustes.ajusteKcal)} de las revisiones` : ""}.`}
-          </p>
-        )}
+        <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
+          Día {n.diasEnFase + 1} de la fase. Tu gasto: {miles(n.tdee.valor)} kcal ({n.tdee.etiqueta.toLowerCase()}).
+        </p>
       </div>
 
-      {/* Las siete temporadas */}
       <div className="tarjeta columna" style={{ gap: 0 }}>
-        <div className="rotulo" style={{ marginBottom: 10 }}>Agosto 2026 → agosto 2027</div>
+        <div className="rotulo" style={{ marginBottom: 10 }}>Septiembre 2026 → septiembre 2027</div>
         {TEMPORADAS.map((t, i) => {
-          const estado = estadoTemporada(t, hoy, ajustes ?? {});
+          const estado = estadoTemporada(t, n.hoy, n.ajustes);
           const actual = estado === "actual";
           return (
             <button
               key={t.id}
               onClick={() => setAbierta(t.id)}
-              aria-label={`Ver la temporada ${t.nombre}`}
+              aria-label={`Ver la fase ${t.nombre}`}
               style={{
                 display: "block", width: "calc(100% + 20px)", margin: "0 -10px",
                 textAlign: "left", border: "none", cursor: "pointer",
@@ -609,9 +907,11 @@ function Ano() {
             </button>
           );
         })}
+        <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.55 }}>
+          Ninguna fase entra sola por fecha. Terminan por datos y criterios, y las confirmas tú.
+        </p>
       </div>
 
-      {/* Fichas de consulta */}
       <div className="tarjeta columna" style={{ gap: 0 }}>
         <div className="rotulo" style={{ marginBottom: 10 }}>Fichas</div>
         {FICHAS.map((f, i) => (
@@ -622,8 +922,7 @@ function Ano() {
             style={{
               display: "block", width: "calc(100% + 20px)", margin: "0 -10px",
               textAlign: "left", border: "none", cursor: "pointer",
-              color: "var(--texto)", padding: "11px 10px", borderRadius: 10,
-              background: "transparent",
+              color: "var(--texto)", padding: "11px 10px", borderRadius: 10, background: "transparent",
               borderTop: i === 0 ? "none" : "1px solid var(--borde)",
             }}
           >
@@ -639,7 +938,7 @@ function Ano() {
       </div>
 
       <Hoja abierta={Boolean(temporada)} alCerrar={() => setAbierta(null)} titulo={temporada?.nombre ?? ""}>
-        {temporada && <DetalleTemporada temporada={temporada} ajustes={ajustes ?? {}} alCerrar={() => setAbierta(null)} />}
+        {temporada && <DetalleFase temporada={temporada} n={n} alCerrar={() => setAbierta(null)} />}
       </Hoja>
 
       <Hoja
@@ -655,41 +954,21 @@ function Ano() {
   );
 }
 
-/** La ficha completa de una temporada, con el botón de confirmarla si toca. */
-function DetalleTemporada({ temporada, ajustes, alCerrar }) {
-  const hoy = hoyISO();
-  const estado = estadoTemporada(temporada, hoy, ajustes);
-  const faseActual = faseDe(hoy, ajustes);
+/** La ficha completa de una fase, con el botón de empezarla si toca. */
+function DetalleFase({ temporada, n, alCerrar }) {
+  const estado = estadoTemporada(temporada, n.hoy, n.ajustes);
+  const actualId = n.estado.faseId;
+  const siguiente = ORDEN_FASES[ORDEN_FASES.indexOf(actualId) + 1];
+  const esSiguiente = temporada.id === siguiente;
 
-  // Solo se ofrece empezar la fase manual SIGUIENTE a la actual.
-  const siguienteDe = {
-    definicion: "mantenimiento-post",
-    "mantenimiento-post": "ganancia",
-    ganancia: "definicion-primavera",
-    "definicion-primavera": "mantenimiento-verano",
-  };
-  const puedeEmpezar = temporada.manual && estado === "futura" && siguienteDe[faseActual.id] === temporada.id;
-  const esActualManual = temporada.manual && estado === "actual";
-
-  const [confirmando, setConfirmando] = useState(false);
-  const sugerido = (ajustes.mantenimientoReal ?? MANTENIMIENTO_HIPOTESIS) + (ajustes.ajusteKcal ?? 0);
-  const [mantenimiento, setMantenimiento] = useState(String(sugerido));
-
-  async function confirmar() {
-    const kcal = Number(mantenimiento.replace(",", "."));
-    if (Number.isNaN(kcal) || kcal < 1500 || kcal > 4000) return;
-    await empezarFase(temporada.id, {
-      mantenimiento: kcal,
-      ajusteInicial: FASES_MANUALES[temporada.id]?.ajusteInicial ?? 0,
-    });
-    alCerrar();
-  }
+  const cinturaAhora = n.cintura?.ultima.cintura ?? null;
+  const tdeeValido = n.tdee.etiqueta !== "ESTIMADO" ? n.tdee.valor : null;
 
   return (
     <div className="columna">
       <div>
         <div style={{ fontSize: 12, color: "var(--texto-tenue)", letterSpacing: ".05em" }}>
-      {temporada.rango.toUpperCase()} · {temporada.kcalTexto.toUpperCase()}
+          {temporada.rango.toUpperCase()} · {temporada.kcalTexto.toUpperCase()}
         </div>
         <p style={{ margin: "8px 0 0", fontSize: 15, fontWeight: 600, lineHeight: 1.5 }}>{temporada.objetivo}</p>
       </div>
@@ -705,256 +984,238 @@ function DetalleTemporada({ temporada, ajustes, alCerrar }) {
         </div>
       )}
 
-      {puedeEmpezar && !confirmando && (
-        <button className="boton boton-primario" onClick={() => setConfirmando(true)}>
-          EMPEZAR {temporada.nombre.toUpperCase()}
-        </button>
+      {esSiguiente && estado === "futura" && (
+        <BotonEmpezar temporada={temporada} n={n} cintura={cinturaAhora} tdee={tdeeValido} alCerrar={alCerrar} />
       )}
+    </div>
+  );
+}
 
-      {puedeEmpezar && confirmando && (
-        <div className="columna" style={{ gap: 10 }}>
-          <label style={{ fontSize: 13, color: "var(--texto-medio)" }}>
-            Tu mantenimiento estimado AHORA (kcal/día):
-            <input
-              type="text"
-              inputMode="numeric"
-              value={mantenimiento}
-              onChange={(e) => setMantenimiento(e.target.value)}
-              style={{
-                width: "100%", marginTop: 6, padding: "12px 14px", fontSize: 18, fontWeight: 700,
-                background: "var(--superficie-3)", border: "1px solid var(--borde-fuerte)",
-                borderRadius: 12, color: "var(--texto)",
-              }}
-            />
-          </label>
-          {FASES_MANUALES[temporada.id]?.ajusteInicial !== 0 && (
-            <p style={{ margin: 0, fontSize: 12.5, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
-              La fase arranca en {miles(Number(mantenimiento.replace(",", ".")) + (FASES_MANUALES[temporada.id]?.ajusteInicial ?? 0) || 0)} kcal
-              ({FASES_MANUALES[temporada.id].ajusteInicial > 0 ? "+" : "−"}{Math.abs(FASES_MANUALES[temporada.id].ajusteInicial)} sobre ese mantenimiento),
-              y la revisión mensual la irá ajustando.
-            </p>
-          )}
-          <button className="boton boton-primario" onClick={confirmar}>CONFIRMAR</button>
-        </div>
-      )}
+function BotonEmpezar({ temporada, n, cintura, tdee, alCerrar }) {
+  const [error, setError] = useState(null);
 
-      {esActualManual && (
+  if (temporada.id === "mantenimiento") {
+    if (!tdee) {
+      return (
+        <p style={{ margin: 0, fontSize: 13, color: "var(--aviso)", lineHeight: 1.55 }}>
+          Para entrar en mantenimiento hace falta un gasto deducido válido. {n.tdee.motivo}
+        </p>
+      );
+    }
+    return (
+      <button className="boton boton-primario" onClick={async () => { await cerrarCut(tdee); alCerrar(); }}>
+        EMPEZAR MANTENIMIENTO EN {miles(Math.round(tdee / 50) * 50)} KCAL
+      </button>
+    );
+  }
+
+  if (temporada.id === "ganancia") {
+    if (n.ajustes.mantenimientoConfirmado == null) {
+      return (
+        <p style={{ margin: 0, fontSize: 13, color: "var(--aviso)", lineHeight: 1.55 }}>
+          La ganancia no arranca sin un mantenimiento CONFIRMADO. Sigue en mantenimiento hasta que
+          la tendencia esté cerca de cero y la cintura estable: la app lo propondrá sola.
+        </p>
+      );
+    }
+    return (
+      <>
         <button
-          onClick={async () => { await quitarFaseManual(); alCerrar(); }}
+          className="boton boton-primario"
+          onClick={async () => {
+            try {
+              await empezarGanancia({ cintura });
+              alCerrar();
+            } catch (e) {
+              setError(e.message);
+            }
+          }}
+        >
+          EMPEZAR GANANCIA EN {miles(n.ajustes.mantenimientoConfirmado + 175)} KCAL
+        </button>
+        {error && <p style={{ margin: 0, fontSize: 12.5, color: "var(--aviso)" }}>{error}</p>}
+      </>
+    );
+  }
+
+  if (temporada.id === "verano") {
+    return (
+      <div className="columna" style={{ gap: 8 }}>
+        <button className="boton boton-primario" onClick={async () => { await empezarVerano({ miniCut: false, cintura }); alCerrar(); }}>
+          MANTENIMIENTO · ME VEO BIEN
+        </button>
+        <button
+          onClick={async () => { await empezarVerano({ miniCut: true, cintura }); alCerrar(); }}
           style={{
             background: "none", border: "1px solid var(--borde-fuerte)", borderRadius: 12,
             color: "var(--texto-tenue)", padding: "12px", fontSize: 13, fontWeight: 700, cursor: "pointer",
           }}
         >
-          DESHACER · VOLVER AL PLAN POR FECHAS
+          MINI-CUT 4–6 SEMANAS
         </button>
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
+
+  return null;
 }
 
 /* ------------------------------------------------------------------ */
-/* Tarjeta del test de mantenimiento (7–20 sep)                        */
+/* POR QUÉ                                                             */
 /* ------------------------------------------------------------------ */
 
-function TarjetaCalibracion() {
-  const ajustes = useAjustes();
-  const pesos = usePesos(60);
-  const estado = estadoCalibracion(pesos, ajustes ?? {}, hoyISO());
-
-  if (estado.fase === "antes" || estado.fase === "guardada") return null;
-
+function PorQue() {
   return (
-    <div className="tarjeta columna" style={{ gap: 10, borderColor: "var(--carrera)" }}>
-      <div className="entre">
-        <div className="rotulo" style={{ color: "var(--carrera)" }}>
-          Test de mantenimiento
-        </div>
-        {estado.fase === "en-curso" && (
-          <span className="chip">DÍA {Math.min(estado.dia, 14)} DE 14</span>
-        )}
+    <>
+      <div className="tarjeta">
+        <div className="rotulo">La idea</div>
+        <p style={{ margin: "10px 0 0", fontSize: 15, fontWeight: 600, lineHeight: 1.55 }}>
+          Tu cuerpo no es una calculadora. Nadie puede decir «mides 1,87, pesas 96,8 y haces tantos
+          pasos, luego gastas 2.900». Lo que sí se puede hacer es esto:
+        </p>
+        <p style={{ margin: "10px 0 0", fontSize: 15, fontWeight: 700, lineHeight: 1.55, color: "var(--exito)" }}>
+          medir → esperar → comparar → cambiar poco → volver a medir.
+        </p>
+        <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
+          Por eso FORJA no trata ninguna cifra inicial como una verdad eterna. Empiezas en 2.400,
+          observas unas semanas y el propio plan se corrige con TUS datos.
+        </p>
       </div>
 
-      {estado.fase === "en-curso" && (
-        <>
-          <div className="fila" style={{ gap: 8 }}>
-            <Cifrita etiqueta="Pesajes sem. 1" valor={`${estado.dias1}/7`} />
-            <Cifrita etiqueta="Pesajes sem. 2" valor={`${estado.dias2}/7`} />
-            <Cifrita
-              etiqueta="Media sem. 1"
-              valor={estado.media1 != null ? `${estado.media1.toFixed(1).replace(".", ",")} kg` : "—"}
-            />
-          </div>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.55 }}>
-            NO AJUSTAR POR PESADAS AISLADAS. Come las ~2.800 planas los 14 días, con la misma
-            proteína y unos pasos parecidos, y pésate cada mañana (después del baño, antes de
-            desayunar). Al acabar, FORJA compara las dos semanas y te propone tu mantenimiento real.
-          </p>
-        </>
-      )}
-
-      {(estado.fase === "lista" || estado.fase === "incompleta") && (
-        <>
-          {estado.fase === "lista" ? (
-            <>
-              <div className="fila" style={{ gap: 8 }}>
-                <Cifrita etiqueta="Media sem. 1" valor={`${estado.media1.toFixed(1).replace(".", ",")} kg`} />
-                <Cifrita etiqueta="Media sem. 2" valor={`${estado.media2.toFixed(1).replace(".", ",")} kg`} />
-                <Cifrita
-                  etiqueta="Tendencia"
-                  valor={`${estado.porSemana > 0 ? "+" : ""}${estado.porSemana.toFixed(2).replace(".", ",")} kg/sem`}
-                />
-              </div>
-              <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
-                {estado.ajuste === 0
-                  ? `El peso se mantuvo estable comiendo ${miles(MANTENIMIENTO_HIPOTESIS)}: ese ES tu mantenimiento real.`
-                  : `Comiendo ${miles(MANTENIMIENTO_HIPOTESIS)} el peso ${estado.porSemana > 0 ? "subió" : "bajó"}: tu mantenimiento real está ` +
-                    `alrededor de ${miles(estado.mantenimiento)} kcal.`}
-                {estado.recortado &&
-                  " (La corrección se limita a ±250 kcal: parte del cambio en dos semanas es agua y glucógeno, no comida.)"}
-              </p>
-            </>
-          ) : (
-            <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
-              El test terminó pero faltan pesajes ({estado.dias1}/7 y {estado.dias2}/7) para una
-              media fiable. Puedes seguir pesándote una semana más, o usar la hipótesis de
-              {" "}{miles(MANTENIMIENTO_HIPOTESIS)} y afinarla con las revisiones mensuales.
-            </p>
-          )}
-
-          <button className="boton boton-primario" onClick={() => guardarMantenimiento(estado.mantenimiento)}>
-            GUARDAR {miles(estado.mantenimiento)} KCAL COMO MANTENIMIENTO
-          </button>
-          <p style={{ margin: 0, fontSize: 12, color: "var(--texto-tenue)" }}>
-            Desde ese momento todas las fases calculan sus kcal sobre este número, empezando por
-            la definición: mantenimiento − 450/600. Se puede corregir en Ajustes.
-          </p>
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Tarjeta de revisión mensual (§65–66)                                */
-/* ------------------------------------------------------------------ */
-
-function TarjetaRevision() {
-  const ajustes = useAjustes();
-  const pesos = usePesos(60);
-  const mediciones = useMediciones();
-  const sesiones = useSesionesFuerza(80);
-  const carreras = useCarreras(80);
-  const hoy = hoyISO();
-
-  const fase = faseDe(hoy, ajustes ?? {});
-  const pendiente = revisionPendiente(fase.id, ajustes ?? {}, hoy);
-
-  // Las series de las sesiones del mes solo se cargan si la revisión toca.
-  const [series, setSeries] = useState(null);
-  useEffect(() => {
-    if (!pendiente || !sesiones.length) return;
-    let vivo = true;
-    const ids = sesiones.filter((s) => s.estado === "completada").map((s) => s.id);
-    db.series.where("sesionId").anyOf(ids).toArray().then((filas) => {
-      if (vivo) setSeries(filas);
-    });
-    return () => { vivo = false; };
-  }, [pendiente, sesiones]);
-
-  if (!pendiente || series == null) return null;
-
-  const r = revisar({ pesos, mediciones, sesiones, carreras, series }, fase.id, hoy);
-  const kcalAhora = (ajustes?.mantenimientoReal ?? MANTENIMIENTO_HIPOTESIS) + (ajustes?.ajusteKcal ?? 0);
-
-  const ACCIONES = {
-    cumplir: { titulo: "Sin cambios", color: "var(--texto-medio)" },
-    mantener: { titulo: "Mantener las kcal", color: "var(--exito)" },
-    subir: { titulo: "Subir 100–150 kcal", color: "var(--aviso)" },
-    bajar: { titulo: "Bajar 100–150 kcal", color: "var(--aviso)" },
-  };
-
-  return (
-    <div className="tarjeta columna" style={{ gap: 10, borderColor: "var(--aviso)" }}>
-      <div className="rotulo" style={{ color: "var(--aviso)" }}>Revisión de las 4 semanas</div>
-
-      <div className="fila" style={{ gap: 8, flexWrap: "wrap" }}>
-        <Cifrita
-          etiqueta="Peso"
-          valor={r.peso ? `${r.peso.porSemana > 0 ? "+" : ""}${r.peso.porSemana.toFixed(2).replace(".", ",")} kg/sem` : "—"}
-        />
-        <Cifrita
-          etiqueta="Cintura"
-          valor={r.cintura ? `${r.cintura.delta > 0 ? "+" : ""}${r.cintura.delta.toFixed(1).replace(".", ",")} cm` : "—"}
-        />
-        <Cifrita etiqueta="Sesiones" valor={`${r.cumplido.hechas}/${r.cumplido.objetivo}`} />
-        <Cifrita
-          etiqueta="Progresan"
-          valor={r.progresion.total ? `${r.progresion.mejoran}/${r.progresion.total}` : "—"}
-        />
-      </div>
-
-      <div style={{ fontSize: 16, fontWeight: 800, color: ACCIONES[r.accion].color }}>
-        {ACCIONES[r.accion].titulo}
-      </div>
-      <p style={{ margin: 0, fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>{r.motivo}</p>
-
-      {(r.accion === "subir" || r.accion === "bajar") && (
-        <div className="fila" style={{ gap: 8 }}>
-          {[100, 150].map((n) => (
-            <button
-              key={n}
-              className="boton boton-primario"
-              style={{ flex: 1 }}
-              onClick={() => aplicarRevision(r.accion === "subir" ? n : -n)}
+      <div className="tarjeta columna" style={{ gap: 0 }}>
+        <div className="rotulo" style={{ marginBottom: 12 }}>Medido, estimado y deducido</div>
+        {[
+          {
+            que: "MEDIDO",
+            por: "Lo que realmente apuntas: 96,8 kg, 12.300 pasos, 2.410 kcal. No son perfectos —una báscula varía, un reloj se equivoca—, pero son datos reales de tu día.",
+          },
+          {
+            que: "ESTIMADO",
+            por: "Lo que calcula una fórmula: «por tu edad, altura, peso y actividad, podrías gastar unas 2.900». No significa que gastes 2.900. Significa que es una buena cifra para empezar.",
+          },
+          {
+            que: "DEDUCIDO",
+            por: "El número que de verdad importa. Si comes 2.400 de media y pierdes 0,55 kg por semana, eso son ~4.235 kcal de déficit semanal, unas 605 al día: gastabas alrededor de 3.005. Vale mucho más que cualquier fórmula.",
+          },
+        ].map((e, i) => (
+          <div
+            key={e.que}
+            className="fila"
+            style={{ gap: 12, alignItems: "flex-start", padding: "12px 0", borderTop: i === 0 ? "none" : "1px solid var(--borde)" }}
+          >
+            <span
+              style={{
+                width: 22, height: 22, borderRadius: 999, flexShrink: 0, display: "grid",
+                placeItems: "center", background: "var(--superficie-3)", color: "var(--texto-medio)",
+                fontSize: 11, fontWeight: 800,
+              }}
             >
-              {r.accion === "subir" ? "+" : "−"}{n} → {miles(kcalAhora + (r.accion === "subir" ? n : -n))}
-            </button>
+              {i + 1}
+            </span>
+            <span style={{ flex: 1 }}>
+              <span style={{ display: "block", fontSize: 13, fontWeight: 800, letterSpacing: ".06em" }}>{e.que}</span>
+              <span style={{ display: "block", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.55, marginTop: 4 }}>
+                {e.por}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="tarjeta">
+        <div className="rotulo" style={{ color: "var(--aviso)" }}>Por qué tu primera semana no valía</div>
+        <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
+          Empezaste en 96,9 kg y una semana después estabas en 96,8 comiendo 2.100–2.150. Parece
+          «no he bajado». Pero venías de tres semanas sin gimnasio, y tu cuerpo estaba haciendo
+          varias cosas a la vez: perder grasa, recuperar glucógeno, recuperar el agua que el
+          glucógeno arrastra e inflamarse por volver a entrenar.
+        </p>
+        <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
+          Puede haber pasado esto: grasa −500 g, agua +500 g, báscula igual. No sabemos si fue
+          exactamente así. Sí sabemos que <strong>una semana no basta para concluir que 2.150 es tu
+          mantenimiento</strong> — ni tampoco que registraras mal.
+        </p>
+      </div>
+
+      <div className="tarjeta">
+        <div className="rotulo">Por qué 2.400 y no otra cifra</div>
+        <div className="columna" style={{ gap: 10, marginTop: 12 }}>
+          {[
+            ["Si tu gasto real fuese 2.900", "déficit de 500 kcal. Moderado."],
+            ["Si fuese 2.700", "déficit de 300. Perderías más despacio."],
+            ["Si fuese 3.000", "déficit de 600. Sigue siendo razonable."],
+          ].map(([a, b]) => (
+            <div key={a} className="entre" style={{ fontSize: 13.5, gap: 12 }}>
+              <span style={{ color: "var(--texto-medio)" }}>{a}</span>
+              <span style={{ fontWeight: 700, textAlign: "right" }}>{b}</span>
+            </div>
           ))}
         </div>
-      )}
+        <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.55 }}>
+          En los tres casos el punto de partida funciona. Por eso se empieza aquí y se ajusta con
+          datos, en vez de afinar sobre el papel un número que nadie conoce todavía.
+        </p>
+      </div>
 
-      <button
-        onClick={() => aplicarRevision(0)}
-        style={{
-          background: r.accion === "mantener" || r.accion === "cumplir" ? "var(--texto)" : "none",
-          color: r.accion === "mantener" || r.accion === "cumplir" ? "var(--fondo)" : "var(--texto-tenue)",
-          border: "1px solid var(--borde-fuerte)", borderRadius: 12,
-          padding: "12px", fontSize: 13, fontWeight: 800, cursor: "pointer",
-        }}
-      >
-        {r.accion === "subir" || r.accion === "bajar" ? "PREFIERO MANTENER" : "VISTO · SEGUIR IGUAL"}
-      </button>
-      <p style={{ margin: 0, fontSize: 12, color: "var(--texto-tenue)" }}>
-        La próxima revisión aparecerá sola dentro de 4 semanas.
-      </p>
-    </div>
+      <div className="tarjeta">
+        <div className="rotulo">Por qué el running NO se suma aparte</div>
+        <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
+          Si en una sesión de CaCo haces 4.000 pasos, esos pasos ya están dentro de los pasos
+          totales del día. Sumar «las calorías de 12.800 pasos + las calorías completas de correr»
+          sería contar lo mismo dos veces. Y tus 12.800 pasos tampoco son 10 km de caminata
+          seguida: son desplazamientos cortos por el taller todo el día. Sirven para saber si esta
+          semana te has movido parecido a la anterior, no para convertir cada paso en calorías.
+        </p>
+      </div>
+
+      <div className="tarjeta">
+        <div className="rotulo">Por qué no hacemos un volumen grande ahora</div>
+        <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--texto-medio)", lineHeight: 1.6 }}>
+          Con un mantenimiento de 2.800 podríamos darte 3.400. Subirías rápido, sí, pero no
+          fabricarías cuatro veces más músculo: sería algo de músculo y bastante grasa, y luego
+          meses quitándola. Primero se baja grasa. Cuando llegue el momento de crecer, se come solo
+          un poco por encima de mantenimiento.
+        </p>
+      </div>
+
+      <div className="tarjeta">
+        <div className="rotulo" style={{ color: "var(--aviso)" }}>Lo que FORJA nunca hará</div>
+        <div style={{ marginTop: 12 }}>
+          <Lista items={NUNCA} />
+        </div>
+      </div>
+
+      <div className="tarjeta">
+        <div className="rotulo" style={{ color: "var(--exito)" }}>El plan entero en una frase</div>
+        <p style={{ margin: "10px 0 0", fontSize: 14.5, fontWeight: 600, lineHeight: 1.6 }}>
+          Ahora pierdes grasa con un déficit moderado; FORJA aprende cuánto gastas de verdad; cuando
+          estés suficientemente definido pasas a mantenimiento; cuando el mantenimiento esté claro
+          empiezas a ganar músculo muy lentamente; y solo vuelves a definir si la cintura y el
+          aspecto lo justifican.
+        </p>
+      </div>
+    </>
   );
 }
 
-function Cifrita({ etiqueta, valor }) {
+/* ------------------------------------------------------------------ */
+/* Piezas sueltas                                                      */
+/* ------------------------------------------------------------------ */
+
+function Cifrita({ etiqueta, valor, color }) {
   return (
-    <div style={{ flex: 1, minWidth: 70, background: "var(--superficie-3)", borderRadius: 10, padding: "8px 10px" }}>
+    <div style={{ background: "var(--superficie-3)", borderRadius: 10, padding: "8px 10px" }}>
       <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: ".08em", color: "var(--texto-tenue)" }}>
         {etiqueta.toUpperCase()}
       </div>
-      <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, whiteSpace: "nowrap" }}>{valor}</div>
+      <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, whiteSpace: "nowrap", color }}>{valor}</div>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-
 function Macro({ etiqueta, valor, color }) {
   return (
-    <div
-      style={{
-        flex: 1,
-        background: "var(--superficie-3)",
-        borderRadius: 12,
-        padding: "10px 12px",
-      }}
-    >
+    <div style={{ flex: 1, background: "var(--superficie-3)", borderRadius: 12, padding: "10px 12px" }}>
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".1em", color: "var(--texto-tenue)" }}>
         {etiqueta.toUpperCase()}
       </div>
@@ -989,4 +1250,8 @@ function Lista({ items }) {
       {items.map((t) => <li key={t}>{t}</li>)}
     </ul>
   );
+}
+
+function kg(v) {
+  return v.toFixed(v >= 10 ? 1 : 2).replace(".", ",");
 }

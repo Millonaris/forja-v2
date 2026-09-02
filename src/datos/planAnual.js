@@ -1,173 +1,104 @@
 /*
- * El plan maestro anual (23 ago 2026 → ago 2027) contado como temporadas.
+ * El plan del año contado como fases, según el SOURCE OF TRUTH v3 de DIETA
+ * (docs/dieta-v3-source-of-truth.md, §8 y §57).
  *
- * Esto es CONTENIDO, no motor: las kcal reales de cada fase viven en
- * planNutricion.js y en los ajustes. Aquí está lo que Jose lee en la vista
- * AÑO: qué es cada temporada, por qué existe, sus reglas y cuándo cambiar.
+ * Esto es CONTENIDO, no motor: las kcal vigentes viven en `ajustes` y las
+ * calcula `planNutricion.js`. Aquí está lo que Jose lee en la vista AÑO: qué
+ * es cada fase, por qué existe, cuándo se entra y cuándo se sale.
  *
- * Las fechas posteriores a septiembre son orientativas a propósito: el plan
- * maestro dice "los datos reales mandan sobre el calendario". Por eso las
- * temporadas manuales no entran solas: las confirma Jose desde su ficha.
+ * Ninguna fase entra sola por fecha. Ni una. "Las fases terminan por datos +
+ * criterios, no solo por calendario": FORJA enseña los criterios de salida y
+ * la decisión la confirma Jose. Lo único con fecha en todo el módulo es el
+ * arranque del cut (2 de septiembre) y su semana de adaptación.
  */
+
+import { ORDEN_FASES } from "./planNutricion.js";
 
 export const TEMPORADAS = [
   {
-    id: "preparacion",
-    nombre: "Preparación",
-    rango: "23 – 25 agosto",
-    desde: "2026-08-23",
-    hasta: "2026-08-25",
-    kcalTexto: "Comer normal",
-    objetivo: "Volver a la estructura después de vacaciones.",
-    detalle: [
-      "Normalizar comidas, hidratación y sueño. Preparar alimentos, volver a registrar el peso y tener FORJA y Fitia listos.",
-      "No compensar las vacaciones con cardio o hambre extrema. Los cambios rápidos de peso de estos días son agua, glucógeno, sodio y contenido intestinal: no interpretarlos todavía como grasa.",
-    ],
-  },
-  {
-    id: "puesta-a-punto",
-    nombre: "Puesta a punto",
-    rango: "26 agosto – 6 septiembre",
-    desde: "2026-08-26",
-    hasta: "2026-09-06",
-    kcalTexto: "2.150 → 2.500",
-    objetivo: "Perder algo de grasa y llegar al 4–5 de septiembre grande, lleno y relativamente definido.",
-    detalle: [
-      "Se cancela el mini-cut de 1.700: con tan poco hidrato llegarías algo más ligero pero plano, vacío y entrenando peor. Nueva referencia de partida: 96,9 kg (26 de agosto).",
-      "Del 26 al 1: déficit moderado de 2.150 kcal con la proteína en 190 g. Del 2 al 5, llenado: 2.300 → 2.500 subiendo solo hidratos, con la recarga y descanso del 3 y los dos días visuales del 4 y 5 a ~2.450. El 6, transición a 2.500 y mediciones: al día siguiente empieza el test. El día a día completo está en HOY y CALENDARIO.",
-      "En el gimnasio, rampa de vuelta: hasta el 1 de septiembre ~75–80 % del volumen con RIR 3; después 90–100 % con RIR 2, sin fallo ni récords. La última sesión completa recomendable es el 2; el 3 no hay sesión dura y el 4–5 solo pump corto opcional.",
-    ],
-  },
-  {
-    id: "calibracion",
-    nombre: "Test de mantenimiento",
-    rango: "7 – 20 septiembre",
-    desde: "2026-09-07",
-    hasta: "2026-09-20",
-    kcalTexto: "~2.800 fijas",
-    objetivo: "Medir tu mantenimiento REAL en 14 días. El número más importante del año.",
-    detalle: [
-      "El mantenimiento no se da por sabido. La estimación de ~2.600 queda descartada: con ~12.800 pasos de media (el running YA va dentro de esos pasos) más las sesiones de hipertrofia, la horquilla probable es 2.750–3.000 y el punto de prueba, 2.800.",
-      "Que la primera semana de vuelta al entrenamiento saliera casi plana comiendo 2.100–2.150 NO demuestra que eso fuera el mantenimiento: coinciden la vuelta después de tres semanas parado, la recuperación de glucógeno, más agua intramuscular e inflamación. El peso puede estar tapando pérdida de grasa.",
-      "Durante 14 días: mismas calorías, misma proteína, pasos parecidos, báscula cada mañana (después del baño, antes de desayunar) y cintura al menos una vez por semana. No se compensa una subida puntual comiendo menos.",
-      "Al final se compara la media del 7–13 con la del 14–20. Medias parecidas: el mantenimiento ronda las 2.800. Si la segunda baja, está por encima; si sube, por debajo. FORJA hace la cuenta sola con tus pesos y te propone el número.",
-      "Los primeros días la báscula puede subir después de las 2.300–2.500 con hidrato alto: eso es glucógeno, agua, contenido intestinal y sodio, no grasa. Por eso el test dura 14 días y usa medias.",
-      "En el gimnasio, desde el 9 de septiembre ya se entrena a volumen completo con el RIR habitual 1–2.",
-    ],
-  },
-  {
-    id: "definicion",
+    id: "cut",
     nombre: "Definición",
-    rango: "21 septiembre – ~1 noviembre · 6 semanas",
-    desde: "2026-09-21",
-    hasta: null,
-    kcalTexto: "Mantenimiento medido −450/600",
-    objetivo: "Bajar grasa a buen ritmo con el músculo y el rendimiento intactos.",
+    rango: "Desde el 2 de septiembre · hasta ~14 semanas",
+    kcalTexto: "Arranque 2.400 kcal",
+    objetivo: "Perder grasa, conservar el máximo músculo y recuperar el rendimiento de antes de vacaciones.",
+    empiezaCuando: ["Ya está en marcha desde el 2 de septiembre de 2026."],
     detalle: [
-      "La cifra exacta NO se fija hasta leer el test: definición = mantenimiento medido − 450–600 kcal. Con 2.800 medidas serían ~2.250–2.350; con 2.900, ~2.350–2.450; con 3.000, ~2.450–2.500.",
-      "Ritmo objetivo: perder 0,5–0,7 % del peso corporal por semana. Con ~97 kg son unos 0,5–0,7 kg a la semana.",
-      "Macros: proteína 180–185 g, grasa 60–70 g y el resto hidratos, que se mantienen relativamente altos para sostener hipertrofia, CaCo, rendimiento y glucógeno.",
-      "Ajustes: no tocar nada mientras el peso medio y la cintura bajen a ritmo razonable. −100 kcal solo si durante ~2 semanas ambos siguen planos con buena adherencia y actividad comparable. +100 si la pérdida va demasiado rápida y empeoran rendimiento, recuperación, hambre o fatiga.",
-      "Seis semanas previstas (fin aproximado el 1 de noviembre), pero la fecha se mueve según el resultado del test. No hay un peso final obligatorio.",
+      "2.400 kcal con 185 P / 246 C / 75 G. No es la cifra perfecta, es un punto razonable para empezar a observar: si tu gasto real fuese 2.900, el déficit sería de 500; si fuese 2.700, de 300; si fuese 3.000, de 600. Los tres son razonables.",
+      "Ritmo objetivo: 0,5–0,7 % del peso a la semana (~0,5–0,65 kg con 97 kg). Se acepta menos si la cintura y las fotos mejoran y el gimnasio aguanta. Ganar algo de músculo puede pasar, pero no se promete durante un déficit.",
+      "Del 2 al 8 de septiembre es ADAPTACIÓN: vienes de 2.100–2.150 y el peso puede subir 0,3–0,8 kg por hidratos, glucógeno, agua y contenido intestinal. Esos días no se evalúan y no se toca nada.",
+      "Mismas calorías todos los días, entrenes pierna, torso, corras o descanses. Los hidratos se pueden mover entre comidas; el total no.",
+      "Bloques orientativos: adaptación (2–8 sep), bloque 1 (9–29 sep), bloque 2 (30 sep–20 oct), bloque 3 (21 oct–10 nov) y un bloque 4 opcional (11 nov–1 dic). Tope ~14 semanas, sin ninguna obligación de agotarlo.",
+      "Se cierra por lo primero que llegue: te ves suficientemente definido y la cintura ha bajado claro; la recuperación se deteriora dos semanas seguidas; se cumplen las ~14 semanas; o el peso se para en la zona de 2.150 kcal, donde FORJA para en vez de seguir bajando.",
     ],
   },
   {
-    id: "mantenimiento-post",
-    nombre: "Mantenimiento",
-    rango: "~noviembre · 2–3 semanas",
-    desde: null,
-    hasta: null,
-    manual: true,
-    kcalTexto: "Mantenimiento nuevo (recalculado)",
-    objetivo: "Estabilizar el peso conseguido, recuperar rendimiento y normalizar el hambre.",
+    id: "mantenimiento",
+    nombre: "Mantenimiento post-cut",
+    rango: "2–3 semanas o más",
+    kcalTexto: "El último TDEE deducido válido",
+    objetivo: "Estabilizar el peso nuevo, recuperar hambre y energía, y CONFIRMAR tu gasto real.",
     empiezaCuando: [
-      "Terminadas las seis semanas de definición.",
-      "Ganas de asentar el resultado antes de decidir el siguiente paso.",
+      "El cut se ha cerrado por cualquiera de sus criterios de salida.",
+      "Hay un TDEE deducido válido con el que arrancar.",
     ],
     detalle: [
-      "NO se vuelve automáticamente a las 2.800: el mantenimiento habrá cambiado con el peso corporal, la actividad, el running y la masa muscular. Se recalcula con los datos reales de ese momento.",
-      "Proteína 175–180 g, grasas 70–80 g, hidratos el resto.",
-      "Objetivos: peso estable, rendimiento recuperándose, hambre normalizada… y disfrutar del físico conseguido.",
+      "Se entra en el último TDEE deducido válido, redondeado a 50. NO se le restan 100 kcal: ese número ya se calculó con tu peso y tu actividad del final del cut, así que restarle algo sería inventarse un ajuste.",
+      "Si el salto desde las kcal del cut pasa de ~400, se puede hacer en dos pasos durante una semana. Solo para reducir el ruido de agua y glucógeno, no porque subir a mantenimiento engorde.",
+      "Primera semana: ADAPTACIÓN. El peso puede subir 0,5–1 kg por glucógeno, agua y contenido intestinal. No se etiqueta como grasa y no se evalúa.",
+      "Después hacen falta ~14 días más. Confirmación fuerte: tendencia dentro de ±0,10 kg/semana con la cintura estable. Provisional: hasta ±0,20. No perseguimos falsa precisión.",
+      "Si sigues perdiendo claramente, +100 kcal. Si subes claramente y la cintura sube, −100.",
+      "Macros: ~175 g de proteína, ~80 g de grasa, el resto hidratos.",
     ],
   },
   {
     id: "ganancia",
     nombre: "Ganancia muscular limpia",
-    rango: "~diciembre 2026 – marzo 2027",
-    desde: null,
-    hasta: null,
-    manual: true,
-    kcalTexto: "Mantenimiento real +100/150",
-    objetivo: "Construir músculo con un superávit pequeño, sin volver a taparlo de grasa.",
+    rango: "Meses. Es la fase larga del año",
+    kcalTexto: "Mantenimiento confirmado +150–200",
+    objetivo: "Construir músculo —hombros, dorsales, espalda y glúteos— con el mínimo de grasa innecesaria.",
     empiezaCuando: [
-      "El mantenimiento post-definición está asentado.",
-      "Peso estable y rendimiento recuperado.",
+      "Existe un mantenimiento CONFIRMADO. Sin ese número, la fase no arranca.",
+      "El peso está estable y el hambre y la energía se han normalizado.",
     ],
     detalle: [
-      "La regla es corta: mantenimiento real + 100–150 kcal. Nada de superávits grandes: lo que sobra por encima de eso es grasa, y deshacerla cuesta otra definición.",
-      "Proteína 175–180 g, grasas 70–80 g, hidratos el resto.",
-      "Velocidad objetivo: 0–0,20 kg/semana DE MEDIA, evaluada en bloques de 4–6 semanas. Una semana suelta no significa nada, y la fase puede ser excelente aunque la báscula suba solo 1–3 kg: lo que se busca es hombro, dorsal, espalda alta y glúteo.",
-      "Solo si durante 3–4 semanas el peso está completamente plano, el entreno bien hecho y la progresión parada se añaden +100–150 kcal. La revisión mensual de FORJA aplica exactamente esta regla.",
+      "Se empieza en mantenimiento confirmado + 150–200 kcal. Con 2.750 confirmadas, 2.900–2.950. No 3.400: meter 700 kcal extra no hace cuatro veces más músculo, solo mucha más grasa que después habría que quitar durante meses.",
+      "Objetivo: 0,25–0,45 kg AL MES, no por semana. En seis meses, 1,5–2,5 kg de subida total sería razonable.",
+      "Si el peso apenas sube pero la fuerza progresa y la cintura está quieta, NO se añaden calorías: eso probablemente es recomposición y es justo lo que se busca.",
+      "Revisión cada 4 semanas. Demasiado rápido (>0,6 kg/mes o cintura >1 cm/mes): −100 kcal. Demasiado lento se juzga con ~8 semanas de peso plano y fuerza estancada: +100 kcal. Nunca por un solo mes.",
+      "Si la cintura sube 2 cm desde el inicio de la fase: volver 2–3 semanas a mantenimiento y reevaluar. NO se empieza un mini-cut automáticamente.",
+      "Según crezca el running, el mantenimiento cambia: no se congela para siempre el número confirmado meses antes. Tiradas de 75–120 min pueden llevar +30–50 g de hidratos ese día; por encima de 90 min, 30–60 g/hora durante la sesión. Es disponibilidad de carbohidrato, no devolver calorías quemadas.",
+      "Macros: ~175 g de proteína, ~80–85 g de grasa, el resto hidratos.",
     ],
   },
   {
-    id: "definicion-primavera",
-    nombre: "Definición de primavera",
-    rango: "~abril – mayo 2027 · si procede",
-    desde: null,
-    hasta: null,
-    manual: true,
-    kcalTexto: "Mantenimiento del momento −400/500",
-    objetivo: "Un cut corto para llegar al verano definido, solo si hace falta.",
+    id: "verano",
+    nombre: "Verano · mini-cut si hace falta",
+    rango: "Verano 2027",
+    kcalTexto: "Mantenimiento, o −400/500 si procede",
+    objetivo: "Llegar al verano bien, sin ciclos agresivos ni decisiones de calendario.",
     empiezaCuando: [
-      "Varios meses buenos de ganancia a la espalda.",
-      "La cintura sube y las fotos dicen que te estás tapando.",
-      "Si sigues relativamente definido, esta fase NO se hace: se continúa creciendo.",
+      "Ha terminado la fase larga de ganancia.",
+      "Se ha mirado cintura, fotos, peso, definición y rendimiento. No porque sea junio.",
     ],
     detalle: [
-      "No entra por calendario: la decisión depende de cintura, fotos, peso, nivel de definición y grasa acumulada.",
-      "Mantenimiento de ese momento − 400–500 kcal. Proteína 180–185 g, grasas 65–75 g, hidratos el resto.",
-      "El entrenamiento NO cambia a poco peso y muchas repeticiones: mismos ejercicios, misma intensidad, mismo RIR. El running ya cuenta como cardio: no se añade HIIT ni cardio interminable.",
-      "Si el cut se hace largo y aparecen fatiga alta, hambre persistente y rendimiento deteriorado: diet break de 7–14 días alrededor de mantenimiento, sin convertirlo en atracones.",
-    ],
-  },
-  {
-    id: "mantenimiento-verano",
-    nombre: "Mantenimiento de verano",
-    rango: "~junio – agosto 2027",
-    desde: null,
-    hasta: null,
-    manual: true,
-    kcalTexto: "Mantenimiento real del momento",
-    objetivo: "Pasar el verano definido, entrenando fuerte y sin ciclos agresivos.",
-    empiezaCuando: [
-      "Terminado el cut de primavera, o llegado el verano ya en un buen punto.",
-    ],
-    detalle: [
-      "Mantenimiento real de ese momento, otra vez recalculado con datos reales, no con la cifra de un año antes.",
-      "Proteína 175–180 g, grasas 70–80 g, hidratos el resto.",
-      "La meta a largo plazo del plan: poder decir \"tengo bastante más músculo que hace un año y ahora se ve\", y tener un sistema sostenible para seguir años.",
+      "Si te sigues viendo suficientemente definido: mantenimiento y a seguir.",
+      "Si has acumulado más grasa de la que quieres: mini-cut de 4–6 semanas a mantenimiento actual − 400–500 kcal, con la proteína en 180–185 g.",
+      "Después, revisión anual: qué ha funcionado, cuánto músculo hay de verdad y qué toca el año siguiente.",
+      "El objetivo del año nunca fue un número de báscula: menos grasa, más músculo, mejor rendimiento y un sistema sostenible que aprende de ti.",
     ],
   },
 ];
 
-/** El estado de una temporada para pintarla: pasada, actual o futura. */
-export function estadoTemporada(temporada, hoy, ajustes = {}) {
-  const manualActiva = ajustes.faseManual ?? null;
-
-  if (temporada.manual) {
-    if (manualActiva === temporada.id) return "actual";
-    // Una manual anterior a la activa se da por pasada (definición < mantenimiento < recomp).
-    const orden = ["mantenimiento-post", "ganancia", "definicion-primavera", "mantenimiento-verano"];
-    if (manualActiva && orden.indexOf(temporada.id) < orden.indexOf(manualActiva)) return "pasada";
-    return "futura";
-  }
-
-  // Con una fase manual activa, todas las de fecha quedan atrás.
-  if (manualActiva) return "pasada";
-  if (temporada.hasta && hoy > temporada.hasta) return "pasada";
-  if (hoy < temporada.desde) return "futura";
-  return "actual";
+/**
+ * El estado de una fase: pasada, actual o futura.
+ *
+ * Ya no hay fechas que comparar: manda el orden del año y en qué fase estás.
+ */
+export function estadoTemporada(temporada, _hoy, ajustes = {}) {
+  const actual = ajustes.faseNutricion ?? "cut";
+  if (temporada.id === actual) return "actual";
+  const orden = ORDEN_FASES;
+  return orden.indexOf(temporada.id) < orden.indexOf(actual) ? "pasada" : "futura";
 }
 
 /* ------------------------------------------------------------------ */
@@ -201,12 +132,13 @@ export const FICHAS = [
   },
   {
     id: "diet-break",
-    titulo: "Diet break (solo en definición)",
-    resumen: "7–14 días a mantenimiento si el cut largo pasa factura.",
+    titulo: "Diet break (opcional, en definición)",
+    resumen: "5–7 días alrededor del mantenimiento deducido.",
     puntos: [
-      "Cuándo: fatiga alta, hambre persistente, rendimiento deteriorado y adherencia cada vez peor.",
-      "Cómo: 7–14 días alrededor de mantenimiento. NO son atracones ni días libres.",
-      "Después se retoma el déficit donde estaba.",
+      "Cuándo: la adherencia empeora, el hambre y la fatiga son altas, el cut se alarga, o simplemente encaja socialmente.",
+      "Cómo: 5–7 días comiendo alrededor del TDEE deducido. NO son atracones ni días libres.",
+      "Objetivo: descanso práctico y mental. No es un \"reset metabólico\": eso no existe.",
+      "Después se retoma el déficit donde estaba, si todavía tiene sentido.",
     ],
   },
   {
@@ -233,12 +165,36 @@ export const FICHAS = [
   },
   {
     id: "dia-visual",
-    titulo: "Día visual futuro (evento, playa, foto)",
+    titulo: "Día visual puntual (evento, playa, foto)",
     resumen: "Cómo verte bien un día concreto sin trucos absurdos.",
     puntos: [
       "24 h antes: agua normal, sal normal, comidas conocidas, hidratos suficientes. Evitar atracones, alcohol y lo que a ti te hincha.",
       "Pump opcional 1–3 h antes: laterales 2–3×15–20, jalón o pullover 2×12–15, press ligero 2×12–15, curl y tríceps 1–2×12–15. RIR 2–3, sin agotarse.",
       "Nunca: deshidratarse, sauna para pesar menos, quitar el sodio, laxantes ni ayunos extremos.",
+      "Esto es una herramienta suelta, no una fase: no cambia el objetivo del día ni interrumpe la definición.",
+    ],
+  },
+  {
+    id: "comida-libre",
+    titulo: "Comida libre y cómo NO compensarla",
+    resumen: "No existe la comida gratis, pero tampoco el castigo.",
+    puntos: [
+      "Si el objetivo son 2.400, la semana son 16.800 kcal. Un sábado de 3.000 son +600 sobre el objetivo semanal: ni destruyen la semana ni desaparecen.",
+      "Opción A: no compensar. Esa semana pierdes algo menos y ya está.",
+      "Opción B: repartir suave, por ejemplo −100 kcal durante 6 días.",
+      "Nunca: ayuno al día siguiente, entreno de castigo ni fingir que esas calorías no existieron.",
+      "El alcohol cuenta como kcal, y además empeora sueño, recuperación y adherencia.",
+    ],
+  },
+  {
+    id: "registro",
+    titulo: "Registrar bien (antes de culpar al metabolismo)",
+    resumen: "Lo que más se escapa en Fitia.",
+    puntos: [
+      "Aceite: 10 g son ~90 kcal. Poner 30 pensando que son 10 son ~180 kcal de diferencia CADA día.",
+      "Salsas, frutos secos, picoteos y bebidas: lo que menos se apunta y más pesa.",
+      "Crudo o cocinado no es lo mismo: elige un criterio y mantenlo.",
+      "Si no hay progreso, primero se audita el registro. No es una acusación: es que sin datos limpios cualquier ajuste sería a ciegas.",
     ],
   },
   {

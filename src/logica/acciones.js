@@ -10,6 +10,7 @@
  */
 
 import { db, leerEstadoCarrera, leerEstadoFuerza } from "../datos/db.js";
+import { FASES, NUTRICION_CFG, OBJETIVO_INICIAL } from "../datos/planNutricion.js";
 import { hoyISO } from "./fechas.js";
 import * as motorCarrera from "./motorCarrera.js";
 import * as motorFuerza from "./motorFuerza.js";
@@ -50,6 +51,10 @@ export async function marcarCarreraHecha(datos = {}) {
     km: datos.km ?? null,
     minutos: datos.minutos ?? null,
     notas: datos.notas ?? "",
+    // Semáforo de molestias del §22: se guarda con la carrera para decidir si
+    // el bloque avanza o se repite, y para poder mirarlo atrás en PROGRESO.
+    dolor: datos.dolor ?? null,
+    molestia: datos.molestia ?? null,
     estado: "completada",
     // Se guarda la fecha que la app sugería, aparte de la real (§57). Sirve
     // para mirar atrás sin convertir la diferencia en un incumplimiento.
@@ -351,12 +356,54 @@ export async function borrarTestPared(fecha) {
 /** Nota libre del día (§52). */
 export async function guardarNota(texto, fecha = hoyISO()) {
   const previa = (await db.diario.get(fecha)) ?? { fecha };
-  if (!texto?.trim()) {
-    // Una nota vacía se borra en vez de dejar una fila fantasma en el diario.
-    if (previa.id != null || previa.nota) await db.diario.delete(fecha);
+  const limpia = texto?.trim() ?? "";
+
+  // La fila del diario ya no es solo la nota: comparte sitio con el cierre del
+  // día (kcal, macros y pasos). Vaciar la nota NO puede borrarla, o apuntar el
+  // peso del día y luego borrar un comentario se llevaría por delante las kcal
+  // que alimentan la adherencia y el TDEE deducido.
+  if (!limpia) {
+    if (previa.nota == null) return;
+    const { nota: _nota, ...resto } = previa;
+    if (Object.keys(resto).length <= 1) await db.diario.delete(fecha);
+    else await db.diario.put(resto);
     return;
   }
-  await db.diario.put({ ...previa, nota: texto.trim() });
+
+  await db.diario.put({ ...previa, nota: limpia });
+}
+
+/* ------------------------------------------------------------------ */
+/* Cierre del día: kcal, macros y pasos (§16, §28 del v3)              */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Esto NO convierte FORJA en un segundo Fitia. La comida se sigue registrando
+ * allí y los pasos los cuenta el Garmin: aquí se copian dos números al acabar
+ * el día. Sin ellos la app no puede calcular adherencia ni deducir el gasto
+ * real, que es justo el motor del plan v3: sin kcal apuntadas no hay TDEE
+ * deducido, y sin TDEE deducido el año entero funciona a ciegas.
+ */
+
+/** Apuntar lo comido y los pasos de un día. Los campos vacíos se borran. */
+export async function guardarCierreDia({ kcal, p, hc, g, pasos } = {}, fecha = hoyISO()) {
+  const previa = (await db.diario.get(fecha)) ?? { fecha };
+  const num = (v) => (v === "" || v == null || Number.isNaN(Number(v)) ? undefined : Math.round(Number(v)));
+
+  const fila = { ...previa, fecha };
+  for (const [campo, valor] of Object.entries({ kcal, p, hc, g, pasos })) {
+    const n = num(valor);
+    if (n == null) delete fila[campo];
+    else fila[campo] = n;
+  }
+
+  // Sin nada que guardar, no se deja una fila fantasma en el diario.
+  const { fecha: _f, ...resto } = fila;
+  if (!Object.keys(resto).length) {
+    await db.diario.delete(fecha);
+    return;
+  }
+  await db.diario.put(fila);
 }
 
 /* ------------------------------------------------------------------ */
@@ -414,45 +461,193 @@ export async function borrarReceta(id) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Plan anual: mantenimiento real, revisiones y cambio de fase         */
+/* Nutrición v3: objetivo, revisiones y cambio de fase                 */
 /* ------------------------------------------------------------------ */
 
-/** Guardar el mantenimiento real que sale del test de mantenimiento (o corregirlo). */
-export async function guardarMantenimiento(kcal) {
-  await db.ajustes.update(1, { mantenimientoReal: Math.round(Number(kcal)) });
-}
+/*
+ * Regla de oro del v3 (§54): antes de cambiar calorías, ≥14 días desde el
+ * último cambio. Toda escritura que mueve el objetivo reinicia ese reloj, y
+ * por eso todas pasan por aquí en vez de por la pantalla.
+ */
 
 /**
- * Cerrar la revisión mensual. `delta` es lo que se suma a las kcal (0 si la
- * decisión fue mantener). El reloj de 28 días se reinicia siempre.
+ * Cambiar el objetivo calórico (§46).
+ *
+ * Proteína y grasa se quedan donde están y el hidrato se lleva la diferencia:
+ * los ajustes van principalmente a carbohidratos porque la proteína protege el
+ * músculo y la grasa ya está en su mínimo razonable.
  */
+export async function fijarKcal(kcal, fecha = hoyISO()) {
+  const nuevas = Math.round(Number(kcal));
+  if (!Number.isFinite(nuevas)) return;
+
+  await db.ajustes.update(1, {
+    kcalObjetivo: nuevas,
+    ultimoCambioKcal: fecha,
+    ultimaRevisionVista: fecha,
+    // Un cambio de kcal invalida el histórico de TDEE: las deducciones
+    // anteriores se calcularon con otra ingesta y mezclarlas ensucia la media.
+    tdeeHistorico: [],
+  });
+}
+
+/** Aplicar el veredicto de la revisión: ±kcal, o simplemente darla por vista. */
 export async function aplicarRevision(delta = 0, fecha = hoyISO()) {
-  const ajustes = await db.ajustes.get(1);
+  const ajustes = (await db.ajustes.get(1)) ?? {};
+  const actual = ajustes.kcalObjetivo ?? OBJETIVO_INICIAL.kcal;
+  const salto = Math.round(Number(delta) || 0);
+
+  if (salto === 0) {
+    // "Seguir igual" no toca el objetivo, pero sí calla la tarjeta 14 días.
+    await db.ajustes.update(1, { ultimaRevisionVista: fecha });
+    return;
+  }
+  await fijarKcal(actual + salto, fecha);
+}
+
+/** Fijar a mano una variante completa de la tabla del cut (§13). */
+export async function fijarObjetivo({ kcal, p, g }, fecha = hoyISO()) {
   await db.ajustes.update(1, {
-    ajusteKcal: (ajustes?.ajusteKcal ?? 0) + Math.round(Number(delta) || 0),
-    ultimaRevision: fecha,
+    kcalObjetivo: Math.round(Number(kcal)),
+    proteinaObjetivo: Math.round(Number(p)),
+    grasaObjetivo: Math.round(Number(g)),
+    ultimoCambioKcal: fecha,
+    ultimaRevisionVista: fecha,
+    tdeeHistorico: [],
+  });
+}
+
+/** Guardar una deducción de gasto válida, suavizando con las anteriores. */
+export async function guardarTdee(valor) {
+  const ajustes = (await db.ajustes.get(1)) ?? {};
+  const historico = [...(ajustes.tdeeHistorico ?? []), Math.round(Number(valor))]
+    .filter(Number.isFinite)
+    .slice(-4);
+  await db.ajustes.update(1, { tdeeDeducido: Math.round(Number(valor)), tdeeHistorico: historico });
+}
+
+/**
+ * Cerrar la definición y pasar a mantenimiento (§47).
+ *
+ * El punto de partida es el ÚLTIMO TDEE deducido válido, redondeado a 50. NO
+ * se le restan 100 kcal: ese TDEE ya se calculó con el peso y la actividad
+ * finales del cut, así que restar otra cosa sería inventarse un ajuste.
+ */
+export async function cerrarCut(tdeeValido, fecha = hoyISO()) {
+  const ajustes = (await db.ajustes.get(1)) ?? {};
+  const inicio = Math.round(Number(tdeeValido) / 50) * 50;
+  const cintura = ajustes.cinturaActual ?? null;
+
+  await db.ajustes.update(1, {
+    faseNutricion: "mantenimiento",
+    faseDesde: fecha,
+    ultimoCambioKcal: fecha,
+    ultimaRevisionVista: fecha,
+    kcalObjetivo: inicio,
+    proteinaObjetivo: FASES.mantenimiento.p,
+    grasaObjetivo: FASES.mantenimiento.g,
+    // El mantenimiento se vuelve a confirmar desde cero con el peso nuevo.
+    mantenimientoConfirmado: null,
+    confianzaMantenimiento: null,
+    cinturaFinCut: cintura,
+    cinturaInicioFase: cintura,
+    tdeeHistorico: [],
+  });
+}
+
+/** Dar el mantenimiento por confirmado con su nivel de confianza (§25). */
+export async function confirmarMantenimiento(kcal, confianza = "high") {
+  await db.ajustes.update(1, {
+    mantenimientoConfirmado: Math.round(Number(kcal)),
+    confianzaMantenimiento: confianza,
+    mantenimientoBase: Math.round(Number(kcal)),
   });
 }
 
 /**
- * Confirmar una fase manual del plan anual (mantenimiento, ganancia limpia,
- * cut de primavera, verano). La regla maestra manda: sus kcal parten del
- * mantenimiento real DE ESE MOMENTO, no del de hace medio año, así que se
- * guarda el que Jose confirma en el diálogo y el ajuste arranca en el punto
- * inicial de la fase (p. ej. +125 en la ganancia limpia).
+ * Empezar la ganancia limpia (§49). Se niega sin mantenimiento confirmado:
+ * construir sobre un número que no se ha medido es exactamente lo que el plan
+ * prohíbe.
  */
-export async function empezarFase(faseId, { mantenimiento, ajusteInicial = 0 }, fecha = hoyISO()) {
+export async function empezarGanancia({ cintura = null } = {}, fecha = hoyISO()) {
+  const ajustes = (await db.ajustes.get(1)) ?? {};
+  if (ajustes.mantenimientoConfirmado == null) {
+    throw new Error("No se puede empezar la ganancia sin mantenimiento confirmado.");
+  }
+
+  const inicio = ajustes.mantenimientoConfirmado + 175;
   await db.ajustes.update(1, {
-    faseManual: faseId,
-    faseManualDesde: fecha,
-    mantenimientoReal: Math.round(Number(mantenimiento)),
-    ajusteKcal: Math.round(Number(ajusteInicial) || 0),
-    // El reloj de revisiones empieza de cero con la fase nueva.
-    ultimaRevision: fecha,
+    faseNutricion: "ganancia",
+    faseDesde: fecha,
+    ultimoCambioKcal: fecha,
+    ultimaRevisionVista: fecha,
+    kcalObjetivo: inicio,
+    proteinaObjetivo: FASES.ganancia.p,
+    grasaObjetivo: FASES.ganancia.g,
+    cinturaInicioFase: cintura ?? ajustes.cinturaInicioFase ?? null,
+    tdeeHistorico: [],
   });
 }
 
-/** Deshacer la fase manual y volver al plan por fechas (la definición). */
-export async function quitarFaseManual() {
-  await db.ajustes.update(1, { faseManual: null, faseManualDesde: null, ajusteKcal: 0 });
+/**
+ * Verano (§31): mantenimiento o mini-cut de 4–6 semanas. Nunca porque toque
+ * junio: solo si cintura, fotos y definición lo justifican.
+ */
+export async function empezarVerano({ miniCut = false, cintura = null } = {}, fecha = hoyISO()) {
+  const ajustes = (await db.ajustes.get(1)) ?? {};
+  const base = ajustes.mantenimientoConfirmado ?? ajustes.tdeeDeducido ?? ajustes.kcalObjetivo ?? OBJETIVO_INICIAL.kcal;
+  const objetivo = miniCut ? base - 450 : base;
+  const fase = miniCut ? FASES.verano : FASES.mantenimiento;
+
+  await db.ajustes.update(1, {
+    faseNutricion: miniCut ? "verano" : "mantenimiento",
+    faseDesde: fecha,
+    ultimoCambioKcal: fecha,
+    ultimaRevisionVista: fecha,
+    kcalObjetivo: Math.round(objetivo / 50) * 50,
+    proteinaObjetivo: fase.p,
+    grasaObjetivo: fase.g,
+    cinturaInicioFase: cintura ?? null,
+    tdeeHistorico: [],
+  });
+}
+
+/**
+ * Volver a mantenimiento unas semanas desde la ganancia (§29, cintura +2 cm).
+ * NO es un mini-cut: es parar, estabilizar y decidir con calma.
+ */
+export async function bloqueDeMantenimiento(fecha = hoyISO()) {
+  const ajustes = (await db.ajustes.get(1)) ?? {};
+  const base = ajustes.mantenimientoConfirmado ?? ajustes.tdeeDeducido ?? ajustes.kcalObjetivo;
+  await db.ajustes.update(1, {
+    faseNutricion: "mantenimiento",
+    faseDesde: fecha,
+    ultimoCambioKcal: fecha,
+    ultimaRevisionVista: fecha,
+    kcalObjetivo: Math.round(Number(base) / 50) * 50,
+    proteinaObjetivo: FASES.mantenimiento.p,
+    grasaObjetivo: FASES.mantenimiento.g,
+    tdeeHistorico: [],
+  });
+}
+
+/** Volver a una fase anterior a mano, si Jose se equivocó al confirmar. */
+export async function volverAFase(faseId, fecha = hoyISO()) {
+  const fase = FASES[faseId];
+  if (!fase) return;
+  const ajustes = (await db.ajustes.get(1)) ?? {};
+  const kcal =
+    faseId === "cut"
+      ? (ajustes.kcalObjetivo ?? OBJETIVO_INICIAL.kcal)
+      : Math.round((ajustes.mantenimientoConfirmado ?? ajustes.tdeeDeducido ?? NUTRICION_CFG.cut.kcalInicio) / 50) * 50;
+
+  await db.ajustes.update(1, {
+    faseNutricion: faseId,
+    faseDesde: fecha,
+    ultimoCambioKcal: fecha,
+    ultimaRevisionVista: fecha,
+    kcalObjetivo: kcal,
+    proteinaObjetivo: fase.p,
+    grasaObjetivo: fase.g,
+  });
 }

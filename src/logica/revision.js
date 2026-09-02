@@ -1,94 +1,76 @@
 /*
- * Revisión de cada 4 semanas (§65–66 del plan maestro) y semáforo de peso.
+ * Las revisiones de cada fase (§45, §48, §50 del v3) y el semáforo (§38).
  *
- * El algoritmo mensual del plan, tal cual, con los datos que la app ya
- * guarda: peso diario, cintura, sesiones completadas y las series del
- * gimnasio. Jose no rellena nada: FORJA hace las cuentas y propone
- * MANTENER, SUBIR 100–150 o BAJAR 100–150. Él decide con un toque.
+ * La regla maestra del plan, antes de tocar una sola caloría (§54):
  *
- * Todo son medias y ventanas, nunca un día suelto: regla nº 6 del plan
- * ("no reaccionar al peso de un solo día") aplicada a rajatabla.
+ *   1. ¿Han pasado ≥14 días desde el último cambio?
+ *   2. ¿La adherencia es suficiente?
+ *   3. ¿La actividad es comparable?
+ *   4. ¿Qué dice la media de peso?
+ *   5. ¿Qué dice la cintura?
+ *   6. ¿Qué dice el rendimiento?
+ *
+ * Si no hay respuesta clara: MANTENER. Ese "mantener" no es pereza, es la
+ * decisión correcta la mayoría de las veces: si cambias 2.400 → 2.300 → 2.500
+ * → 2.200 cada pocos días, nunca sabes qué estaba funcionando.
+ *
+ * Ninguna de estas funciones escribe nada: devuelven una propuesta con su
+ * motivo y Jose decide con un toque.
  */
 
+import { NUTRICION_CFG } from "../datos/planNutricion.js";
+import { adherencia, pasosComparables, tendenciaMensual, tendenciaSemanal } from "./nutricion.js";
 import { pesoDeTrabajo, repsTotales } from "./progresion.js";
 import { diasEntre, hoyISO, sumarDias } from "./fechas.js";
 
-/** La primera revisión cuenta desde el arranque de la definición. */
-export const INICIO_REVISIONES = "2026-09-21";
-const CADA_DIAS = 28;
-
-/* Fases en las que la revisión tiene sentido (las que tienen kcal ajustables). */
-const FASES_CON_REVISION = new Set([
-  "definicion",
-  "mantenimiento-post",
-  "ganancia",
-  "definicion-primavera",
-  "mantenimiento-verano",
-]);
-
-/* Las dos fases de déficit se juzgan igual, y las dos de mantenimiento también. */
-const EN_DEFICIT = new Set(["definicion", "definicion-primavera"]);
-const ESTABLES = new Set(["mantenimiento-post", "mantenimiento-verano"]);
-
-/** ¿Toca ya la revisión mensual? */
-export function revisionPendiente(faseId, ajustes = {}, hoy = hoyISO()) {
-  if (!FASES_CON_REVISION.has(faseId)) return false;
-  const base = ajustes.ultimaRevision ?? INICIO_REVISIONES;
-  return hoy >= sumarDias(base, CADA_DIAS);
-}
-
 /* ------------------------------------------------------------------ */
-/* Medidas sobre ventanas                                              */
+/* ¿Toca revisar?                                                      */
 /* ------------------------------------------------------------------ */
-
-function mediaPesos(pesos, desde, hasta) {
-  const kgs = pesos.filter((p) => p.fecha >= desde && p.fecha <= hasta && p.kg != null);
-  if (kgs.length < 3) return null;
-  return kgs.reduce((t, p) => t + p.kg, 0) / kgs.length;
-}
 
 /**
- * Velocidad del peso en kg/semana: media de los últimos 7 días contra la de
- * hace 3–4 semanas. Los centros de las ventanas quedan a ~3 semanas, así que
- * la diferencia se divide entre 3. Null si falta báscula en alguna ventana.
+ * La revisión aparece cuando han pasado 14 días desde el último cambio de
+ * calorías Y desde la última vez que se miró. No hay calendario fijo: el reloj
+ * lo marca el último cambio, que es lo que de verdad importa.
  */
-export function velocidadPeso(pesos, hoy = hoyISO()) {
-  const reciente = mediaPesos(pesos, sumarDias(hoy, -6), hoy);
-  const antigua = mediaPesos(pesos, sumarDias(hoy, -27), sumarDias(hoy, -21));
-  if (reciente == null || antigua == null) return null;
-  return { porSemana: (reciente - antigua) / 3, reciente, antigua };
+export function revisionPendiente(ajustes = {}, hoy = hoyISO()) {
+  const base = ajustes.ultimaRevisionVista ?? ajustes.ultimoCambioKcal ?? ajustes.faseDesde;
+  if (!base) return false;
+  return diasEntre(base, hoy) >= NUTRICION_CFG.diasMinimosEntreCambios;
 }
 
-/** Cambio de cintura: última medición contra la de hace ~4 semanas. */
-function cambioCintura(mediciones, hoy) {
+/** La fecha de la próxima revisión, para poder anunciarla (§37). */
+export function proximaRevision(ajustes = {}) {
+  const base = ajustes.ultimaRevisionVista ?? ajustes.ultimoCambioKcal ?? ajustes.faseDesde;
+  return base ? sumarDias(base, NUTRICION_CFG.diasMinimosEntreCambios) : null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Contexto: lo que la revisión necesita saber                         */
+/* ------------------------------------------------------------------ */
+
+/** Cambio de cintura entre la última medición y la de hace ~2–4 semanas. */
+export function tendenciaCintura(mediciones = [], hoy = hoyISO(), semanas = 2) {
   const conCintura = mediciones.filter((m) => m.cintura != null).sort((a, b) => a.fecha.localeCompare(b.fecha));
   const ultima = conCintura.at(-1);
-  if (!ultima || ultima.fecha < sumarDias(hoy, -14)) return null;
-  // La referencia: la medición más cercana a 28 días atrás (entre 3 y 6 semanas).
-  const objetivo = sumarDias(hoy, -28);
-  const previas = conCintura.filter((m) => m.fecha >= sumarDias(hoy, -42) && m.fecha <= sumarDias(hoy, -21));
+  if (!ultima || diasEntre(ultima.fecha, hoy) > 10) return null;
+
+  const objetivo = sumarDias(hoy, -7 * semanas);
+  const previas = conCintura.filter((m) => m.fecha < sumarDias(ultima.fecha, -7));
   if (!previas.length) return null;
+
   const referencia = previas.reduce((mejor, m) =>
     Math.abs(diasEntre(m.fecha, objetivo)) < Math.abs(diasEntre(mejor.fecha, objetivo)) ? m : mejor);
+
   return { delta: ultima.cintura - referencia.cintura, ultima, referencia };
 }
 
-/** Sesiones de fuerza y carreras completadas en los últimos 28 días. */
-function cumplimiento(sesiones, carreras, hoy) {
-  const desde = sumarDias(hoy, -27);
-  const fuerza = sesiones.filter((s) => s.estado === "completada" && s.fecha >= desde && s.fecha <= hoy).length;
-  const carrera = carreras.filter((c) => c.estado === "completada" && c.fecha >= desde && c.fecha <= hoy).length;
-  // Objetivo del plan: 3 fuerza + 3 carrera por semana.
-  return { fuerza, carrera, hechas: fuerza + carrera, objetivo: 24, pct: (fuerza + carrera) / 24 };
-}
-
 /**
- * ¿Progresa el gimnasio? Por ejercicio con al menos dos sesiones en 28 días:
- * mejora si el peso de trabajo subió, o con el mismo peso subieron las
- * repeticiones totales. Es el mismo criterio del motor de doble progresión.
+ * ¿Progresa el gimnasio? Por ejercicio con al menos dos sesiones en la
+ * ventana: mejora si subió el peso de trabajo, o si con el mismo peso subieron
+ * las repeticiones totales. Es el mismo criterio del motor de doble progresión.
  */
-function progresionFuerza(sesiones, series, hoy) {
-  const desde = sumarDias(hoy, -27);
+export function progresionFuerza(sesiones = [], series = [], hoy = hoyISO(), dias = 28) {
+  const desde = sumarDias(hoy, -(dias - 1));
   const validas = new Map(
     sesiones
       .filter((s) => s.estado === "completada" && s.fecha >= desde && s.fecha <= hoy)
@@ -106,227 +88,343 @@ function progresionFuerza(sesiones, series, hoy) {
 
   let total = 0;
   let mejoran = 0;
+  let empeoran = 0;
   for (const porSesionId of porEjercicio.values()) {
     if (porSesionId.size < 2) continue;
     const ordenadas = [...porSesionId.entries()].sort((a, b) => validas.get(a[0]).localeCompare(validas.get(b[0])));
     const primera = ordenadas[0][1];
     const ultima = ordenadas.at(-1)[1];
     total += 1;
-    const pesoAntes = pesoDeTrabajo(primera);
-    const pesoAhora = pesoDeTrabajo(ultima);
-    if (pesoAhora > pesoAntes || (pesoAhora === pesoAntes && repsTotales(ultima) > repsTotales(primera))) {
-      mejoran += 1;
-    }
+    const antes = pesoDeTrabajo(primera);
+    const ahora = pesoDeTrabajo(ultima);
+    if (ahora > antes || (ahora === antes && repsTotales(ultima) > repsTotales(primera))) mejoran += 1;
+    else if (ahora < antes || repsTotales(ultima) < repsTotales(primera)) empeoran += 1;
   }
 
-  return { total, mejoran, progresa: total > 0 && mejoran / total >= 0.4 };
+  return { total, mejoran, empeoran, progresa: total > 0 && mejoran / total >= 0.4, cae: empeoran >= 2 };
 }
 
 /* ------------------------------------------------------------------ */
-/* La revisión completa                                                */
+/* La revisión                                                         */
 /* ------------------------------------------------------------------ */
 
 /**
- * El algoritmo mensual (§66) con los datos del móvil. Devuelve los datos
- * medidos y una recomendación: {accion: "cumplir"|"mantener"|"subir"|"bajar",
- * motivo}. "cumplir" = no tocar nada porque el cumplimiento fue bajo.
+ * La revisión de la fase actual.
+ *
+ * `datos` trae los registros diarios ya cruzados (peso + kcal + pasos), las
+ * mediciones de cintura, las sesiones y las series. Devuelve
+ * {accion, kcal?, motivo} donde accion ∈ hold | decrease | increase | audit |
+ * confirm | maintenanceBlock.
  */
-export function revisar({ pesos = [], mediciones = [], sesiones = [], carreras = [], series = [] }, faseId, hoy = hoyISO()) {
-  const peso = velocidadPeso(pesos, hoy);
-  const cintura = cambioCintura(mediciones, hoy);
-  const cumplido = cumplimiento(sesiones, carreras, hoy);
+export function revisar({ registros = [], mediciones = [], sesiones = [], series = [] }, ajustes = {}, hoy = hoyISO()) {
+  const faseId = ajustes.faseNutricion ?? "cut";
+  const kcalObjetivo = ajustes.kcalObjetivo ?? NUTRICION_CFG.cut.kcalInicio;
+  const diasDesdeCambio = ajustes.ultimoCambioKcal ? diasEntre(ajustes.ultimoCambioKcal, hoy) : null;
+  const diasEnFase = ajustes.faseDesde ? diasEntre(ajustes.faseDesde, hoy) : null;
+
+  const contexto = {
+    tendencia: tendenciaSemanal(registros),
+    tendenciaMes: tendenciaMensual(registros),
+    adherencia: adherencia(registros, kcalObjetivo, 14),
+    pasosComparables: pasosComparables(registros),
+    cintura: tendenciaCintura(mediciones, hoy),
+    progresion: progresionFuerza(sesiones, series, hoy),
+    diasDesdeCambio,
+    diasEnFase,
+  };
+
+  if (faseId === "mantenimiento") return { ...contexto, ...revisarMantenimiento(contexto, kcalObjetivo) };
+  if (faseId === "ganancia") return { ...contexto, ...revisarGanancia(contexto, ajustes) };
+  return { ...contexto, ...revisarCut(contexto) };
+}
+
+/** Definición (§45). Perder 0,4–0,8 kg/semana con el gimnasio en pie. */
+function revisarCut(c) {
+  if (c.diasDesdeCambio != null && c.diasDesdeCambio < NUTRICION_CFG.diasMinimosEntreCambios) {
+    return {
+      accion: "hold",
+      motivo: `Solo ${c.diasDesdeCambio} días desde el último cambio. Nunca se ajusta antes de 14: el peso tiene ruido y cambiando cada semana nunca sabrías qué funcionaba.`,
+    };
+  }
+
+  if (c.tendencia == null) {
+    return {
+      accion: "hold",
+      motivo: "Faltan pesadas para tener dos medias de 7 días que comparar. Pésate cada mañana y la próxima revisión tendrá números.",
+    };
+  }
+
+  if (c.adherencia == null || c.adherencia < NUTRICION_CFG.adherencia.min) {
+    return {
+      accion: "audit",
+      motivo:
+        `Adherencia del ${c.adherencia == null ? "—" : Math.round(c.adherencia * 100) + " %"}: por debajo del 85 % no se puede juzgar si el plan funciona. ` +
+        "Antes de tocar calorías, revisa el registro: aceite, salsas, frutos secos, picoteos y bebidas son lo que más se escapa. Esto no es una acusación, es que sin datos limpios cualquier ajuste sería a ciegas.",
+    };
+  }
+
+  const perdida = -c.tendencia;
+  const [lentoMin, lentoMax] = NUTRICION_CFG.cut.perdidaLentaAceptable;
+  const [buenoMin, buenoMax] = NUTRICION_CFG.cut.perdidaSemanalPreferida;
+
+  if (perdida >= buenoMin && perdida <= buenoMax) {
+    return { accion: "hold", motivo: `Pierdes ${vel(perdida)} de media, justo en el rango objetivo. Si funciona, no se toca.` };
+  }
+
+  if (perdida >= lentoMin && perdida < lentoMax && c.cintura && c.cintura.delta < 0) {
+    return {
+      accion: "hold",
+      motivo: `Pierdes ${vel(perdida)}, algo lento, PERO la cintura ha bajado ${cm(-c.cintura.delta)}. Hay progreso real: no hace falta tocar nada.`,
+    };
+  }
+
+  if (perdida < lentoMin && (!c.cintura || c.cintura.delta >= 0) && c.pasosComparables) {
+    return {
+      accion: "decrease",
+      kcal: 100,
+      motivo:
+        "El peso medio está prácticamente plano, la cintura no baja, la adherencia es buena y te has movido parecido. " +
+        "Ese es el único caso en que se profundiza el déficit: −100 kcal, principalmente de hidratos, y otras dos semanas mirando.",
+    };
+  }
+
+  if (perdida > NUTRICION_CFG.cut.perdidaDemasiadoRapida) {
+    return {
+      accion: "increase",
+      kcal: 100,
+      motivo:
+        `Pierdes ${vel(perdida)}, por encima del ritmo sano. ` +
+        (c.progresion.cae
+          ? "Además el gimnasio está cayendo. "
+          : "Si además tienes hambre fuerte, duermes mal o notas que las cargas bajan, ") +
+        "el déficit es demasiado grande: +100 kcal. Si te encuentras bien, se puede dejar como está.",
+    };
+  }
+
+  return { accion: "hold", motivo: "Sin señal suficientemente clara en una dirección. Cuando dudamos, mantenemos." };
+}
+
+/** Mantenimiento (§48). Aquí el éxito es que la báscula no se mueva. */
+function revisarMantenimiento(c, kcalObjetivo) {
+  if (c.diasEnFase != null && c.diasEnFase < 21) {
+    return {
+      accion: "hold",
+      motivo:
+        `Llevas ${c.diasEnFase} días de mantenimiento. La primera semana es adaptación (glucógeno y agua) y hacen falta ` +
+        "unos 14 días más para confirmar nada. No se confirma un mantenimiento con una sola semana.",
+    };
+  }
+
+  if (c.tendencia == null) return { accion: "hold", motivo: "Faltan pesadas para la tendencia." };
+
+  const abs = Math.abs(c.tendencia);
+  const cinturaQuieta = !c.cintura || Math.abs(c.cintura.delta) <= 0.3;
+
+  if (abs <= NUTRICION_CFG.mantenimiento.tendenciaConfirmacionFuerte && cinturaQuieta) {
+    return {
+      accion: "confirm",
+      confianza: "high",
+      kcal: kcalObjetivo,
+      motivo: `Peso y cintura estables durante estas semanas comiendo ${kcalObjetivo} kcal. Ese ES tu mantenimiento, y con confianza alta.`,
+    };
+  }
+
+  if (abs <= NUTRICION_CFG.mantenimiento.tendenciaProvisional && cinturaQuieta) {
+    return {
+      accion: "confirm",
+      confianza: "medium",
+      kcal: kcalObjetivo,
+      motivo: `El peso se mueve poquísimo (${vel(abs)}) con la cintura estable. ${kcalObjetivo} kcal es un mantenimiento razonable. No perseguimos falsa precisión.`,
+    };
+  }
+
+  if (c.tendencia < -NUTRICION_CFG.mantenimiento.tendenciaProvisional) {
+    return {
+      accion: "increase",
+      kcal: NUTRICION_CFG.mantenimiento.ajusteKcal,
+      motivo: `Sigues perdiendo ${vel(-c.tendencia)} en mantenimiento: tu gasto real es mayor de lo que estamos comiendo. +100 kcal.`,
+    };
+  }
+
+  if (c.tendencia > NUTRICION_CFG.mantenimiento.tendenciaProvisional && c.cintura && c.cintura.delta > 0) {
+    return {
+      accion: "decrease",
+      kcal: NUTRICION_CFG.mantenimiento.ajusteKcal,
+      motivo: `El peso sube ${vel(c.tendencia)} y la cintura también: nos hemos pasado un poco. −100 kcal.`,
+    };
+  }
+
+  return { accion: "hold", motivo: "Datos ambiguos. Mantener y volver a mirar." };
+}
+
+/** Ganancia limpia (§50). Se juzga por MES, no por semana. */
+function revisarGanancia(c, ajustes) {
+  const porMes = c.tendenciaMes;
+  const cinturaDesdeInicio =
+    ajustes.cinturaInicioFase != null && c.cintura ? c.cintura.ultima.cintura - ajustes.cinturaInicioFase : null;
+
+  if (cinturaDesdeInicio != null && cinturaDesdeInicio >= NUTRICION_CFG.ganancia.cinturaMaxCm) {
+    return {
+      accion: "maintenanceBlock",
+      semanas: 2,
+      motivo:
+        `La cintura ha subido ${cm(cinturaDesdeInicio)} desde que empezó la ganancia. Eso NO significa hacer un cut: ` +
+        "significa volver 2–3 semanas a mantenimiento, ver si se estabiliza y decidir con calma si merece la pena seguir creciendo.",
+    };
+  }
+
+  if (porMes == null) {
+    return { accion: "hold", motivo: "Hacen falta cuatro semanas de báscula para juzgar una fase que se mide por meses." };
+  }
+
+  const [min, max] = NUTRICION_CFG.ganancia.kgPorMesObjetivo;
+  const cinturaMes = c.cintura?.delta ?? 0;
+
+  if (porMes >= min && porMes <= max && cinturaMes <= 0.5 && c.progresion.progresa) {
+    return { accion: "hold", motivo: `Subes ${kgMes(porMes)} con la cintura quieta y la fuerza progresando. Ganancia limpia dentro de objetivo: no se toca nada.` };
+  }
+
+  if (porMes > NUTRICION_CFG.ganancia.kgPorMesExcesivo || cinturaMes > 1) {
+    return {
+      accion: "decrease",
+      kcal: NUTRICION_CFG.ganancia.ajusteKcal,
+      motivo: `Subes ${kgMes(porMes)}${cinturaMes > 1 ? ` y la cintura ${cm(cinturaMes)} en un mes` : ""}. Demasiado rápido: eso ya es grasa. −100 kcal.`,
+    };
+  }
+
+  if (c.semanasPlano >= 8 && !c.progresion.progresa) {
+    return { accion: "increase", kcal: NUTRICION_CFG.ganancia.ajusteKcal, motivo: "Ocho semanas con el peso plano y la fuerza estancada: +100 kcal." };
+  }
+
+  if (porMes < min && c.progresion.progresa) {
+    return {
+      accion: "hold",
+      motivo:
+        "El peso apenas sube, pero la fuerza SÍ progresa. No hay ninguna prisa por añadir calorías: puede estar " +
+        "ocurriendo una recomposición muy buena. No se ajusta por un solo mes.",
+    };
+  }
+
+  return { accion: "hold", motivo: "No hay motivo claro para ajustar." };
+}
+
+/* ------------------------------------------------------------------ */
+/* Semáforo (§38)                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * El color del momento. Verde: va bien. Amarillo: todavía no sabemos.
+ * Rojo: hay un problema repetido que toca mirar.
+ *
+ * El semáforo NO modifica calorías por sí solo. Es un aviso, no un motor.
+ */
+export function semaforo({ registros = [], mediciones = [], sesiones = [], series = [] }, ajustes = {}, hoy = hoyISO()) {
+  const faseId = ajustes.faseNutricion ?? "cut";
+  const kcalObjetivo = ajustes.kcalObjetivo ?? NUTRICION_CFG.cut.kcalInicio;
+  const diasDesdeCambio = ajustes.ultimoCambioKcal ? diasEntre(ajustes.ultimoCambioKcal, hoy) : null;
+
+  const tendencia = tendenciaSemanal(registros);
+  const a = adherencia(registros, kcalObjetivo, 14);
+  const cintura = tendenciaCintura(mediciones, hoy);
   const progresion = progresionFuerza(sesiones, series, hoy);
 
-  const datos = { peso, cintura, cumplido, progresion };
-
-  // Paso 1 del algoritmo: sin cumplimiento no se juzga el plan.
-  if (cumplido.pct < 0.85) {
-    return {
-      ...datos,
-      accion: "cumplir",
-      motivo:
-        `Estas 4 semanas se hicieron ${cumplido.hechas} de ~${cumplido.objetivo} sesiones (fuerza + carrera). ` +
-        "Con un cumplimiento por debajo del 85 % el plan no se toca: primero cumplirlo, luego juzgarlo.",
-    };
+  if (tendencia == null) {
+    return { estado: "amarillo", texto: "Todavía no hay dos semanas de báscula que comparar. No sabemos nada aún, y eso está bien." };
+  }
+  if (diasDesdeCambio != null && diasDesdeCambio < 14) {
+    return { estado: "amarillo", porSemana: tendencia, texto: `Solo ${diasDesdeCambio} días desde el último cambio: demasiado pronto para juzgarlo.` };
+  }
+  if (a != null && a < NUTRICION_CFG.adherencia.min) {
+    return { estado: "amarillo", porSemana: tendencia, texto: `Adherencia del ${Math.round(a * 100)} %: con estos datos no se puede concluir nada.` };
+  }
+  if (!pasosComparables(registros)) {
+    return { estado: "amarillo", porSemana: tendencia, texto: "La actividad ha cambiado bastante respecto a la semana anterior: los números no son comparables." };
   }
 
-  if (EN_DEFICIT.has(faseId)) return { ...datos, ...revisarDefinicion(peso, progresion) };
-  if (faseId === "ganancia") return { ...datos, ...revisarGanancia(peso, cintura, progresion) };
-  return { ...datos, ...revisarEstable(peso) };
-}
-
-/** Ganancia limpia: subir 0–0,20 kg/semana con la cintura quieta. */
-function revisarGanancia(peso, cintura, progresion) {
-  if (peso == null) {
-    return {
-      accion: "mantener",
-      motivo:
-        "Faltan pesajes para calcular la tendencia (hace falta báscula esta semana y hace ~4 semanas). " +
-        "Sin tendencia fiable no se toca nada: pésate a diario y la próxima revisión tendrá números.",
-    };
+  if (faseId === "cut") {
+    const perdida = -tendencia;
+    if (perdida > NUTRICION_CFG.cut.perdidaDemasiadoRapida && progresion.cae) {
+      return { estado: "rojo", porSemana: tendencia, texto: `Pierdes ${vel(perdida)} y el gimnasio está cayendo. Toca revisar.` };
+    }
+    if (perdida >= NUTRICION_CFG.cut.perdidaSemanalPreferida[0]) {
+      return { estado: "verde", porSemana: tendencia, texto: `Pierdes ${vel(perdida)}: ritmo adecuado.` };
+    }
+    if (perdida >= NUTRICION_CFG.cut.perdidaLentaAceptable[0] && cintura && cintura.delta < 0) {
+      return { estado: "verde", porSemana: tendencia, texto: "Lento en la báscula pero la cintura baja: hay progreso." };
+    }
+    if (perdida < NUTRICION_CFG.cut.perdidaLentaAceptable[0]) {
+      return { estado: "rojo", porSemana: tendencia, texto: "Varias semanas sin bajar peso ni cintura con buena adherencia: la revisión propondrá ajustar." };
+    }
+    return { estado: "amarillo", porSemana: tendencia, texto: "Baja despacio. Un par de semanas más y se verá claro." };
   }
 
-  if (peso.porSemana > 0.35) {
-    return {
-      accion: "bajar",
-      motivo:
-        `El peso sube ${vel(peso.porSemana)} de media, bastante más que el objetivo (0–0,20 kg/semana). ` +
-        "A ese ritmo lo que sobra es grasa: −100–150 kcal y a observar otras 4 semanas.",
-    };
+  if (faseId === "mantenimiento") {
+    if (Math.abs(tendencia) <= NUTRICION_CFG.mantenimiento.tendenciaProvisional) {
+      return { estado: "verde", porSemana: tendencia, texto: "Peso estable: exactamente el objetivo de la fase." };
+    }
+    return { estado: "amarillo", porSemana: tendencia, texto: tendencia > 0 ? "Sube más de lo que pide la fase." : "Sigues bajando: probablemente el mantenimiento sea más alto." };
   }
 
-  if (cintura && cintura.delta >= 2) {
-    return {
-      accion: "bajar",
-      motivo:
-        `La cintura ha subido ${cintura.delta.toFixed(1).replace(".", ",")} cm en un mes. Aunque el gimnasio vaya bien, ` +
-        "esa subida no la justifica: −100–150 kcal y vigilar la cintura por encima de la báscula.",
-    };
+  // Ganancia y verano se juzgan por mes.
+  const porMes = tendenciaMensual(registros);
+  if (porMes == null) return { estado: "amarillo", porSemana: tendencia, texto: "Esta fase se mide por meses: aún no hay cuatro semanas." };
+  if (porMes > NUTRICION_CFG.ganancia.kgPorMesExcesivo) {
+    return { estado: "rojo", porSemana: tendencia, texto: `Subes ${kgMes(porMes)}: demasiado rápido para una ganancia limpia.` };
   }
-
-  if (progresion.progresa) {
-    return {
-      accion: "mantener",
-      motivo:
-        `El gimnasio progresa (${progresion.mejoran} de ${progresion.total} ejercicios mejoran) con el peso ` +
-        `${peso.porSemana < 0.05 ? "estable" : `subiendo ${vel(peso.porSemana)}`}. Exactamente lo que busca la fase: no se toca nada.`,
-    };
-  }
-
-  if (peso.porSemana < 0.05) {
-    return {
-      accion: "subir",
-      motivo:
-        "Peso completamente plano y progresión parada durante estas semanas, con el entreno cumplido: es el " +
-        "caso exacto del plan para añadir +100–150 kcal. Después, otras 3–4 semanas de observación sin tocar nada.",
-    };
-  }
-
-  return {
-    accion: "mantener",
-    motivo:
-      `El peso sube ${vel(peso.porSemana)}, dentro del objetivo. La progresión aún no se ve clara en los números, ` +
-      "pero con el peso moviéndose no toca añadir: dale otras 4 semanas al mismo plan.",
-  };
-}
-
-/** Definición: perder ~0,5–0,7 % del peso a la semana (§16 del contexto). */
-function revisarDefinicion(peso, progresion) {
-  if (peso == null) {
-    return {
-      accion: "mantener",
-      motivo: "Faltan pesajes para calcular la tendencia. En definición la báscula diaria es la brújula: sin ella no se ajusta nada.",
-    };
-  }
-
-  const pct = (peso.porSemana / peso.reciente) * 100;
-
-  if (pct <= -0.85) {
-    return {
-      accion: "subir",
-      motivo:
-        `Pierdes ${vel(-peso.porSemana)} (${pctTexto(-pct)} del peso corporal), más rápido que el objetivo de 0,5–0,7 %. ` +
-        "Demasiado déficit se come músculo y rendimiento: +100–150 kcal.",
-    };
-  }
-
-  if (pct >= -0.15) {
-    return {
-      accion: "bajar",
-      motivo:
-        "El peso medio y la cintura llevan semanas planos con el plan cumplido y la actividad parecida. " +
-        "Ese es el único caso en que se profundiza el déficit: −100 kcal.",
-    };
-  }
-
-  return {
-    accion: "mantener",
-    motivo:
-      `Pierdes ${vel(-peso.porSemana)} (${pctTexto(-pct)}/semana), dentro del rango objetivo${progresion.progresa ? " y el gimnasio aguanta" : ""}. ` +
-      "Justo lo que pide el plan: no se toca nada.",
-  };
-}
-
-/** Mantenimiento y recomposición: el peso quieto es el éxito. */
-function revisarEstable(peso) {
-  if (peso == null) {
-    return { accion: "mantener", motivo: "Faltan pesajes para la tendencia. Báscula a diario y se revisa el mes que viene." };
-  }
-  if (peso.porSemana > 0.25) {
-    return {
-      accion: "bajar",
-      motivo: `El peso sube ${vel(peso.porSemana)} y en esta fase debería estar quieto: −100–150 kcal.`,
-    };
-  }
-  if (peso.porSemana < -0.25) {
-    return {
-      accion: "subir",
-      motivo: `El peso baja ${vel(-peso.porSemana)} sin buscarlo: +100–150 kcal para volver a mantenimiento.`,
-    };
-  }
-  return { accion: "mantener", motivo: `Peso estable (${vel(peso.porSemana)}). Es exactamente el objetivo de la fase.` };
+  const [min, max] = NUTRICION_CFG.ganancia.kgPorMesObjetivo;
+  if (porMes >= min && porMes <= max) return { estado: "verde", porSemana: tendencia, texto: `Subes ${kgMes(porMes)}: en el objetivo.` };
+  return { estado: "amarillo", porSemana: tendencia, texto: "Fuera del rango objetivo del mes, pero no se ajusta por un solo mes." };
 }
 
 /* ------------------------------------------------------------------ */
-/* Semáforo de velocidad del peso (para la gráfica de PROGRESO)        */
+/* Criterios de salida de fase (§20, §25, §31)                         */
 /* ------------------------------------------------------------------ */
 
 /**
- * El veredicto de la tendencia según la fase: qué significa la velocidad
- * actual del peso. Devuelve null si la fase no tiene objetivo de báscula
- * (preparación) o faltan datos para una media honesta.
+ * ¿Hay motivos para cerrar el cut? No devuelve una orden: devuelve los avisos
+ * que Jose debe mirar. No existe un peso final obligatorio.
  */
-export function semaforoPeso(pesos, faseId, hoy = hoyISO()) {
-  const peso = velocidadPeso(pesos, hoy);
-  if (peso == null) return null;
-  const v = peso.porSemana;
+export function salidaDelCut({ registros = [], sesiones = [], series = [] }, ajustes = {}, hoy = hoyISO()) {
+  const motivos = [];
+  const semanas = ajustes.faseDesde ? Math.floor(diasEntre(ajustes.faseDesde, hoy) / 7) : 0;
+  const progresion = progresionFuerza(sesiones, series, hoy, 14);
 
-  if (faseId === "deficit-moderado") {
-    if (v < -1.2) return rojo(v, "Muy rápido incluso para este déficit: vigila fuerza y descanso.");
-    if (v < 0) return verde(v, "Bajando, que es lo que toca en el déficit moderado.");
-    return ambar(v, "El déficit aún no se nota en la media. Paciencia: la media manda.");
+  if (semanas >= NUTRICION_CFG.cut.semanasMax) {
+    motivos.push({
+      id: "tiempo",
+      texto: `Llevas ${semanas} semanas de definición, el tope orientativo del plan. Toca pasar a mantenimiento aunque no hayas llegado a ningún peso concreto.`,
+    });
   }
 
-  if (faseId === "llenado" || faseId === "transicion") {
-    // Días de más hidrato: el peso puede subir por glucógeno y agua aunque se
-    // esté perdiendo grasa. Aquí no se emiten alertas de grasa (§31 del contexto).
-    return info(v, "Con más hidratos el peso puede subir por glucógeno y agua: no es grasa. Nada que juzgar estos días.");
+  if (progresion.cae) {
+    motivos.push({
+      id: "rendimiento",
+      texto: "Las cargas están cayendo en varios ejercicios. Si además duermes mal y tienes hambre alta, el cut ya ha durado bastante.",
+    });
   }
 
-  if (faseId === "calibracion") {
-    return info(v, "TEST DE MANTENIMIENTO: semanas de medir, no de juzgar. Come las ~2.800 planas y deja que la media hable.");
+  const kcal = ajustes.kcalObjetivo ?? NUTRICION_CFG.cut.kcalInicio;
+  const tendencia = tendenciaSemanal(registros);
+  if (kcal <= NUTRICION_CFG.cut.zonaRevisionKcal && tendencia != null && Math.abs(tendencia) < 0.2) {
+    motivos.push({
+      id: "zona-baja",
+      texto: `Estás en ${kcal} kcal, la zona de revisión, y el peso no se mueve. Aquí FORJA PARA: no se sigue bajando automáticamente. Toca revisar el registro o cerrar el cut.`,
+    });
   }
 
-  if (EN_DEFICIT.has(faseId)) {
-    const pct = (v / peso.reciente) * 100;
-    if (pct <= -0.85) return ambar(v, "Más rápido que el 0,5–0,7 % semanal objetivo: cuidado con el músculo.");
-    if (pct <= -0.4) return verde(v, "Dentro del ritmo objetivo (0,5–0,7 %/semana).");
-    if (pct <= -0.15) return ambar(v, "Baja despacio. Si sigue así dos semanas, la revisión propondrá ajustar.");
-    return rojo(v, "El peso no baja. La revisión mensual dirá si toca −100 kcal.");
-  }
-
-  if (ESTABLES.has(faseId)) {
-    if (Math.abs(v) <= 0.2) return verde(v, "Peso estable: el objetivo de la fase.");
-    return ambar(v, v > 0 ? "Sube más de lo que pide la fase." : "Baja sin buscarlo.");
-  }
-
-  // Ganancia limpia: 0–0,20 kg/semana de media, evaluado en bloques largos.
-  if (v > 0.35) return rojo(v, "Demasiado rápido: a este ritmo se acumula grasa. La revisión propondrá bajar.");
-  if (v > 0.2) return ambar(v, "Algo por encima del objetivo (0–0,20 kg/semana). Vigilar cintura.");
-  if (v >= -0.1) return verde(v, "En el objetivo: 0–0,20 kg/semana. Construyendo sin engordar.");
-  return info(v, "El peso baja. Si el gimnasio progresa, es recomposición y va bien; si no, la revisión propondrá subir.");
+  return motivos;
 }
 
-const verde = (v, texto) => ({ estado: "verde", porSemana: v, texto });
-const ambar = (v, texto) => ({ estado: "ambar", porSemana: v, texto });
-const rojo = (v, texto) => ({ estado: "rojo", porSemana: v, texto });
-const info = (v, texto) => ({ estado: "info", porSemana: v, texto });
+/* ------------------------------------------------------------------ */
 
 function vel(v) {
-  const abs = Math.abs(v);
-  return `${abs.toFixed(2).replace(".", ",")} kg/semana`;
+  return `${Math.abs(v).toFixed(2).replace(".", ",")} kg/semana`;
 }
 
-function pctTexto(p) {
-  return `${p.toFixed(2).replace(".", ",")} %`;
+function kgMes(v) {
+  return `${v > 0 ? "+" : "−"}${Math.abs(v).toFixed(2).replace(".", ",")} kg/mes`;
+}
+
+function cm(v) {
+  return `${Math.abs(v).toFixed(1).replace(".", ",")} cm`;
 }

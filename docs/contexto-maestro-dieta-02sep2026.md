@@ -1,3 +1,10 @@
+> **SUPERADO — 2 de septiembre de 2026.**
+> La fuente de verdad de DIETA es ahora `dieta-v3-source-of-truth.md`.
+> Este documento queda entero sin efecto: el protocolo visual del 4–5, el
+> llenado y el test de mantenimiento de ~2.800 están CANCELADOS. Desde el 2
+> de septiembre la fase es una definición a 2.400 kcal y el mantenimiento se
+> deduce de los datos, no se mide con un test de 14 días.
+
 # FORJA — CONTEXTO MAESTRO DE DIETA
 ## Versión actualizada: 2 de septiembre de 2026
 

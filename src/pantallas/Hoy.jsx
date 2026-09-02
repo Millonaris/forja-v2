@@ -65,7 +65,7 @@ export default function Hoy({ irA, alAbrirAjustes, alRetomarEntreno, pedirPeso, 
   const ejPostura = ejerciciosDeHoy(ajustes?.creada ? diasEntre(ajustes.creada, hoy) : 0);
   const hechosPostura = posturaHoy?.hechos?.length ?? 0;
 
-  const objetivos = objetivosDe(hoy, ajustes ?? {});
+  const objetivos = objetivosDe(ajustes ?? {}, hoy);
   const rampa = rampaDe(hoy);
   const protocolos = protocolosDe(hoy);
 

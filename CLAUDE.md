@@ -11,9 +11,10 @@ producto**: tiene un solo usuario y se optimiza para él.
   de desarrollador.
 - Quiere las cosas 100 % funcionales, sin datos de prueba.
 - Decisiones suyas ya tomadas (no reabrir): registro de comida en Fitia (la app
-  NO registra comida), GPS en Garmin (la app no lo duplica), sin gamificación ni
-  rachas, sin cuentas ni nube: todos los datos viven en su móvil y la copia de
-  seguridad es un JSON exportado.
+  no lleva un diario de alimentos; solo se copia el TOTAL del día en el "cierre
+  del día", que es lo que alimenta adherencia y TDEE deducido), GPS en Garmin
+  (la app no lo duplica), sin gamificación ni rachas, sin cuentas ni nube: todos
+  los datos viven en su móvil y la copia de seguridad es un JSON exportado.
 
 ## Comandos
 
@@ -37,32 +38,32 @@ solo se usa para los atajos del manifest (#entrenar, #peso, #postura).
 - `src/datos/` — el PLAN (rutinas, bloques de carrera, fases de nutrición,
   plan anual, semilla). Datos escritos, no registro.
 - `src/logica/` — motores puros y testeables: rotación de fuerza, carrera,
-  progresión (doble progresión), calibración, revisión mensual, agenda,
+  progresión (doble progresión), `nutricion.js` (adherencia, tendencias y TDEE
+  deducido), `revision.js` (las revisiones de cada fase y el semáforo), agenda,
   informe, acciones (TODAS las escrituras a Dexie pasan por `acciones.js`).
 - `src/pantallas/` — HOY, ENTRENAR (SesionFuerza), PROGRESO, PLAN, DIETA,
   Ajustes, DetalleSesion, Informe.
 - `pruebas/aceptacion.test.js` — los casos que protegen las reglas de negocio.
-- `docs/` — especificación maestra, plan maestro anual, rutina definitiva y
-  contexto maestro de dieta (los documentos fuente de verdad que Jose entregó).
-  `contexto-maestro-septiembre-2026.md` está SUPERADO de su día 7 en adelante.
+- `docs/` — especificación maestra, plan maestro anual, rutina definitiva y el
+  SOURCE OF TRUTH v3 de dieta (los documentos que Jose entregó). Los dos
+  `contexto-maestro-*.md` están SUPERADOS enteros: no consultarlos.
 
 ## Invariantes que NO se rompen
 
 1. **El estado manda, la fecha solo recomienda.** La rotación de fuerza
    (TORSO A → PIERNA A → TORSO B → PIERNA B) y los bloques de carrera avanzan
    SOLO al completar sesiones, nunca por calendario. No se reinician los lunes.
-2. **La nutrición es lo único con fecha** — y solo hasta el 20-sep-2026
-   (puesta a punto + test de mantenimiento). El protocolo vigente es
-   `docs/contexto-maestro-dieta-02sep2026.md`, que sustituye al del 26 de
-   agosto a partir del día 7: el mantenimiento estimado sube a ~2.800 y el test
-   pasa a ser del 7 al 20 de septiembre. Desde el 21-sep manda la definición de
-   seis semanas, y sus kcal se calculan:
-   `mantenimientoReal + ajusteBase de la fase + ajusteKcal` (campos de
-   `ajustes`). Las fases posteriores (mantenimiento, ganancia limpia, cut de
-   primavera, verano 2027) NO entran por fecha: las confirma Jose desde
-   DIETA → AÑO (`ajustes.faseManual`). Regla maestra: las calorías futuras
-   nunca son cifras fijas, primero se mide el mantenimiento y después se le
-   suma o resta.
+2. **La nutrición va por DATOS, no por fechas** (SOURCE OF TRUTH v3,
+   `docs/dieta-v3-source-of-truth.md`; la versión en cristiano para Jose está
+   en `docs/dieta-v3-explicada-facil.md`). Solo tienen fecha el arranque del
+   cut (2-sep-2026), su semana de adaptación (2–8 sep) y el mapa orientativo de
+   bloques. Todo lo demás sale del estado en `ajustes`: `faseNutricion`
+   (cut → mantenimiento → ganancia → verano), `kcalObjetivo`, `proteinaObjetivo`,
+   `grasaObjetivo`, `tdeeDeducido` y `mantenimientoConfirmado`. **Ninguna fase
+   entra sola**: las confirma Jose desde DIETA → AÑO cuando se cumplen los
+   criterios de salida. Las kcal no se tocan antes de 14 días desde el último
+   cambio, y se mueven de 100 en 100 saliendo de los hidratos.
+   Ciclo: medir → esperar → comparar → cambiar poco → volver a medir.
 3. **Ids de ejercicio estables**: `plantilla:clave` (p. ej. `torso-a:jalon-pecho`).
    Renombrar o reordenar no rompe el historial. Si se cambia una clave, añadir
    la migración en `CLAVES_ANTIGUAS` y subir `VERSION_PLAN` en `semilla.js`
@@ -90,10 +91,18 @@ solo se usa para los atajos del manifest (#entrenar, #peso, #postura).
 - **Motor de progresión** (`logica/progresion.js`): doble progresión con
   veredictos SUBE/LLENA/MANTÉN/REVISAR, reto del día (`objetivoDeHoy`) y
   detección de estancamiento con causa (RIR 3+ = va sobrado ≠ meseta).
-- **Revisión mensual** (`logica/revision.js`): algoritmo §66 del plan maestro
-  con datos reales (peso, cintura, cumplimiento, progresión) → mantener /
-  ±100–150 kcal. **Calibración** (`logica/calibracion.js`): medias 7d vs 7d,
-  tope ±250 kcal (el rebote post-mini-cut es agua).
+- **TDEE deducido** (`logica/nutricion.js`): `kcalMedias − tendenciaKg×7700/7`.
+  Test obligatorio del plan: 2.400 kcal con −0,55 kg/sem → 3.005. Solo se usa
+  con ≥21 días, ≥21 desde el último cambio de kcal, adherencia ≥85 % y pasos
+  comparables (±20 %). Se enseña siempre con etiqueta ESTIMADO / DEDUCIDO /
+  CONFIRMADO: nunca se presenta una fórmula como una verdad.
+- **Revisiones** (`logica/revision.js`): una por fase (cut, mantenimiento,
+  ganancia) con los algoritmos §45/§48/§50. Proponen, no aplican. Cuando las
+  seis preguntas de la regla maestra no apuntan igual, la respuesta es MANTENER.
+- **Lo que la app NUNCA hace** (§55 del v3, y hay lista en la UI): cambiar kcal
+  por una pesada, contar dos veces el running (los pasos ya lo incluyen), leer
+  agua/glucógeno como grasa, bajar kcal por dolor al correr, hacer mini-cut
+  porque toca junio, o acusar a Jose de registrar mal.
 - Los datos de entrenamiento de Jose están EN SU MÓVIL. El IndexedDB del
   navegador de desarrollo es de pruebas y se puede ensuciar sin miedo.
 

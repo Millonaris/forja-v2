@@ -18,7 +18,7 @@ import { BLOQUES, NOMBRES_FASE } from "../datos/planCarrera.js";
 import { RUTINAS, nombreDe } from "../datos/rutinas.js";
 import { ejerciciosDeHoy } from "../datos/rutinaPostural.js";
 import {
-  useAjustes, useCarreras, useCatalogoEjercicios, useEstadoCarrera,
+  useAjustes, useCarreras, useCatalogoEjercicios, useDiario, useEstadoCarrera,
   useMediciones, usePesos, usePostura, useSesionesFuerza, useTestsPared,
 } from "../ganchos/useDatos.js";
 import {
@@ -26,10 +26,11 @@ import {
 } from "../logica/acciones.js";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../datos/db.js";
-import { diaCorto, diasDesde, diasEntre, fechaCorta, hoyISO, ultimosDias } from "../logica/fechas.js";
+import { diaCorto, diasDesde, diasEntre, fechaCorta, hoyISO, sumarDias, ultimosDias } from "../logica/fechas.js";
 import { cambioSemanal, formatear as formatearPeso, media, serie, serieMedia } from "../logica/peso.js";
 import { faseDe } from "../datos/planNutricion.js";
-import { semaforoPeso } from "../logica/revision.js";
+import { registrosDiarios } from "../logica/nutricion.js";
+import { semaforo as semaforoNutricion } from "../logica/revision.js";
 import { porSesion, veredicto } from "../logica/progresion.js";
 import { rampaDe } from "../datos/rampa.js";
 import * as motorCarrera from "../logica/motorCarrera.js";
@@ -90,13 +91,23 @@ export default function Progreso({ sub, alVolver }) {
 
 function Cuerpo() {
   const pesos = usePesos();
+  const diario = useDiario(180);
   const ajustes = useAjustes();
   const [dias, setDias] = useState(30);
 
   const actual = pesos.length ? pesos[pesos.length - 1] : null;
   const cambio = cambioSemanal(pesos);
-  const fase = faseDe(hoyISO(), ajustes ?? {});
-  const semaforo = semaforoPeso(pesos, fase.id);
+  const fase = faseDe(ajustes ?? {});
+  // El semáforo del v3 mira más que la báscula: también adherencia, pasos y
+  // cuánto hace del último cambio de kcal. Un "no sabemos todavía" honesto vale
+  // más que un veredicto sacado de dos pesadas.
+  const registros = registrosDiarios({
+    pesos,
+    diario,
+    desde: ajustes?.faseDesde ?? sumarDias(hoyISO(), -60),
+    hasta: hoyISO(),
+  });
+  const semaforo = semaforoNutricion({ registros }, ajustes ?? {}, hoyISO());
 
   if (!pesos.length) {
     return <Vacio texto="Apunta tu peso unos días y aquí aparecerá la tendencia." />;
@@ -104,9 +115,8 @@ function Cuerpo() {
 
   const COLORES_SEMAFORO = {
     verde: "var(--exito)",
-    ambar: "var(--aviso)",
+    amarillo: "var(--aviso)",
     rojo: "var(--aviso)",
-    info: "var(--carrera)",
   };
 
   return (
@@ -129,10 +139,12 @@ function Cuerpo() {
             <div className="rotulo" style={{ color: COLORES_SEMAFORO[semaforo.estado] }}>
               Velocidad · {fase.nombre}
             </div>
-            <span style={{ fontSize: 14, fontWeight: 800 }}>
-              {semaforo.porSemana > 0 ? "+" : ""}
-              {semaforo.porSemana.toFixed(2).replace(".", ",")} kg/sem
-            </span>
+            {semaforo.porSemana != null && (
+              <span style={{ fontSize: 14, fontWeight: 800 }}>
+                {semaforo.porSemana > 0 ? "+" : ""}
+                {semaforo.porSemana.toFixed(2).replace(".", ",")} kg/sem
+              </span>
+            )}
           </div>
           <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.55 }}>
             {semaforo.texto}

@@ -13,7 +13,7 @@
 import { db } from "./db.js";
 import { CLAVES_ANTIGUAS, RUTINAS } from "./rutinas.js";
 import { BLOQUES } from "./planCarrera.js";
-import { FASES } from "./planNutricion.js";
+import { FASES, INICIO_CUT, OBJETIVO_INICIAL } from "./planNutricion.js";
 import { PROTOCOLOS } from "./protocolos.js";
 import { hoyISO } from "../logica/fechas.js";
 
@@ -22,11 +22,12 @@ import { hoyISO } from "../logica/fechas.js";
  * de 1.700 y el tramo 26 ago → 22 sep pasa a déficit moderado (2.150),
  * llenado (2.300–2.500), dos días visuales a ~2.450 y transición (2.500).
  * v8: las primeras recetas de Jose entran en el recetario (una sola vez).
- * v9: entra el contexto maestro de DIETA del 2 de septiembre — el
- * mantenimiento estimado sube a ~2.800, el test pasa a ser del 7 al 20 de
- * septiembre y detrás viene una definición de seis semanas, no hipertrofia.
+ * v10: entra el SOURCE OF TRUTH v3 de DIETA. La nutrición deja de ir por
+ * fechas y pasa a ir por datos: definición desde el 2 de septiembre a 2.400
+ * kcal, y FORJA aprende el gasto real con peso + ingesta + actividad. Se
+ * cancelan el protocolo visual, el llenado y el test de ~2.800.
  */
-export const VERSION_PLAN = 9;
+export const VERSION_PLAN = 10;
 
 /*
  * Las comidas que Jose pidió tener de partida en DIETA → RECETAS. Solo el
@@ -90,7 +91,7 @@ export async function sembrar() {
       // queden como filas fantasma en la base y en las copias de seguridad.
       await db.fasesNutricion.clear();
       await db.protocolos.clear();
-      for (const f of FASES) await db.fasesNutricion.put(f);
+      for (const f of Object.values(FASES)) await db.fasesNutricion.put(f);
       for (const p of PROTOCOLOS) await db.protocolos.put(p);
 
       /* --- Recetario: las primeras recetas (v8) --- */
@@ -121,17 +122,27 @@ export async function sembrar() {
         // El onboarding de instalación limpia (§54) aún no se ha hecho.
         calibrada: previo.calibrada ?? false,
         /*
-         * Plan anual. El mantenimiento real lo mide el test del 7 al 20 de
-         * septiembre; hasta entonces las fases dinámicas usan la hipótesis de
-         * 2.800. `ajusteKcal` acumula los ±100–150 de las revisiones
-         * mensuales, y `faseManual` es la fase confirmada a mano
-         * (mantenimiento, ganancia, cut de primavera, verano) o null.
+         * Estado nutricional v3 (§39 del source of truth).
+         *
+         * La fase NO se deduce de la fecha: se guarda. `kcalObjetivo` es lo
+         * único que Jose ve cada día, y solo cambia cuando la revisión de 14
+         * días lo justifica. `tdeeDeducido` lo aprende la app sola con el peso
+         * y las kcal apuntadas; `mantenimientoConfirmado` es el número que
+         * habilita la fase de ganancia, y hasta que exista no se empieza.
          */
-        mantenimientoReal: previo.mantenimientoReal ?? null,
-        ajusteKcal: previo.ajusteKcal ?? 0,
-        faseManual: previo.faseManual ?? null,
-        faseManualDesde: previo.faseManualDesde ?? null,
-        ultimaRevision: previo.ultimaRevision ?? null,
+        faseNutricion: previo.faseNutricion ?? "cut",
+        faseDesde: previo.faseDesde ?? INICIO_CUT,
+        ultimoCambioKcal: previo.ultimoCambioKcal ?? INICIO_CUT,
+        ultimaRevisionVista: previo.ultimaRevisionVista ?? null,
+        kcalObjetivo: previo.kcalObjetivo ?? OBJETIVO_INICIAL.kcal,
+        proteinaObjetivo: previo.proteinaObjetivo ?? OBJETIVO_INICIAL.p,
+        grasaObjetivo: previo.grasaObjetivo ?? OBJETIVO_INICIAL.g,
+        tdeeDeducido: previo.tdeeDeducido ?? null,
+        tdeeHistorico: previo.tdeeHistorico ?? [],
+        mantenimientoConfirmado: previo.mantenimientoConfirmado ?? null,
+        confianzaMantenimiento: previo.confianzaMantenimiento ?? null,
+        mantenimientoBase: previo.mantenimientoBase ?? null,
+        cinturaInicioFase: previo.cinturaInicioFase ?? null,
         // Variante agresiva de la rutina: una serie más en seis ejercicios.
         // Se empieza SIEMPRE en la conservadora (§ del informe).
         rutinaAgresiva: previo.rutinaAgresiva ?? false,

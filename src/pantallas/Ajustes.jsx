@@ -13,10 +13,10 @@ import DialogoNumero from "../componentes/DialogoNumero.jsx";
 import Hoja from "../componentes/Hoja.jsx";
 import { guardarAjustes } from "../datos/db.js";
 import { BLOQUES, describirSesion } from "../datos/planCarrera.js";
-import { MANTENIMIENTO_HIPOTESIS } from "../datos/planNutricion.js";
+import { FASES, ORDEN_FASES, estadoNutricion } from "../datos/planNutricion.js";
 import { RUTINAS } from "../datos/rutinas.js";
 import { useAjustes, useEstadoCarrera, useEstadoFuerza } from "../ganchos/useDatos.js";
-import { corregirEstadoCarrera, corregirEstadoFuerza, guardarMantenimiento } from "../logica/acciones.js";
+import { confirmarMantenimiento, corregirEstadoCarrera, corregirEstadoFuerza, fijarKcal, volverAFase } from "../logica/acciones.js";
 import { miles } from "../logica/formato.js";
 import { haceCuanto } from "../logica/fechas.js";
 import { estadoPermiso, pedirPermiso } from "../utiles/avisos.js";
@@ -80,7 +80,11 @@ export default function Ajustes({ abierto, alCerrar }) {
             alCambiar={(v) => guardarAjustes({ rutinaAgresiva: v === "1" })}
           />
 
-          <Mantenimiento ajustes={ajustes} />
+        </Seccion>
+
+        {/* ---------- Dieta ---------- */}
+        <Seccion titulo="Dieta">
+          <Nutricion ajustes={ajustes} />
         </Seccion>
 
         {/* ---------- Avisos ---------- */}
@@ -190,48 +194,89 @@ function Seccion({ titulo, children }) {
 }
 
 /*
- * El mantenimiento real es EL número del plan anual: de él salen las kcal de
- * la definición, el mantenimiento posterior y la ganancia. Normalmente lo pone
- * el test del 7 al 20 de septiembre; aquí solo se corrige si hizo falta.
+ * El estado nutricional editable.
+ *
+ * Normalmente NO se toca desde aquí: el objetivo lo mueve la revisión de 14
+ * días y la fase se confirma desde DIETA → AÑO. Esto está para arreglar un
+ * despiste —confirmar la fase equivocada, apuntar mal un número— sin tener que
+ * empezar de cero, que es justo lo que este rediseño quiere evitar.
  */
-function Mantenimiento({ ajustes }) {
-  const [editando, setEditando] = useState(false);
-  const valor = ajustes.mantenimientoReal;
+function Nutricion({ ajustes }) {
+  const e = estadoNutricion(ajustes);
+  const [editando, setEditando] = useState(null);
 
   return (
     <>
-      <button
-        onClick={() => setEditando(true)}
-        className="entre"
-        style={{
-          width: "100%", background: "var(--superficie)", border: "1px solid var(--borde)",
-          borderRadius: 12, padding: "12px 14px", color: "var(--texto)", fontSize: 14, cursor: "pointer",
-        }}
-      >
-        <span style={{ color: "var(--texto-medio)", fontSize: 13 }}>Mantenimiento real</span>
-        <span style={{ fontWeight: 700 }}>
-          {valor == null ? `Sin medir (${miles(MANTENIMIENTO_HIPOTESIS)})` : `${miles(valor)} kcal`}
-          {(ajustes.ajusteKcal ?? 0) !== 0 && (
-            <span style={{ color: "var(--texto-tenue)", fontWeight: 600 }}>
-              {" "}{ajustes.ajusteKcal > 0 ? "+" : "−"}{Math.abs(ajustes.ajusteKcal)}
-            </span>
-          )}
-        </span>
-      </button>
+      <Selector
+        etiqueta="Fase"
+        valor={e.faseId}
+        opciones={ORDEN_FASES.map((id) => ({ valor: id, texto: FASES[id].nombre }))}
+        alCambiar={(v) => { if (v !== e.faseId) volverAFase(v); }}
+      />
+
+      <FilaAjuste
+        etiqueta="Objetivo de calorías"
+        valor={`${miles(e.kcal)} kcal`}
+        alPulsar={() => setEditando("kcal")}
+      />
+
+      <FilaAjuste
+        etiqueta="Mantenimiento confirmado"
+        valor={
+          e.mantenimientoConfirmado == null
+            ? "Sin confirmar"
+            : `${miles(e.mantenimientoConfirmado)} kcal · ${e.confianzaMantenimiento === "medium" ? "provisional" : "alta"}`
+        }
+        alPulsar={() => setEditando("mantenimiento")}
+      />
+
+      <p style={{ margin: 0, fontSize: 12, color: "var(--texto-tenue)", lineHeight: 1.5 }}>
+        Cambiar las calorías aquí reinicia el reloj de 14 días, igual que hacerlo desde la revisión.
+        El gasto deducido lo calcula la app sola con tu peso y lo que apuntas cada día.
+      </p>
 
       <DialogoNumero
-        abierto={editando}
-        alCerrar={() => setEditando(false)}
-        titulo="Mantenimiento real"
-        subtitulo="Las kcal con las que tu peso se queda quieto. Lo mide el test de mantenimiento del 7 al 20 de septiembre; corrígelo solo si sabes lo que haces."
+        abierto={editando === "kcal"}
+        alCerrar={() => setEditando(null)}
+        titulo="Objetivo de calorías"
+        subtitulo="Lo que comes cada día en esta fase. La proteína y la grasa se quedan donde están; el hidrato se lleva la diferencia."
         unidad="kcal"
-        marcador="2800"
-        valorInicial={{ valor: valor ?? MANTENIMIENTO_HIPOTESIS }}
+        marcador="2400"
+        valorInicial={{ valor: e.kcal }}
+        min={1200}
+        max={4500}
+        alGuardar={({ valor: v }) => fijarKcal(v)}
+      />
+
+      <DialogoNumero
+        abierto={editando === "mantenimiento"}
+        alCerrar={() => setEditando(null)}
+        titulo="Mantenimiento confirmado"
+        subtitulo="Las kcal con las que tu peso se queda quieto. Normalmente lo confirma sola la fase de mantenimiento; corrígelo solo si sabes lo que haces."
+        unidad="kcal"
+        marcador="2750"
+        valorInicial={{ valor: e.mantenimientoConfirmado ?? e.kcal }}
         min={1500}
-        max={4000}
-        alGuardar={({ valor: v }) => guardarMantenimiento(v)}
+        max={4500}
+        alGuardar={({ valor: v }) => confirmarMantenimiento(v, "medium")}
       />
     </>
+  );
+}
+
+function FilaAjuste({ etiqueta, valor, alPulsar }) {
+  return (
+    <button
+      onClick={alPulsar}
+      className="entre"
+      style={{
+        width: "100%", background: "var(--superficie)", border: "1px solid var(--borde)",
+        borderRadius: 12, padding: "12px 14px", color: "var(--texto)", fontSize: 14, cursor: "pointer",
+      }}
+    >
+      <span style={{ color: "var(--texto-medio)", fontSize: 13 }}>{etiqueta}</span>
+      <span style={{ fontWeight: 700 }}>{valor}</span>
+    </button>
   );
 }
 
