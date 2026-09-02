@@ -259,23 +259,3 @@ export function balanceSemanal(registros, kcalObjetivo, dias = 7) {
     repartoSugerido: Math.abs(diferencia) < 200 ? null : Math.round(diferencia / 6 / 10) * 10,
   };
 }
-
-/* ------------------------------------------------------------------ */
-/* Semáforo del dolor al correr (§22, §52)                             */
-/* ------------------------------------------------------------------ */
-
-/**
- * Verde sigue, amarillo repite, rojo para. La nutrición ayuda a recuperar,
- * pero NO se tocan las calorías por una molestia: eso se gestiona con carga.
- */
-export function semaforoDolor({ dolor = 0, persisteAlDiaSiguiente = false, alteraLaMarcha = false, hinchazon = false, dueleAlCaminar = false }) {
-  if (alteraLaMarcha || hinchazon || dueleAlCaminar || dolor >= 5) return "rojo";
-  if (persisteAlDiaSiguiente || dolor >= 3) return "amarillo";
-  return "verde";
-}
-
-export const ACCION_DOLOR = {
-  verde: "Puedes continuar con la progresión normal.",
-  amarillo: "No aumentes la carga: repite el bloque o recorta la sesión y revisa recuperación.",
-  rojo: "Para el running y valóralo. Esto no se arregla comiendo más.",
-};

@@ -12,8 +12,6 @@ import { useState } from "react";
 
 import Hoja, { Opciones } from "../componentes/Hoja.jsx";
 import { ENVOLTURA, NOMBRES_FASE, proximoHito } from "../datos/planCarrera.js";
-import { nutricionCarrera } from "../datos/planNutricion.js";
-import { ACCION_DOLOR, semaforoDolor } from "../logica/nutricion.js";
 import { useCarreras, useEstadoCarrera } from "../ganchos/useDatos.js";
 import { cerrarBloqueCarrera, marcarCarreraHecha, omitirCarrera } from "../logica/acciones.js";
 import { haceCuanto } from "../logica/fechas.js";
@@ -204,11 +202,6 @@ function RegistroCarrera({ abierto, alCerrar, proxima, esCaco, alGuardar }) {
   const [minutos, setMinutos] = useState("");
   const [notas, setNotas] = useState("");
   const [guardando, setGuardando] = useState(false);
-  const [dolor, setDolor] = useState(0);
-  const [banderas, setBanderas] = useState({});
-
-  const molestia = semaforoDolor({ dolor, ...banderas });
-  const nutricion = nutricionCarrera(minutos ? Number(minutos.replace(",", ".")) : null);
 
   async function guardar() {
     setGuardando(true);
@@ -218,12 +211,8 @@ function RegistroCarrera({ abierto, alCerrar, proxima, esCaco, alGuardar }) {
       // Number("32,5") es NaN y se colaba tal cual en el registro.
       minutos: minutos ? Number(minutos.replace(",", ".")) : null,
       notas,
-      // El semáforo de molestias se guarda con la carrera: sirve para decidir
-      // si el bloque avanza o se repite, y para mirar atrás si algo se tuerce.
-      dolor,
-      molestia,
     });
-    setKm(""); setMinutos(""); setNotas(""); setDolor(0); setBanderas({}); setGuardando(false);
+    setKm(""); setMinutos(""); setNotas(""); setGuardando(false);
   }
 
   return (
@@ -240,29 +229,6 @@ function RegistroCarrera({ abierto, alCerrar, proxima, esCaco, alGuardar }) {
             <Campo etiqueta="minutos" valor={minutos} alCambiar={setMinutos} marcador={String(proxima.sesion.minutos ?? "")} />
           </div>
         )}
-
-        {/* Nutrición de tirada larga. Con las sesiones de ahora (~30 min) no
-            aparece nada: no hacen falta geles, bebidas ni subir 300 kcal. */}
-        {nutricion.extraHc > 0 && (
-          <div className="tarjeta" style={{ margin: 0, borderColor: "var(--carrera)" }}>
-            <div className="rotulo" style={{ color: "var(--carrera)" }}>Tirada larga</div>
-            <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--texto-medio)", lineHeight: 1.55 }}>
-              Con esta duración puedes añadir <strong>~{nutricion.extraHc} g de hidratos</strong> ese
-              día alrededor de la carrera
-              {nutricion.durante ? `, y tomar ${nutricion.durante} durante la sesión` : ""}. Es
-              combustible para rendir y recuperarte, no devolver calorías quemadas.
-            </p>
-          </div>
-        )}
-
-        {/* Semáforo de molestias (§22). La nutrición NO se toca por dolor. */}
-        <SemaforoMolestias
-          dolor={dolor}
-          alCambiarDolor={setDolor}
-          banderas={banderas}
-          alCambiarBanderas={setBanderas}
-          molestia={molestia}
-        />
 
         <textarea
           value={notas}
@@ -281,78 +247,6 @@ function RegistroCarrera({ abierto, alCerrar, proxima, esCaco, alGuardar }) {
         </button>
       </div>
     </Hoja>
-  );
-}
-
-/*
- * Verde sigue, amarillo repite, rojo para.
- *
- * Está aquí y no en una pantalla aparte porque el único momento en que Jose se
- * acuerda de una molestia es justo al terminar de correr. Y una regla que el
- * plan repite dos veces: esto NO cambia las calorías. El dolor se gestiona con
- * carga, no comiendo más.
- */
-function SemaforoMolestias({ dolor, alCambiarDolor, banderas, alCambiarBanderas, molestia }) {
-  const COLOR = { verde: "var(--exito)", amarillo: "var(--aviso)", rojo: "var(--aviso)" };
-  const SENALES = [
-    { id: "persisteAlDiaSiguiente", texto: "Seguía al día siguiente" },
-    { id: "alteraLaMarcha", texto: "Me cambia la forma de correr" },
-    { id: "hinchazon", texto: "Hinchazón" },
-    { id: "dueleAlCaminar", texto: "Duele al caminar" },
-  ];
-
-  return (
-    <div className="columna" style={{ gap: 10 }}>
-      <div className="entre">
-        <span className="rotulo">Molestias</span>
-        <span style={{ fontSize: 13, fontWeight: 800, color: COLOR[molestia] }}>
-          {molestia.toUpperCase()}
-        </span>
-      </div>
-
-      <div className="fila" style={{ gap: 5, flexWrap: "wrap" }}>
-        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-          <button
-            key={n}
-            onClick={() => alCambiarDolor(n)}
-            aria-pressed={dolor === n}
-            aria-label={`Dolor ${n} de 10`}
-            style={{
-              flex: 1, minWidth: 30, padding: "9px 0", borderRadius: 10, cursor: "pointer",
-              fontSize: 13, fontWeight: 800,
-              background: dolor === n ? "var(--texto)" : "var(--superficie-3)",
-              color: dolor === n ? "var(--fondo)" : "var(--texto-tenue)",
-              border: "1px solid var(--borde)",
-            }}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
-
-      <div className="fila" style={{ gap: 6, flexWrap: "wrap" }}>
-        {SENALES.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => alCambiarBanderas({ ...banderas, [s.id]: !banderas[s.id] })}
-            aria-pressed={Boolean(banderas[s.id])}
-            className="chip"
-            style={{
-              cursor: "pointer",
-              background: banderas[s.id] ? "var(--aviso)" : "var(--superficie-3)",
-              color: banderas[s.id] ? "var(--fondo)" : "var(--texto-tenue)",
-              borderColor: banderas[s.id] ? "var(--aviso)" : undefined,
-            }}
-          >
-            {s.texto}
-          </button>
-        ))}
-      </div>
-
-      <p style={{ margin: 0, fontSize: 12.5, color: COLOR[molestia], lineHeight: 1.5 }}>
-        {ACCION_DOLOR[molestia]}
-      </p>
-    </div>
   );
 }
 

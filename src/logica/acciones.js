@@ -51,10 +51,6 @@ export async function marcarCarreraHecha(datos = {}) {
     km: datos.km ?? null,
     minutos: datos.minutos ?? null,
     notas: datos.notas ?? "",
-    // Semáforo de molestias del §22: se guarda con la carrera para decidir si
-    // el bloque avanza o se repite, y para poder mirarlo atrás en PROGRESO.
-    dolor: datos.dolor ?? null,
-    molestia: datos.molestia ?? null,
     estado: "completada",
     // Se guarda la fecha que la app sugería, aparte de la real (§57). Sirve
     // para mirar atrás sin convertir la diferencia en un incumplimiento.

@@ -15,11 +15,11 @@ import * as fuerza from "../src/logica/motorFuerza.js";
 import * as carrera from "../src/logica/motorCarrera.js";
 import {
   ADAPTACION, BLOQUES_CUT, INICIO_CUT, NUTRICION_CFG, OBJETIVO_INICIAL, VARIANTES_CUT,
-  bloqueDe, enAdaptacion, faseDe, kcalDe, macrosDesdeKcal, nutricionCarrera, objetivosDe, porQueDe,
+  bloqueDe, enAdaptacion, faseDe, kcalDe, macrosDesdeKcal, objetivosDe, porQueDe,
 } from "../src/datos/planNutricion.js";
 import { TEMPORADAS, estadoTemporada } from "../src/datos/planAnual.js";
 import {
-  adherencia, balanceSemanal, estadoTdee, registrosDiarios, semaforoDolor,
+  adherencia, balanceSemanal, estadoTdee, registrosDiarios,
   tdeeDeducido, tdeeUtilizable, tendenciaSemanal,
 } from "../src/logica/nutricion.js";
 import { proximaRevision, revisar, revisionPendiente, salidaDelCut, semaforo } from "../src/logica/revision.js";
@@ -491,7 +491,7 @@ test("§20 · la zona de 2.150 hace que FORJA pare, no que siga bajando", () => 
 });
 
 /* ------------------------------------------------------------------ */
-/* Comidas libres, running y fases del año                             */
+/* Comidas libres y fases del año                                      */
 /* ------------------------------------------------------------------ */
 
 test("§35 · una comida libre ni destruye la semana ni desaparece", () => {
@@ -502,27 +502,6 @@ test("§35 · una comida libre ni destruye la semana ni desaparece", () => {
   assert.equal(b.dias, 7);
   assert.equal(b.diferencia, 600);
   assert.equal(b.repartoSugerido, 100, "−100 kcal durante seis días, no un ayuno");
-});
-
-test("§51 · el running no devuelve calorías: da hidrato cuando toca", () => {
-  // Las carreras de ahora (CaCo, ~30 min) no cambian nada.
-  assert.deepEqual(nutricionCarrera(30), { extraHc: 0, durante: null });
-  assert.deepEqual(nutricionCarrera(60), { extraHc: 0, durante: null });
-
-  // A partir de 75 min sí, y por encima de 90 también durante la sesión.
-  assert.equal(nutricionCarrera(80).extraHc, 40);
-  assert.equal(nutricionCarrera(80).durante, null);
-  assert.ok(nutricionCarrera(100).durante.includes("30–60 g/h"));
-  assert.equal(nutricionCarrera(150).extraHc, 50);
-});
-
-test("§52 · el semáforo de molestias no toca las calorías", () => {
-  assert.equal(semaforoDolor({ dolor: 1 }), "verde");
-  assert.equal(semaforoDolor({ dolor: 3 }), "amarillo");
-  assert.equal(semaforoDolor({ dolor: 1, persisteAlDiaSiguiente: true }), "amarillo");
-  assert.equal(semaforoDolor({ dolor: 5 }), "rojo");
-  assert.equal(semaforoDolor({ dolor: 1, alteraLaMarcha: true }), "rojo");
-  assert.equal(semaforoDolor({ dolor: 0, hinchazon: true }), "rojo");
 });
 
 test("las cuatro fases del año no entran solas por fecha", () => {

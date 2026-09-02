@@ -415,34 +415,6 @@ export function porQueDe(ajustes = {}, hoy) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Nutrición del running (§30, §51)                                    */
-/* ------------------------------------------------------------------ */
-
-/**
- * Qué hacer con los hidratos en una tirada larga.
- *
- * Es DISPONIBILIDAD de carbohidrato para rendir y recuperarse, no "devolver
- * las calorías quemadas". Las carreras de ahora (CaCo, ~30 min) no necesitan
- * nada: ni geles, ni bebidas especiales, ni subir 300 kcal.
- */
-export function nutricionCarrera(minutos) {
-  if (!minutos || minutos < 75) return { extraHc: 0, durante: null };
-  if (minutos <= 120) {
-    return { extraHc: 40, durante: minutos > 90 ? "30–60 g/h según tolerancia" : null };
-  }
-  return { extraHc: 50, durante: "30–60 g/h según tolerancia" };
-}
-
-/** La semana del 20K (§30). No tiene fecha: se activa cuando llega. */
-export const SEMANA_20K = [
-  "No recortar kcal esa semana.",
-  "Priorizar hidratos y usar el rango alto de ingesta.",
-  "Los 2 días previos, mayor disponibilidad de carbohidrato.",
-  "Comida previa conocida y baja en fibra si hace falta.",
-  "Después, una semana aproximadamente en mantenimiento antes de retomar el superávit.",
-];
-
-/* ------------------------------------------------------------------ */
 /* Lo que FORJA nunca debe hacer (§55)                                 */
 /* ------------------------------------------------------------------ */
 
